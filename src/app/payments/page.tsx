@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
-  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw,
+  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw, Trash2,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Invoice, Room } from '@/types'
@@ -251,6 +251,32 @@ export default function PaymentsPage() {
     }
 
     showToast('success', '미납으로 되돌렸습니다.')
+    load()
+  }
+
+  /* ─── 청구서 삭제 ─── */
+  const deleteInvoice = async (inv: InvoiceWithRoom) => {
+    const label = inv.room?.name ?? '청구서'
+    const isPaid = inv.status === 'paid'
+    const msg = isPaid
+      ? `${label}은 이미 완납된 청구서입니다. 삭제하면 수납기록도 함께 삭제됩니다. 계속하시겠습니까?`
+      : `${label} 청구서를 삭제하시겠습니까?`
+    if (!confirm(msg)) return
+
+    // 완납 청구서면 payments 기록도 삭제 + rooms.status 복구
+    if (isPaid) {
+      await supabase.from('payments').delete().eq('invoice_id', inv.id)
+      const { data: otherPaid } = await supabase
+        .from('invoices').select('id')
+        .eq('room_id', inv.room_id).eq('status', 'paid').neq('id', inv.id)
+      if (!otherPaid || otherPaid.length === 0) {
+        await supabase.from('rooms').update({ status: 'OCCUPIED' }).eq('id', inv.room_id)
+      }
+    }
+
+    const { error } = await supabase.from('invoices').delete().eq('id', inv.id)
+    if (error) return showToast('error', error.message)
+    showToast('success', '청구서가 삭제되었습니다.')
     load()
   }
 
@@ -675,49 +701,58 @@ export default function PaymentsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {inv.status === 'paid' ? (
-                        /* 완납 → 미납 반환 버튼 */
-                        <button onClick={() => revertToUnpaid(inv)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
-                          style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
-                          <RotateCcw size={11} />
-                          미납전환
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          {/* 가상계좌 발급 / 확인 버튼 */}
-                          <button
-                            onClick={() => {
-                              setVaBank('SHINHAN')
-                              setVaResult(null)
-                              setVaModal({ invoiceId: inv.id, roomName: inv.room?.name ?? '—', amount: inv.amount })
-                              if (hasVA) {
-                                setVaResult({
-                                  accountNumber: inv.virtual_account_number!,
-                                  bank:          inv.virtual_account_bank ?? '',
-                                  bankLabel:     VA_BANKS[inv.virtual_account_bank ?? ''] ?? (inv.virtual_account_bank ?? ''),
-                                  expiredAt:     inv.virtual_account_due ?? '',
-                                  alreadyIssued: true,
-                                })
-                              }
-                            }}
+                      <div className="flex items-center gap-1.5">
+                        {inv.status === 'paid' ? (
+                          /* 완납 → 미납 반환 버튼 */
+                          <button onClick={() => revertToUnpaid(inv)}
                             className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
-                            style={{
-                              background: hasVA ? 'var(--color-info-bg)' : 'var(--color-muted-bg)',
-                              color:      hasVA ? 'var(--color-info)'    : 'var(--color-muted)',
-                              border:     '1px solid currentColor',
-                            }}>
-                            <Building2 size={11} />
-                            {hasVA ? '계좌확인' : '가상계좌'}
+                            style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
+                            <RotateCcw size={11} />
+                            미납전환
                           </button>
-                          {/* 수납처리 버튼 */}
-                          <button onClick={() => markPaid(inv)}
-                            className="px-3 py-1 rounded-lg text-xs font-medium text-white"
-                            style={{ background: 'var(--color-primary)' }}>
-                            수납처리
-                          </button>
-                        </div>
-                      )}
+                        ) : (
+                          <>
+                            {/* 가상계좌 발급 / 확인 버튼 */}
+                            <button
+                              onClick={() => {
+                                setVaBank('SHINHAN')
+                                setVaResult(null)
+                                setVaModal({ invoiceId: inv.id, roomName: inv.room?.name ?? '—', amount: inv.amount })
+                                if (hasVA) {
+                                  setVaResult({
+                                    accountNumber: inv.virtual_account_number!,
+                                    bank:          inv.virtual_account_bank ?? '',
+                                    bankLabel:     VA_BANKS[inv.virtual_account_bank ?? ''] ?? (inv.virtual_account_bank ?? ''),
+                                    expiredAt:     inv.virtual_account_due ?? '',
+                                    alreadyIssued: true,
+                                  })
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                              style={{
+                                background: hasVA ? 'var(--color-info-bg)' : 'var(--color-muted-bg)',
+                                color:      hasVA ? 'var(--color-info)'    : 'var(--color-muted)',
+                                border:     '1px solid currentColor',
+                              }}>
+                              <Building2 size={11} />
+                              {hasVA ? '계좌확인' : '가상계좌'}
+                            </button>
+                            {/* 수납처리 버튼 */}
+                            <button onClick={() => markPaid(inv)}
+                              className="px-3 py-1 rounded-lg text-xs font-medium text-white"
+                              style={{ background: 'var(--color-primary)' }}>
+                              수납처리
+                            </button>
+                          </>
+                        )}
+                        {/* 삭제 버튼 (모든 상태 공통) */}
+                        <button onClick={() => deleteInvoice(inv)}
+                          className="p-1.5 rounded-lg"
+                          style={{ color: 'var(--color-muted)' }}
+                          title="청구서 삭제">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
