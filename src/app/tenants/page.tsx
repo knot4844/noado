@@ -219,18 +219,18 @@ function TenantCard({ room, onClick }: { room: TenantRoom; onClick: () => void }
         </span>
       </div>
 
-      {/* 월세 / 보증금 */}
+      {/* 보증금 / 월세 */}
       <div className="flex gap-4 mb-3">
-        <div>
-          <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>월세</p>
-          <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
-            {formatKRW(room.monthly_rent)}
-          </p>
-        </div>
         <div>
           <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>보증금</p>
           <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
             {formatKRW(room.deposit)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>월세</p>
+          <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
+            {formatKRW(room.monthly_rent)}
           </p>
         </div>
       </div>
@@ -238,17 +238,26 @@ function TenantCard({ room, onClick }: { room: TenantRoom; onClick: () => void }
       {/* 구분선 */}
       <div className="mb-3" style={{ height: 1, background: 'var(--color-border)' }} />
 
-      {/* 연락처 + 계약 만료 */}
+      {/* 연락처 */}
+      <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--color-muted)' }}>
+        <Phone size={11} />
+        {room.tenant_phone ? formatPhone(room.tenant_phone) : '연락처 없음'}
+      </div>
+
+      {/* 계약일 / 계약만료일 */}
       <div className="flex items-center justify-between text-xs" style={{ color: 'var(--color-muted)' }}>
         <div className="flex items-center gap-1">
-          <Phone size={11} />
-          {room.tenant_phone ? formatPhone(room.tenant_phone) : '연락처 없음'}
+          <Calendar size={11} />
+          {room.lease_start ? formatDate(room.lease_start) : '계약일 없음'}
         </div>
-        {daysLeft !== null && (
+        {room.lease_end && (
           <div className="flex items-center gap-1"
-               style={{ color: daysLeft <= 30 ? 'var(--color-danger)' : 'var(--color-muted)' }}>
-            <Calendar size={11} />
-            {daysLeft <= 0 ? '만료됨' : daysLeft <= 30 ? `D-${daysLeft}` : formatDate(room.lease_end!)}
+               style={{ color: daysLeft !== null && daysLeft <= 30 ? 'var(--color-danger)' : 'var(--color-muted)' }}>
+            <span>~</span>
+            {daysLeft !== null
+              ? (daysLeft <= 0 ? '만료됨' : daysLeft <= 30 ? `만료 D-${daysLeft}` : formatDate(room.lease_end))
+              : formatDate(room.lease_end)
+            }
           </div>
         )}
       </div>
