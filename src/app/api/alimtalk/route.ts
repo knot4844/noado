@@ -32,13 +32,13 @@ function getVariables(
   switch (templateKey) {
     case 'UNPAID_REMINDER':
       return {
-        '#{이름}':  tenantName,
+        '#{세입자}': tenantName,
         '#{호실}':  roomName,
         '#{금액}':  amount,
       }
     case 'PAYMENT_DONE':
       return {
-        '#{이름}':  tenantName,
+        '#{세입자}': tenantName,
         '#{호실}':  roomName,
         '#{금액}':  amount,
       }

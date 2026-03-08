@@ -56,16 +56,15 @@ export async function POST(request: Request) {
             if (type === "UNPAID_REMINDER") {
                 templateCode = "KA01TP260302200441583wMOcyLIy71M"; // 미납 독촉
                 variables = {
-                    tenantName: room.tenant_name || "임차인",
-                    roomName: room.name,
-                    unpaidAmount: (room.unpaid_amount || 0).toLocaleString(),
-                    unpaidMonths: String(room.unpaid_months || 1),
+                    '#{세입자}': room.tenant_name || "임차인",
+                    '#{호실}':   room.name,
+                    '#{금액}':   (room.unpaid_amount || 0).toLocaleString(),
                 };
             } else {
                 templateCode = "KA01TP2603022005171505KORmx0Qpva"; // 수납 완료
                 variables = {
-                    tenantName: room.tenant_name || "임차인",
-                    roomName: room.name,
+                    '#{세입자}': room.tenant_name || "임차인",
+                    '#{호실}':   room.name,
                 };
             }
 
