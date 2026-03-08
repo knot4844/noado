@@ -1,213 +1,235 @@
-"use client";
+'use client'
 
-import React, { useMemo } from "react";
-import { useBusiness } from "@/components/providers/BusinessProvider";
-import { BarChart3, TrendingUp, PieChart, FileSpreadsheet } from "lucide-react";
+export const dynamic = 'force-dynamic'
+
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip as RechartsTooltip,
-    ResponsiveContainer,
-    PieChart as RechartsPieChart,
-    Pie,
-    Cell,
-    Legend
-} from 'recharts';
-import * as XLSX from 'xlsx';
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend
+} from 'recharts'
+import { TrendingUp, BarChart3, PieChart, Home, FileSpreadsheet, RefreshCw } from 'lucide-react'
+import { formatKRW } from '@/lib/utils'
+import * as XLSX from 'xlsx'
+import type { Room } from '@/types'
+
+interface Invoice {
+  id: string
+  year: number
+  month: number
+  paid_amount: number
+  amount: number
+  status: string
+}
+
+const COLORS = ['#1d3557', '#a8dadc', '#e63946']
 
 export default function ReportsPage() {
-    const { currentBusiness, getRoomsByBusiness, allBusinesses } = useBusiness();
-    const rooms = getRoomsByBusiness(currentBusiness?.id || "ALL");
+  const supabase = useMemo(() => createClient(), [])
 
-    // --- Statistics Calculations ---
-    const totalRooms = rooms.length;
-    const vacantRooms = rooms.filter(r => r.status === "VACANT").length;
-    const occupancyRate = totalRooms > 0 ? ((totalRooms - vacantRooms) / totalRooms) * 100 : 0;
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
 
-    const unpaidRooms = rooms.filter(r => r.status === "UNPAID");
-    const totalUnpaidAmount = unpaidRooms.reduce((sum, r) => sum + (r.unpaidAmount || 0), 0);
-    const unpaidCount = unpaidRooms.length;
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
 
-    // Simulate Yearly Cumulative Revenue based on monthly rent
-    const monthlyExpectedRevenue = rooms
-        .filter(r => r.status !== "VACANT")
-        .reduce((sum, r) => sum + (r.paymentInfo?.monthlyRent || 0), 0);
-    // Assume we've collected 11 months so far + some current month
-    const estimatedYearlyRevenue = (monthlyExpectedRevenue * 11) - totalUnpaidAmount;
+    const [{ data: roomList }, { data: invoiceList }] = await Promise.all([
+      supabase.from('rooms').select('*').eq('owner_id', user.id),
+      supabase.from('invoices').select('*').eq('owner_id', user.id)
+        .order('year').order('month'),
+    ])
 
-    // --- Chart 1: Monthly Revenue Trend (Mock projection based on real rent volume) ---
-    const monthlyData = useMemo(() => {
-        const data = [];
-        const baseRev = monthlyExpectedRevenue;
-        // Generate mock trend using actual base revenue
-        for (let i = 1; i <= 12; i++) {
-            // Apply some random fluctuation to make it look realistic (+/- 5%)
-            // But if the base is 0, keep it 0
-            const fluctuation = baseRev * (0.95 + (Math.random() * 0.1));
-            data.push({
-                name: `${i}월`,
-                revenue: baseRev > 0 ? Math.floor(fluctuation) : 0,
-            });
-        }
-        return data;
-    }, [monthlyExpectedRevenue]);
+    setRooms(roomList ?? [])
+    setInvoices(invoiceList ?? [])
+    setLoading(false)
+  }, [supabase])
 
-    // --- Chart 2: Occupancy/Vacancy Distribution ---
-    const pieData = [
-        { name: '임대중 (Paid/Unpaid)', value: totalRooms - vacantRooms },
-        { name: '공실 (Vacant)', value: vacantRooms },
-    ];
-    const COLORS = ['#2563eb', '#f1f5f9']; // Blue, Light Gray
+  useEffect(() => { fetchData() }, [fetchData])
 
-    // --- Export to Excel ---
-    const handleExportExcel = () => {
-        // Prepare data
-        const exportData = [
-            { 항목: '총 누적 임대수익 (추정)', 금액: estimatedYearlyRevenue },
-            { 항목: '총 미수 채권액', 금액: totalUnpaidAmount },
-            { 항목: '미수 채권 건수', 일수_건수: unpaidCount },
-            { 항목: '총 호실 수', 일수_건수: totalRooms },
-            { 항목: '공실 수', 일수_건수: vacantRooms },
-            { 항목: '평균 임대율', 일수_건수: `${occupancyRate.toFixed(1)}%` },
-        ];
+  // ── 통계 계산 ──
+  const totalRooms   = rooms.length
+  const vacantRooms  = rooms.filter(r => r.status === 'VACANT').length
+  const unpaidRooms  = rooms.filter(r => r.status === 'UNPAID')
+  const paidRooms    = rooms.filter(r => r.status === 'PAID')
+  const occupancyRate = totalRooms > 0
+    ? Math.round(((totalRooms - vacantRooms) / totalRooms) * 100) : 0
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        // Style columns
-        ws['!cols'] = [{ wch: 30 }, { wch: 20 }];
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "재무_리포트");
+  const totalUnpaid = unpaidRooms.reduce((s, r) => s + r.monthly_rent, 0)
+  const monthlyExpected = rooms
+    .filter(r => r.status !== 'VACANT')
+    .reduce((s, r) => s + r.monthly_rent, 0)
 
-        const fileName = `${currentBusiness?.name || '전체사업장'}_재무보고서.xlsx`;
-        XLSX.writeFile(wb, fileName);
-    };
+  // 월별 수납 차트 (최근 12개월)
+  const monthlyChartData = useMemo(() => {
+    const grouped: Record<string, number> = {}
+    invoices.filter(i => i.status === 'paid').forEach(i => {
+      const key = `${i.year}-${String(i.month).padStart(2, '0')}`
+      grouped[key] = (grouped[key] ?? 0) + (i.paid_amount || 0)
+    })
+    return Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([key, amount]) => ({
+        name: `${key.slice(2, 4)}-${key.slice(5)}`,
+        amount,
+      }))
+  }, [invoices])
 
+  // 파이 차트 데이터
+  const pieData = [
+    { name: '납부완료', value: paidRooms.length },
+    { name: '공실', value: vacantRooms },
+    { name: '미납', value: unpaidRooms.length },
+  ].filter(d => d.value > 0)
+
+  // 엑셀 내보내기
+  const handleExportExcel = () => {
+    const summaryData = [
+      { 항목: '총 관리 호실', 값: `${totalRooms}세대` },
+      { 항목: '입주율', 값: `${occupancyRate}%` },
+      { 항목: '납부완료', 값: `${paidRooms.length}세대` },
+      { 항목: '미납', 값: `${unpaidRooms.length}세대 (${formatKRW(totalUnpaid)})` },
+      { 항목: '공실', 값: `${vacantRooms}세대` },
+      { 항목: '월 예상 수납액', 값: formatKRW(monthlyExpected) },
+    ]
+    const roomData = rooms.map(r => ({
+      호실: r.name,
+      임차인: r.tenant_name || '',
+      월세: r.monthly_rent,
+      보증금: r.deposit || 0,
+      상태: r.status,
+      계약시작: r.lease_start || '',
+      계약만료: r.lease_end || '',
+    }))
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), '요약')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(roomData), '호실현황')
+    XLSX.writeFile(wb, `noado_보고서_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  if (loading) {
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
-            <header className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">보고서 및 통계</h1>
-                    <p className="text-neutral-500 mt-1">
-                        {currentBusiness ? currentBusiness.name : "전체 사업장"}의 매출 및 채권 현황을 한눈에 파악합니다.
-                    </p>
-                </div>
-                <button
-                    onClick={handleExportExcel}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors shadow-sm font-medium"
-                >
-                    <FileSpreadsheet size={18} />
-                    엑셀 다운로드
-                </button>
-            </header>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {/* Summary Cards */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col gap-2 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-500">
-                        <TrendingUp size={64} />
-                    </div>
-                    <span className="text-neutral-500 font-medium text-sm flex items-center gap-2 relative z-10">
-                        <TrendingUp size={16} className="text-emerald-500" /> 누적 임대수익 (당해 추정)
-                    </span>
-                    <span className="text-2xl lg:text-3xl font-bold tracking-tight text-neutral-900 relative z-10">
-                        ₩ {estimatedYearlyRevenue.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-emerald-600 font-medium bg-emerald-50 w-fit px-2 py-0.5 rounded mt-1 relative z-10">+12% 전년 대비</span>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col gap-2 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
-                        <BarChart3 size={64} />
-                    </div>
-                    <span className="text-neutral-500 font-medium text-sm flex items-center gap-2 relative z-10">
-                        <BarChart3 size={16} className="text-rose-500" /> 총 미수 채권액
-                    </span>
-                    <span className="text-2xl lg:text-3xl font-bold tracking-tight text-neutral-900 relative z-10">
-                        ₩ {totalUnpaidAmount.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-rose-600 font-medium bg-rose-50 w-fit px-2 py-0.5 rounded mt-1 relative z-10">총 {unpaidCount}건 미수</span>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col gap-2 relative overflow-hidden group">
-                    {/* Vacancy impact */}
-                    <span className="text-neutral-500 font-medium text-sm flex items-center gap-2 relative z-10">
-                        <PieChart size={16} className="text-blue-500" /> 공실률
-                    </span>
-                    <span className="text-2xl lg:text-3xl font-bold tracking-tight text-neutral-900 relative z-10">
-                        {occupancyRate.toFixed(1)}%
-                    </span>
-                    <span className="text-xs text-neutral-500 font-medium bg-neutral-100 w-fit px-2 py-0.5 rounded mt-1 relative z-10">현재 {vacantRooms}개 공실</span>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-100 flex flex-col gap-2 relative overflow-hidden group justify-center items-center">
-                    <div className="text-center">
-                        <p className="text-neutral-500 text-sm font-medium mb-1">총 관리 호실</p>
-                        <p className="text-4xl font-extrabold text-blue-600">{totalRooms}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Recharts Bar Chart */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200 min-h-[400px] flex flex-col">
-                    <h3 className="text-lg font-bold text-neutral-900 mb-6">월별 임대 수익 추이 ({new Date().getFullYear()}년)</h3>
-                    <div className="flex-1 w-full h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={monthlyData}
-                                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 12 }}
-                                    tickFormatter={(val) => `₩${(val / 10000).toLocaleString()}만`}
-                                />
-                                <RechartsTooltip
-                                    cursor={{ fill: '#f8fafc' }}
-                                    formatter={(value: number | undefined) => [`₩ ${Number(value).toLocaleString()}`, '임대수익']}
-                                />
-                                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Recharts Pie Chart */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200 min-h-[400px] flex flex-col">
-                    <h3 className="text-lg font-bold text-neutral-900 mb-6">공실 현황 비중</h3>
-                    <div className="flex-1 w-full h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <RechartsPieChart>
-                                <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={70}
-                                    outerRadius={100}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {pieData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <RechartsTooltip
-                                    formatter={(value: number | undefined) => [`${Number(value)}호실`, '호실 수']}
-                                />
-                                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                            </RechartsPieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-3 border-t-transparent animate-spin"
+               style={{ borderColor: 'var(--color-accent)', borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>데이터 불러오는 중...</p>
         </div>
-    );
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-6">
+
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+            보고서
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-muted)' }}>매출 및 임대 현황 통계</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchData}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ color: 'var(--color-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <RefreshCw size={14} /> 새로고침
+          </button>
+          <button onClick={handleExportExcel}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ color: 'var(--color-primary)', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <FileSpreadsheet size={14} /> 엑셀 다운로드
+          </button>
+        </div>
+      </div>
+
+      {/* KPI 카드 4개 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { icon: <Home size={18} style={{ color: 'var(--color-info)' }} />, label: '총 관리 호실', value: `${totalRooms}세대`, accent: 'var(--color-info-bg)' },
+          { icon: <TrendingUp size={18} style={{ color: 'var(--color-success)' }} />, label: '입주율', value: `${occupancyRate}%`, sub: `${totalRooms - vacantRooms}/${totalRooms} 세대`, accent: 'var(--color-success-bg)' },
+          { icon: <BarChart3 size={18} style={{ color: 'var(--color-danger)' }} />, label: '미납 총액', value: formatKRW(totalUnpaid), sub: `${unpaidRooms.length}세대`, accent: 'var(--color-danger-bg)' },
+          { icon: <PieChart size={18} style={{ color: 'var(--color-accent-dark, #1d3557)' }} />, label: '월 예상 수납', value: formatKRW(monthlyExpected), accent: 'var(--color-muted-bg)' },
+        ].map(card => (
+          <div key={card.label} className="card p-5 flex flex-col gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                 style={{ background: card.accent }}>
+              {card.icon}
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>{card.label}</p>
+              <p className="text-2xl font-bold tabular" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>{card.value}</p>
+              {card.sub && <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{card.sub}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 차트 영역 */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        {/* 월별 수납 막대 차트 (60%) */}
+        <div className="card p-5 lg:col-span-3">
+          <h3 className="text-sm font-semibold mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+            월별 수납 현황
+          </h3>
+          {monthlyChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={monthlyChartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6d7d8b' }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <RechartsTooltip
+                  formatter={(v: unknown) => [formatKRW(Number(v)), '수납액']}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                />
+                <Bar dataKey="amount" fill="#a8dadc" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center text-sm"
+                 style={{ color: 'var(--color-muted)' }}>
+              수납 데이터가 없습니다.
+            </div>
+          )}
+        </div>
+
+        {/* 호실 상태 파이 차트 (40%) */}
+        <div className="card p-5 lg:col-span-2">
+          <h3 className="text-sm font-semibold mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+            호실 상태 분포
+          </h3>
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <RechartsPieChart>
+                <Pie data={pieData} cx="50%" cy="45%" innerRadius={60} outerRadius={90}
+                     paddingAngle={4} dataKey="value">
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip
+                  formatter={(v: unknown, name: unknown) => [`${v}세대`, String(name)]}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle"
+                        wrapperStyle={{ fontSize: 12 }} />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center text-sm"
+                 style={{ color: 'var(--color-muted)' }}>
+              호실 데이터가 없습니다.
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  )
 }

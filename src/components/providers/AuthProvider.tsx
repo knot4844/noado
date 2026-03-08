@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         // Check for demo login first (Local UI testing bypassing Supabase)
         if (typeof window !== 'undefined' && localStorage.getItem('local_demo_login') === 'true') {
-            setUser({ id: 'demo-user-123', email: 'demo@daewoo-office.com' } as any);
+            setUser({ id: 'demo-user-123', email: 'demo@noado.kr' } as any);
             setIsLoading(false);
             return;
         }

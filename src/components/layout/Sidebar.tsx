@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  FileText, Bell, Settings, LogOut, BarChart3,
+  FileText, Bell, Settings, LogOut, BarChart3, Receipt,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/contracts',      label: '전자계약',    icon: FileText },
   { href: '/notifications',  label: '알림톡',      icon: Bell },
   { href: '/reports',        label: '보고서',      icon: BarChart3 },
+  { href: '/export',         label: '세무 내보내기', icon: Receipt },
 ]
 
 export function Sidebar() {

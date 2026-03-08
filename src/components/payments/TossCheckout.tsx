@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import React, { useEffect, useRef, useState } from "react";
 import { loadPaymentWidget, PaymentWidgetInstance } from "@tosspayments/payment-widget-sdk";

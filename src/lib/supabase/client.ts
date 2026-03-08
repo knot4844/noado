@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Supabase 브라우저 클라이언트
  * 클라이언트 컴포넌트('use client')에서 사용

@@ -1,36 +1,38 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   MessageSquare, Send, CheckCircle2, AlertCircle,
-  Loader2, X, Phone, RefreshCw, Clock,
+  Loader2, X, Phone, RefreshCw,
 } from 'lucide-react'
 import { formatDate, formatPhone } from '@/lib/utils'
 import type { NotificationLog, Room } from '@/types'
 
-/* ─── 알림톡 템플릿 ─── */
+/* ─── 알림톡 템플릿 (env에 있는 3개) ─── */
 const TEMPLATES = {
-  PAYMENT_REQUEST: {
-    key:   'PAYMENT_REQUEST',
-    label: '납부 요청',
-    desc:  '월세 청구 안내 (매월 1일)',
-    preview: (room: string, amount: string, due: string) =>
-      `[noado] 안녕하세요.\n${room} 이번 달 월세 ${amount}원 납부 안내 드립니다.\n납부 기한: ${due}\n\n감사합니다.`,
-  },
   UNPAID_REMINDER: {
-    key:   'UNPAID_REMINDER',
-    label: '미납 독촉',
-    desc:  '납부 기한 초과 알림',
-    preview: (room: string, amount: string) =>
-      `[noado] 안녕하세요.\n${room} 이번 달 월세 ${amount}원이 아직 납부되지 않았습니다.\n빠른 납부 부탁드립니다.`,
+    key:     'UNPAID_REMINDER',
+    label:   '미납 독촉',
+    desc:    '납부 기한 초과 알림',
+    preview: (tenantName: string, roomName: string, amount: string) =>
+      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월세 ${amount}원이 아직 납부되지 않았습니다.\n빠른 납부 부탁드립니다.\n\n문의: noado 관리자`,
   },
-  CONTRACT_EXPIRY: {
-    key:   'CONTRACT_EXPIRY',
-    label: '계약 만료 안내',
-    desc:  '계약 만료 30일 전 안내',
-    preview: (room: string, _: string, date: string) =>
-      `[noado] 안녕하세요.\n${room} 임대차 계약이 ${date}에 만료됩니다.\n재계약 또는 퇴실 의사를 알려주세요.`,
+  PAYMENT_DONE: {
+    key:     'PAYMENT_DONE',
+    label:   '수납 완료',
+    desc:    '입금 확인 완료 알림',
+    preview: (tenantName: string, roomName: string, amount: string) =>
+      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월세 ${amount}원 수납이 확인되었습니다.\n감사합니다.`,
+  },
+  DAILY_BRIEFING: {
+    key:     'DAILY_BRIEFING',
+    label:   '일일 브리핑',
+    desc:    '오늘의 수납 현황 요약 (AI 생성)',
+    preview: (_: string, __: string, ___: string) =>
+      `[noado] 오늘의 관리 현황 브리핑\n\n수납 완료: 12건 / 15건\n미납 알림 발송 예정: 3건\n\n※ 실제 발송 시 AI가 현황을 요약합니다.`,
   },
 } as const
 
@@ -38,7 +40,7 @@ type TemplateKey = keyof typeof TEMPLATES
 
 /* ─── 메인 ─── */
 export default function NotificationsPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [logs, setLogs]       = useState<NotificationLog[]>([])
   const [rooms, setRooms]     = useState<Room[]>([])
@@ -47,24 +49,24 @@ export default function NotificationsPage() {
   const [toast, setToast]     = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // 발송 폼
-  const [showForm, setShowForm]         = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>('PAYMENT_REQUEST')
+  const [showForm, setShowForm]               = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>('UNPAID_REMINDER')
   const [selectedRooms, setSelectedRooms]       = useState<Set<string>>(new Set())
-  const [customMsg, setCustomMsg]               = useState('')
-  const [useCustom, setUseCustom]               = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setLoading(false); return }
 
     const [{ data: logData }, { data: roomData }] = await Promise.all([
-      supabase.from('notification_logs')
+      supabase
+        .from('notification_logs')
         .select('*')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100),
-      supabase.from('rooms')
+      supabase
+        .from('rooms')
         .select('*')
         .eq('owner_id', user.id)
         .neq('status', 'VACANT')
@@ -90,16 +92,19 @@ export default function NotificationsPage() {
     const targetRooms = rooms.filter(r => selectedRooms.has(r.id))
     const results = await Promise.all(
       targetRooms.map(async r => {
+        if (!r.tenant_phone) return { room: r, ok: false, reason: '연락처 없음' }
+
         const res = await fetch('/api/alimtalk', {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             templateKey: selectedTemplate,
             phone:       r.tenant_phone,
             roomName:    r.name,
+            tenantName:  r.tenant_name  ?? '세입자',
             amount:      String(r.monthly_rent),
             dueDate:     '매월 10일',
-            customMsg:   useCustom ? customMsg : undefined,
+            roomId:      r.id,
           }),
         })
         return { room: r, ok: res.ok }
@@ -108,8 +113,10 @@ export default function NotificationsPage() {
 
     const successCount = results.filter(r => r.ok).length
     const failCount    = results.length - successCount
+    const noPhone      = results.filter(r => !r.ok && (r as { reason?: string }).reason === '연락처 없음').length
 
-    if (failCount === 0) showToast('success', `${successCount}건 발송 완료`)
+    if (noPhone > 0) showToast('error', `연락처 없음 ${noPhone}건 제외, ${successCount}건 발송 완료`)
+    else if (failCount === 0) showToast('success', `${successCount}건 발송 완료`)
     else showToast('error', `${successCount}건 성공, ${failCount}건 실패`)
 
     setShowForm(false)
@@ -127,6 +134,8 @@ export default function NotificationsPage() {
 
   const tpl    = TEMPLATES[selectedTemplate]
   const sample = rooms.find(r => selectedRooms.has(r.id)) ?? rooms[0]
+
+  const TEMPLATE_KEYS = Object.keys(TEMPLATES) as TemplateKey[]
 
   return (
     <div className="p-6 max-w-[1200px]">
@@ -255,7 +264,7 @@ export default function NotificationsPage() {
                 <div>
                   <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>템플릿</label>
                   <div className="space-y-2">
-                    {(Object.keys(TEMPLATES) as TemplateKey[]).map(key => {
+                    {TEMPLATE_KEYS.map(key => {
                       const t = TEMPLATES[key]
                       return (
                         <button key={key} onClick={() => setSelectedTemplate(key)}
@@ -284,10 +293,14 @@ export default function NotificationsPage() {
                     </button>
                   </div>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {rooms.map(r => (
+                    {rooms.length === 0 ? (
+                      <p className="text-xs text-center py-4" style={{ color: 'var(--color-muted)' }}>입주 중인 호실이 없습니다.</p>
+                    ) : rooms.map(r => (
                       <label key={r.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer"
-                             style={{ background: selectedRooms.has(r.id) ? 'rgba(29,53,87,0.05)' : 'var(--color-background)',
-                                      border: `1px solid ${selectedRooms.has(r.id) ? 'var(--color-primary)' : 'var(--color-border)'}` }}>
+                             style={{
+                               background: selectedRooms.has(r.id) ? 'rgba(29,53,87,0.05)' : 'var(--color-background)',
+                               border: `1px solid ${selectedRooms.has(r.id) ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                             }}>
                         <input type="checkbox" checked={selectedRooms.has(r.id)}
                           onChange={() => {
                             const next = new Set(selectedRooms)
@@ -299,7 +312,7 @@ export default function NotificationsPage() {
                           {r.name}
                           {r.tenant_name && <span className="ml-1 text-xs" style={{ color: 'var(--color-muted)' }}>({r.tenant_name})</span>}
                         </span>
-                        <span className="text-xs flex items-center gap-0.5" style={{ color: 'var(--color-muted)' }}>
+                        <span className="text-xs flex items-center gap-0.5" style={{ color: r.tenant_phone ? 'var(--color-muted)' : 'var(--color-danger)' }}>
                           <Phone size={10} /> {r.tenant_phone ? formatPhone(r.tenant_phone) : '연락처 없음'}
                         </span>
                       </label>
@@ -319,17 +332,26 @@ export default function NotificationsPage() {
                     <div className="px-3 py-2 text-xs font-bold" style={{ background: '#FAE100', color: '#3A2100' }}>
                       kakao
                     </div>
-                    <div className="px-3 py-3 text-xs leading-relaxed whitespace-pre-wrap"
-                         style={{ color: '#1A1A1A', fontSize: '10px' }}>
+                    <div className="px-3 py-3 whitespace-pre-wrap"
+                         style={{ color: '#1A1A1A', fontSize: '10px', lineHeight: 1.6 }}>
                       {sample
-                        ? tpl.preview(sample.name, sample.monthly_rent.toLocaleString(), sample.lease_end ?? '2026.12.31')
-                        : tpl.preview('101호', '500,000', '2026.12.31')}
+                        ? tpl.preview(
+                            sample.tenant_name ?? '세입자',
+                            sample.name,
+                            sample.monthly_rent.toLocaleString()
+                          )
+                        : tpl.preview('세입자', '101호', '500,000')}
                     </div>
                   </div>
                 </div>
                 <p className="text-xs mt-3 text-center" style={{ color: 'var(--color-muted)' }}>
                   {selectedRooms.size}명에게 발송
                 </p>
+                {selectedRooms.size > 0 && rooms.filter(r => selectedRooms.has(r.id) && !r.tenant_phone).length > 0 && (
+                  <p className="text-xs mt-1 text-center" style={{ color: 'var(--color-danger)' }}>
+                    ⚠️ 연락처 없는 {rooms.filter(r => selectedRooms.has(r.id) && !r.tenant_phone).length}건 제외됨
+                  </p>
+                )}
               </div>
             </div>
 

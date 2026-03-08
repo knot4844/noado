@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -255,7 +257,12 @@ export default function LoginPage() {
             </div>
           )}
 
-          <p className="text-center text-xs mt-8" style={{ color: 'var(--color-muted)' }}>
+          <p className="text-center text-sm mt-6" style={{ color: 'var(--color-muted)' }}>
+            계정이 없으신가요?{' '}
+            <a href="/signup" className="font-medium underline hover:opacity-80" style={{ color: 'var(--color-primary)' }}>회원가입</a>
+          </p>
+
+          <p className="text-center text-xs mt-4" style={{ color: 'var(--color-muted)' }}>
             계속 진행하면{' '}
             <a href="/terms" className="underline hover:opacity-80">이용약관</a>
             {' '}및{' '}

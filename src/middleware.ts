@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
   const isPublicPath =
     pathname === '/' ||
     pathname === '/login' ||
+    pathname === '/signup' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/portal/') ||   // 임차인 포털 (토큰 기반 접근)

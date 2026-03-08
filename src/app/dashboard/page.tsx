@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
@@ -101,14 +103,16 @@ function RoomRow({ room }: { room: Room }) {
 
 // ── 메인 대시보드 ─────────────────────────────────────────
 export default function DashboardPage() {
-  const supabase = createClient()
+  // supabase 클라이언트는 useMemo로 한 번만 생성 (매 렌더 재생성 방지)
+  const supabase = useMemo(() => createClient(), [])
 
   const [rooms,    setRooms]    = useState<Room[]>([])
   const [loading,  setLoading]  = useState(true)
   const [briefing, setBriefing] = useState<string | null>(null)
   const [chartData, setChartData] = useState<{ month: string; amount: number }[]>([])
 
-  const today = new Date()
+  // today는 렌더와 무관하게 고정 (무한루프 방지)
+  const today = useMemo(() => new Date(), [])
   const thisYear  = today.getFullYear()
   const thisMonth = today.getMonth() + 1
 
