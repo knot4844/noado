@@ -1,12 +1,16 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from "react";
-import { Bell, Search, User as UserIcon, Menu, LogOut, AlertTriangle, CalendarX } from "lucide-react";
+import { Bell, Search, User as UserIcon, Menu, LogOut, AlertTriangle, CalendarX, Building2 } from "lucide-react";
 import { useAuth, toggleDemoLogin } from "@/components/providers/AuthProvider";
 import { useBusiness } from "@/components/providers/BusinessProvider";
 import Link from "next/link";
 
-export function Header() {
+interface HeaderProps {
+    onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
     const { user, signOut } = useAuth();
     const { currentBusiness, rooms } = useBusiness();
     const [showNotifications, setShowNotifications] = useState(false);
@@ -57,9 +61,25 @@ export function Header() {
     return (
         <header className="h-16 px-4 md:px-8 border-b border-neutral-200 bg-white flex items-center justify-between sticky top-0 z-10 w-full">
             <div className="flex items-center gap-2 md:gap-4 flex-1">
-                <button className="md:hidden p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg">
+                {/* 모바일 메뉴 버튼 */}
+                <button
+                    className="md:hidden p-2 text-neutral-500 hover:bg-neutral-100 rounded-lg"
+                    onClick={onMenuClick}
+                    aria-label="메뉴 열기"
+                >
                     <Menu size={24} />
                 </button>
+                {/* 모바일 로고 */}
+                <Link href="/dashboard" className="md:hidden flex items-center gap-1.5">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                         style={{ background: 'var(--color-accent)' }}>
+                        N
+                    </div>
+                    <span className="font-bold text-base tracking-tight" style={{ color: 'var(--color-sidebar-active)' }}>
+                        noado
+                    </span>
+                </Link>
+                {/* 데스크탑 검색바 */}
                 <div className="relative w-full max-w-sm hidden sm:block">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
                     <input
@@ -142,7 +162,11 @@ export function Header() {
                 <div className="h-6 w-px bg-neutral-200" />
 
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 hover:bg-neutral-50 px-2 py-1 rounded-lg transition-colors">
+                    {/* 프로필 → 설정 페이지 링크 */}
+                    <Link
+                        href="/settings"
+                        className="flex items-center gap-2 hover:bg-neutral-50 px-2 py-1 rounded-lg transition-colors"
+                    >
                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-medium">
                             <UserIcon size={16} />
                         </div>
@@ -154,7 +178,7 @@ export function Header() {
                                 {currentBusiness?.name || "noado"}
                             </p>
                         </div>
-                    </button>
+                    </Link>
                     <button
                         onClick={() => {
                             if (user?.id === 'demo-user-123') {

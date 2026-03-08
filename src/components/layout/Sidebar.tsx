@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  FileText, Bell, Settings, LogOut, BarChart3, Receipt,
+  FileText, Bell, Settings, LogOut, BarChart3, Receipt, X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -20,7 +20,12 @@ const NAV_ITEMS = [
   { href: '/export',         label: '세무 내보내기', icon: Receipt },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router   = useRouter()
 
@@ -32,13 +37,13 @@ export function Sidebar() {
     router.push('/login')
   }
 
-  return (
-    <aside className="fixed left-0 top-0 h-screen w-60 flex flex-col z-50"
+  const sidebarContent = (
+    <aside className="w-60 h-full flex flex-col"
            style={{ background: 'var(--color-sidebar-bg)' }}>
 
       {/* 로고 */}
-      <div className="px-5 py-6 border-b" style={{ borderColor: 'var(--color-sidebar-border)' }}>
-        <Link href="/dashboard" className="flex items-center gap-2.5 group">
+      <div className="px-5 py-6 border-b flex items-center justify-between" style={{ borderColor: 'var(--color-sidebar-border)' }}>
+        <Link href="/dashboard" className="flex items-center gap-2.5 group" onClick={onClose}>
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                style={{ background: 'var(--color-accent)' }}>
             N
@@ -48,6 +53,15 @@ export function Sidebar() {
             noado
           </span>
         </Link>
+        {/* 모바일 닫기 버튼 */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        )}
       </div>
 
       {/* 네비게이션 */}
@@ -58,6 +72,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
               style={{
                 color:      active ? 'var(--color-sidebar-active)' : 'var(--color-sidebar-text)',
@@ -86,6 +101,7 @@ export function Sidebar() {
            style={{ borderColor: 'var(--color-sidebar-border)' }}>
         <Link
           href="/settings"
+          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
           style={{ color: 'var(--color-sidebar-text)' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--color-sidebar-hover)'}
@@ -106,5 +122,27 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* 데스크탑: 항상 표시 */}
+      <div className="hidden md:block fixed left-0 top-0 h-screen w-60 z-50">
+        {sidebarContent}
+      </div>
+
+      {/* 모바일: 오버레이 + 슬라이드 */}
+      {isOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <div className="relative w-60 h-full shadow-2xl animate-in slide-in-from-left duration-200">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
