@@ -86,7 +86,7 @@ export default function NotificationsPage() {
 
   /* ─── 발송 ─── */
   const handleSend = async () => {
-    if (selectedRooms.size === 0) return showToast('error', '발송할 세입자를 선택해주세요.')
+    if (selectedRooms.size === 0) return showToast('error', '발송할 입주사를 선택해주세요.')
     setSending(true)
 
     const targetRooms = rooms.filter(r => selectedRooms.has(r.id))
@@ -101,7 +101,7 @@ export default function NotificationsPage() {
             templateKey: selectedTemplate,
             phone:       r.tenant_phone,
             roomName:    r.name,
-            tenantName:  r.tenant_name  ?? '세입자',
+            tenantName:  r.tenant_name  ?? '입주사',
             amount:      String(r.monthly_rent),
             dueDate:     '매월 10일',
             roomId:      r.id,
@@ -336,11 +336,11 @@ export default function NotificationsPage() {
                          style={{ color: '#1A1A1A', fontSize: '10px', lineHeight: 1.6 }}>
                       {sample
                         ? tpl.preview(
-                            sample.tenant_name ?? '세입자',
+                            sample.tenant_name ?? '입주사',
                             sample.name,
                             sample.monthly_rent.toLocaleString()
                           )
-                        : tpl.preview('세입자', '101호', '500,000')}
+                        : tpl.preview('입주사', '101호', '500,000')}
                     </div>
                   </div>
                 </div>

@@ -97,7 +97,7 @@ export function UnpaidSummary() {
                                 )}
                             </div>
                             <span className="text-sm font-medium text-neutral-600 ml-2">
-                                총 <strong className="text-rose-600">{displayCount}명</strong>의 임차인이 미납 중입니다
+                                총 <strong className="text-rose-600">{displayCount}명</strong>의 입주사가 미납 중입니다
                             </span>
                         </div>
                     </>

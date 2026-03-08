@@ -176,7 +176,7 @@ export default function ContractsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                {['호실', '세입자', '계약기간', '상태', '생성일', '서명일', '작업'].map(h => (
+                {['호실', '입주사', '계약기간', '상태', '생성일', '서명일', '작업'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold"
                       style={{ color: 'var(--color-muted)', background: 'var(--color-muted-bg)' }}>{h}</th>
                 ))}
@@ -314,7 +314,7 @@ function CreateContractModal({
 
   const handleCreate = async () => {
     if (!form.room_id)     return onError('호실을 선택해주세요.')
-    if (!form.tenant_name) return onError('세입자 이름을 입력해주세요.')
+    if (!form.tenant_name) return onError('입주사 이름을 입력해주세요.')
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
@@ -387,7 +387,7 @@ function CreateContractModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <CField label="세입자 이름 *" value={form.tenant_name} onChange={set('tenant_name')} />
+            <CField label="입주사 이름 *" value={form.tenant_name} onChange={set('tenant_name')} />
             <CField label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} type="tel" />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -433,7 +433,7 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   const r    = contract.room
 
   const rows = [
-    { label: '세입자',    value: contract.tenant_name ?? '—' },
+    { label: '입주사',    value: contract.tenant_name ?? '—' },
     { label: '소재지',    value: snap?.address ?? '—' },
     { label: '보증금',    value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
     { label: '월세',      value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },

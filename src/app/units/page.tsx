@@ -126,7 +126,7 @@ function RoomModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>세입자 이름</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>입주사 이름</label>
               <input value={form.tenant_name} onChange={set('tenant_name')} placeholder="홍길동"
                 className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={inputSty} />
             </div>
@@ -298,7 +298,7 @@ function UnitsContent() {
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="호실명, 세입자 검색..."
+            placeholder="호실명, 입주사 검색..."
             className="pl-9 pr-3 py-1.5 rounded-lg border text-sm outline-none"
             style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', minWidth: 200 }} />
         </div>
@@ -319,7 +319,7 @@ function UnitsContent() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                {['호실', '세입자', '연락처', '월세', '보증금', '계약만료', '상태', '작업'].map(h => (
+                {['호실', '입주사', '연락처', '월세', '보증금', '계약만료', '상태', '작업'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold"
                       style={{ color: 'var(--color-muted)', background: 'var(--color-muted-bg)' }}>{h}</th>
                 ))}

@@ -141,7 +141,7 @@ export function AddPaymentModal({ onClose }: AddPaymentModalProps) {
                     <div className="grid grid-cols-2 gap-3">
                         {/* 임차인명 */}
                         <div>
-                            <label className="block text-xs font-semibold text-neutral-600 mb-1.5">임차인명 *</label>
+                            <label className="block text-xs font-semibold text-neutral-600 mb-1.5">입주사명 *</label>
                             <input
                                 className="w-full px-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm outline-none focus:border-blue-500"
                                 placeholder="홍길동"

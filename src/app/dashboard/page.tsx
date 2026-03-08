@@ -336,7 +336,7 @@ export default function DashboardPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--color-muted-bg)' }}>
-                  {['호실', '임차인', '월세', '상태', ''].map(h => (
+                  {['호실', '입주사', '월세', '상태', ''].map(h => (
                     <th key={h} className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wide"
                         style={{ color: 'var(--color-muted)' }}>{h}</th>
                   ))}

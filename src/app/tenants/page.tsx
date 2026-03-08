@@ -101,7 +101,7 @@ export default function TenantsPage() {
             입주사 관리
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-muted)' }}>
-            현재 입주 중인 세입자 정보 및 수납 현황
+            현재 입주 중인 입주사 정보 및 수납 현황
           </p>
         </div>
         <button
@@ -363,7 +363,7 @@ function TenantModal({
         <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <Field label="호실명 *" value={form.name} onChange={set('name')} placeholder="예: 101호" />
-            <Field label="세입자 이름" value={form.tenant_name} onChange={set('tenant_name')} placeholder="홍길동" />
+            <Field label="입주사 이름" value={form.tenant_name} onChange={set('tenant_name')} placeholder="홍길동" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} placeholder="01012345678" type="tel" />

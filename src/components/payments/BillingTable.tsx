@@ -4,7 +4,7 @@ import { Search, Filter, Download } from "lucide-react";
 const DUMMY_BILLING = Array.from({ length: 15 }, (_, i) => ({
     id: `INV-202602-${String(i + 1).padStart(3, '0')}`,
     room: `${i + 1}호실`,
-    tenant: `임차인${i + 1}`,
+    tenant: `입주사${i + 1}`,
     amount: 350000,
     dueDate: `2026-02-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
     status: Math.random() > 0.3 ? 'PAID' : 'UNPAID',
@@ -19,7 +19,7 @@ export function BillingTable() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                     <input
                         type="text"
-                        placeholder="호실 또는 임차인명 검색..."
+                        placeholder="호실 또는 입주사명 검색..."
                         className="w-full pl-10 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                 </div>
@@ -42,7 +42,7 @@ export function BillingTable() {
                         <tr>
                             <th className="px-6 py-4 font-medium">청구 번호</th>
                             <th className="px-6 py-4 font-medium">호실</th>
-                            <th className="px-6 py-4 font-medium">임차인</th>
+                            <th className="px-6 py-4 font-medium">입주사</th>
                             <th className="px-6 py-4 font-medium text-right">청구 금액 (원)</th>
                             <th className="px-6 py-4 font-medium">납부 기한</th>
                             <th className="px-6 py-4 font-medium">상태</th>

@@ -35,7 +35,7 @@ export function ContractExpiryWidget() {
                 </div>
                 <div className="flex-1">
                     <h3 className="text-orange-900 font-bold text-lg mb-1">
-                        계약 만료 임박 임차인 <span className="text-orange-600">{expiringRooms.length}명</span>
+                        계약 만료 임박 입주사 <span className="text-orange-600">{expiringRooms.length}명</span>
                     </h3>
                     <p className="text-orange-700 text-sm">
                         향후 60일 이내에 계약이 만료되는 호실이 있습니다. 연장 의사를 확인하거나 전자계약을 갱신하세요.

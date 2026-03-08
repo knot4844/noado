@@ -26,7 +26,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         notifications.push({
             type: 'unpaid',
             title: `${r.name} 미납`,
-            desc: `${r.tenant?.name || '임차인'} · ${r.unpaidMonths || 1}개월 미납`,
+            desc: `${r.tenant?.name || '입주사'} · ${r.unpaidMonths || 1}개월 미납`,
             href: '/tenants',
         });
     });
@@ -39,7 +39,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             notifications.push({
                 type: 'expiring',
                 title: `${r.name} 계약만료 ${daysLeft}일 전`,
-                desc: `${r.tenant?.name || '임차인'} · ${r.leaseEnd}`,
+                desc: `${r.tenant?.name || '입주사'} · ${r.leaseEnd}`,
                 href: '/tenants',
             });
         }
@@ -84,7 +84,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
                     <input
                         type="text"
-                        placeholder="임차인, 호실, 전화번호 검색..."
+                        placeholder="입주사, 호실, 전화번호 검색..."
                         className="w-full pl-9 pr-4 py-2 bg-neutral-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all placeholder:text-neutral-400"
                     />
                 </div>
@@ -151,7 +151,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                                         onClick={() => setShowNotifications(false)}
                                         className="block text-center text-xs text-blue-600 font-bold hover:underline"
                                     >
-                                        임차인 관리 바로가기 →
+                                        입주사 관리 바로가기 →
                                     </Link>
                                 </div>
                             )}

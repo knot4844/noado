@@ -114,7 +114,7 @@ export default function InvoicesPage() {
                                             onChange={toggleSelectAll}
                                         />
                                     </th>
-                                    <th className="p-3">임차인 (상호)</th>
+                                    <th className="p-3">입주사 (상호)</th>
                                     <th className="p-3">호실</th>
                                     <th className="p-3 text-right">공급가액</th>
                                     <th className="p-3 text-right">부가세</th>
