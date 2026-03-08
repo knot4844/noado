@@ -135,7 +135,7 @@ export default function PaymentsPage() {
       const colKeys  = Object.keys(firstRow)
       const dateKey  = colKeys.find(k => /날짜|일자|date/i.test(k)) ?? colKeys[0]
       const amtKey   = colKeys.find(k => /금액|입금|amount/i.test(k)) ?? colKeys[1]
-      const noteKey  = colKeys.find(k => /적요|내용|note|memo/i.test(k)) ?? colKeys[2]
+      const noteKey  = colKeys.find(k => /내용|적요|note|memo/i.test(k)) ?? colKeys[2]
 
       const bankRows: BankRow[] = rows
         .map(r => ({
@@ -165,10 +165,8 @@ export default function PaymentsPage() {
       const candidate = invoices.find(inv =>
         inv.status !== 'paid' &&
         inv.amount === row.amount &&
-        (
-          row.note.includes(inv.room?.name  || '___NOMATCH___') ||
-          row.note.includes(inv.room?.tenant_name || '___NOMATCH___')
-        )
+        !!inv.room?.tenant_name &&
+        row.note.includes(inv.room.tenant_name)
       )
 
       if (candidate) {
@@ -299,7 +297,7 @@ export default function PaymentsPage() {
     const { utils, writeFile } = await import('xlsx')
     const rows = filtered.map(inv => ({
       호실:       inv.room?.name        ?? '',
-      세입자:     inv.room?.tenant_name  ?? '',
+      입주사:     inv.room?.tenant_name  ?? '',
       연락처:     inv.room?.tenant_phone ?? '',
       청구금액:   inv.amount,
       수납금액:   inv.paid_amount,
@@ -559,7 +557,7 @@ export default function PaymentsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                {['호실', '세입자', '청구금액', '수납금액', '미납', '납부기한', '상태', '처리'].map(h => (
+                {['호실', '입주사', '청구금액', '수납금액', '미납', '납부기한', '상태', '처리'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold"
                       style={{ color: 'var(--color-muted)', background: 'var(--color-muted-bg)' }}>{h}</th>
                 ))}
