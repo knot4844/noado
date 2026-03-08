@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
-  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy,
+  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Invoice, Room } from '@/types'
@@ -58,6 +58,10 @@ export default function PaymentsPage() {
   const [importing, setImporting] = useState(false)
   const [toast, setToast]         = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [matchResult, setMatchResult] = useState<{ matched: number; unmatched: number } | null>(null)
+
+  // 청구금액 인라인 수정
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [editAmount, setEditAmount] = useState('')
 
   // 가상계좌 모달
   const [vaModal, setVaModal]       = useState<VaModalState | null>(null)
@@ -204,6 +208,49 @@ export default function PaymentsPage() {
 
     setMatchResult({ matched, unmatched })
     showToast('success', `${matched}건 자동매칭 완료 (미매칭 ${unmatched}건)`)
+    load()
+  }
+
+  /* ─── 청구금액 수정 ─── */
+  const saveAmount = async (inv: InvoiceWithRoom) => {
+    const newAmount = Number(editAmount.replace(/[^0-9]/g, ''))
+    if (!newAmount || newAmount === inv.amount) { setEditingId(null); return }
+    const { error } = await supabase.from('invoices').update({ amount: newAmount }).eq('id', inv.id)
+    if (error) return showToast('error', error.message)
+    showToast('success', '청구금액이 수정되었습니다.')
+    setEditingId(null)
+    load()
+  }
+
+  /* ─── 완납 → 미납 반환 ─── */
+  const revertToUnpaid = async (inv: InvoiceWithRoom) => {
+    if (!confirm(`${inv.room?.name ?? ''} 수납을 취소하고 미납으로 되돌리겠습니까?`)) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // 1) 청구서 상태 초기화
+    const { error } = await supabase.from('invoices').update({
+      paid_amount: 0,
+      status:      'ready',
+      paid_at:     null,
+    }).eq('id', inv.id)
+    if (error) return showToast('error', error.message)
+
+    // 2) payments 테이블 수납기록 삭제
+    await supabase.from('payments').delete().eq('invoice_id', inv.id)
+
+    // 3) rooms.status 복구 (해당 월 다른 paid 청구서 없으면 OCCUPIED로)
+    const { data: otherPaid } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('room_id', inv.room_id)
+      .eq('status', 'paid')
+      .neq('id', inv.id)
+    if (!otherPaid || otherPaid.length === 0) {
+      await supabase.from('rooms').update({ status: 'OCCUPIED' }).eq('id', inv.room_id)
+    }
+
+    showToast('success', '미납으로 되돌렸습니다.')
     load()
   }
 
@@ -576,8 +623,41 @@ export default function PaymentsPage() {
                     <td className="px-4 py-3" style={{ color: 'var(--color-text)' }}>
                       {inv.room?.tenant_name ?? '—'}
                     </td>
-                    <td className="px-4 py-3 tabular" style={{ color: 'var(--color-text)' }}>
-                      {formatKRW(inv.amount)}
+                    <td className="px-4 py-3 tabular">
+                      {editingId === inv.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editAmount}
+                            onChange={e => setEditAmount(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') saveAmount(inv)
+                              if (e.key === 'Escape') setEditingId(null)
+                            }}
+                            className="w-28 px-2 py-0.5 rounded text-sm outline-none tabular"
+                            style={{ border: '1px solid var(--color-primary)', background: 'var(--color-surface)', color: 'var(--color-text)' }}
+                          />
+                          <button onClick={() => saveAmount(inv)}
+                            className="px-2 py-0.5 rounded text-xs text-white"
+                            style={{ background: 'var(--color-primary)' }}>저장</button>
+                          <button onClick={() => setEditingId(null)}
+                            className="px-1.5 py-0.5 rounded text-xs"
+                            style={{ color: 'var(--color-muted)' }}>✕</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 group">
+                          <span style={{ color: 'var(--color-text)' }}>{formatKRW(inv.amount)}</span>
+                          {inv.status !== 'paid' && (
+                            <button
+                              onClick={() => { setEditingId(inv.id); setEditAmount(String(inv.amount)) }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
+                              style={{ color: 'var(--color-muted)' }}>
+                              <Pencil size={11} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 tabular" style={{ color: inv.paid_amount > 0 ? 'var(--color-success)' : 'var(--color-muted)' }}>
                       {formatKRW(inv.paid_amount)}
@@ -595,7 +675,15 @@ export default function PaymentsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {inv.status !== 'paid' && (
+                      {inv.status === 'paid' ? (
+                        /* 완납 → 미납 반환 버튼 */
+                        <button onClick={() => revertToUnpaid(inv)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                          style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
+                          <RotateCcw size={11} />
+                          미납전환
+                        </button>
+                      ) : (
                         <div className="flex items-center gap-1.5">
                           {/* 가상계좌 발급 / 확인 버튼 */}
                           <button
@@ -603,7 +691,6 @@ export default function PaymentsPage() {
                               setVaBank('SHINHAN')
                               setVaResult(null)
                               setVaModal({ invoiceId: inv.id, roomName: inv.room?.name ?? '—', amount: inv.amount })
-                              // 이미 발급된 경우 결과 바로 채워주기
                               if (hasVA) {
                                 setVaResult({
                                   accountNumber: inv.virtual_account_number!,
