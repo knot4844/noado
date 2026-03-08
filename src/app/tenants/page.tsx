@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Search, Plus, Phone, Calendar, ChevronRight,
-  User, Home, Loader2, X, AlertCircle, CheckCircle2,
+  User, Home, Loader2, X, AlertCircle, CheckCircle2, Trash2,
 } from 'lucide-react'
 import { formatKRW, formatDate, formatPhone } from '@/lib/utils'
 import type { Room, Invoice } from '@/types'
@@ -177,6 +177,7 @@ export default function TenantsPage() {
           room={selected}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load(); showToast('success', '저장되었습니다.') }}
+          onDeleted={() => { setShowModal(false); load(); showToast('success', '입주사가 삭제되었습니다.') }}
           onError={(msg) => showToast('error', msg)}
         />
       )}
@@ -283,11 +284,12 @@ function TenantCard({ room, onClick }: { room: TenantRoom; onClick: () => void }
 
 /* ─── 입주사 모달 (추가/편집) ─── */
 function TenantModal({
-  room, onClose, onSaved, onError,
+  room, onClose, onSaved, onDeleted, onError,
 }: {
   room: TenantRoom | null
   onClose: () => void
   onSaved: () => void
+  onDeleted: () => void
   onError: (msg: string) => void
 }) {
   const supabase = createClient()
@@ -304,7 +306,9 @@ function TenantModal({
     lease_end:     room?.lease_end     ?? '',
     memo:          room?.memo          ?? '',
   })
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting]   = useState(false)
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }))
@@ -340,6 +344,27 @@ function TenantModal({
     }
     setSaving(false)
     onSaved()
+  }
+
+  const handleDelete = async () => {
+    if (!room) return
+    setDeleting(true)
+    // 연관된 payments 먼저 삭제 (invoice_id 기준)
+    const { data: invs } = await supabase
+      .from('invoices').select('id').eq('room_id', room.id)
+    if (invs && invs.length > 0) {
+      const invIds = invs.map((i: { id: string }) => i.id)
+      await supabase.from('payments').delete().in('invoice_id', invIds)
+    }
+    // invoices 삭제
+    await supabase.from('invoices').delete().eq('room_id', room.id)
+    // contracts 삭제
+    await supabase.from('contracts').delete().eq('room_id', room.id)
+    // room 삭제
+    const { error } = await supabase.from('rooms').delete().eq('id', room.id)
+    setDeleting(false)
+    if (error) return onError(error.message)
+    onDeleted()
   }
 
   return (
@@ -385,8 +410,40 @@ function TenantModal({
           </div>
         </div>
 
+        {/* 삭제 확인 영역 */}
+        {confirmDelete && isEdit && (
+          <div className="px-6 py-3 mx-6 mb-0 rounded-xl text-sm"
+               style={{ background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger)', color: 'var(--color-danger)' }}>
+            <p className="font-semibold mb-2">⚠️ 정말 삭제하시겠습니까?</p>
+            <p className="text-xs mb-3" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
+              청구서·입금내역·계약서까지 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-1.5 rounded-lg text-xs font-medium border"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-surface)' }}>
+                취소
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-60"
+                style={{ background: 'var(--color-danger)' }}>
+                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                삭제 확인
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 푸터 */}
         <div className="flex gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          {isEdit && (
+            <button onClick={() => setConfirmDelete(true)} disabled={confirmDelete}
+              className="p-2.5 rounded-lg border flex items-center justify-center disabled:opacity-40"
+              style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
+              title="입주사 삭제">
+              <Trash2 size={16} />
+            </button>
+          )}
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
