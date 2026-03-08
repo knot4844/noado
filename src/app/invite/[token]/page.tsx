@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * /invite/[token] - 전자계약 서명 페이지 (임차인 접근)
  * sign_token으로 계약서 조회 → Canvas 서명 → 저장

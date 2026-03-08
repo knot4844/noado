@@ -1,12 +1,13 @@
 {
-  "name": "daewoo-office",
+  "name": "noado",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/patch-next.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -13,9 +13,10 @@ export interface Room {
   deposit:      number
   lease_start:  string | null
   lease_end:    string | null
-  memo:         string | null
-  created_at:   string
-  updated_at:   string
+  memo:                   string | null
+  virtual_account_number: string | null
+  created_at:             string
+  updated_at:             string
 }
 
 // ── 청구서 ─────────────────────────────────────────────
@@ -33,6 +34,11 @@ export interface Invoice {
   due_date:    string | null
   paid_at:     string | null
   created_at:  string
+  // PortOne V2 가상계좌
+  portone_payment_id:     string | null
+  virtual_account_number: string | null
+  virtual_account_bank:   string | null
+  virtual_account_due:    string | null
 }
 
 // ── 결제 로그 ──────────────────────────────────────────

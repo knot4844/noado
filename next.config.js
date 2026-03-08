@@ -1,9 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  swcMinify: false,
   experimental: {
     serverActions: { bodySizeLimit: '10mb' },
-    forceSwcTransforms: false,
   },
   images: {
     remotePatterns: [

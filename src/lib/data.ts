@@ -52,7 +52,7 @@ export interface Business {
 
 // 1. 사업장 데이터
 export const businesses: Business[] = [
-    { id: "b_daewoo", name: "대우 고시원", ownerName: "대표님", address: "서울시 강남구 역삼동" },
+    { id: "b_sample", name: "샘플 건물", ownerName: "대표님", address: "서울시 강남구 역삼동" },
     { id: "b_royal", name: "로얄 오피스텔", ownerName: "대표님", address: "서울시 서초구 서초동" },
     { id: "b_teheran", name: "테헤란로상가", ownerName: "대표님", address: "서울시 강남구 테헤란로" },
 ];
@@ -106,8 +106,8 @@ const generateRooms = (businessId: string, count: number, startRoomNum: number):
     return rooms;
 };
 
-// 2. 대우오피스 호실 데이터 (30개)
-const mockDaewooRooms = generateRooms("b_daewoo", 30, 201);
+// 2. 샘플 호실 데이터 (30개)
+const mockDaewooRooms = generateRooms("b_sample", 30, 201);
 
 // 3. 로얄 오피스텔 호실 데이터 (5개)
 const mockRoyalRooms = generateRooms("b_royal", 5, 101);

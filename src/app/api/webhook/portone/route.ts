@@ -3,6 +3,10 @@
  * - HMAC-SHA256 서명 검증
  * - 결제 완료(PAID) 시 invoice 매칭 + room 상태 업데이트
  * - 멱등성: portone_payment_id UNIQUE constraint 활용
+ *
+ * invoice 조회 우선순위:
+ * 1) orderId 로 invoices.id 직접 조회 (SDK 결제 흐름)
+ * 2) paymentId 로 invoices.portone_payment_id 조회 (서버 가상계좌 발급 흐름)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/service'
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
     type: string
     data: {
       paymentId: string
-      orderId:   string
+      orderId?:  string
       status:    string
       amount:    { total: number }
       paidAt?:   string
@@ -74,15 +78,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, duplicate: true })
   }
 
-  /* ─── orderId로 invoice 조회 (orderId = invoice.id) ─── */
-  const { data: invoice, error: invErr } = await supabase
-    .from('invoices')
-    .select('id, room_id, owner_id, amount')
-    .eq('id', orderId)
-    .single()
+  /* ─── invoice 조회 (두 가지 경로 지원) ─── */
+  let invoice: { id: string; room_id: string; owner_id: string; amount: number } | null = null
 
-  if (invErr || !invoice) {
-    console.error('[Webhook] Invoice not found:', orderId, invErr)
+  // 1) orderId = invoice.id (JS SDK 결제 흐름)
+  if (orderId) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, room_id, owner_id, amount')
+      .eq('id', orderId)
+      .single()
+    invoice = inv ?? null
+  }
+
+  // 2) paymentId = invoices.portone_payment_id (서버 가상계좌 발급 흐름)
+  if (!invoice) {
+    const { data: inv } = await supabase
+      .from('invoices')
+      .select('id, room_id, owner_id, amount')
+      .eq('portone_payment_id', paymentId)
+      .single()
+    invoice = inv ?? null
+  }
+
+  if (!invoice) {
+    console.error('[Webhook] Invoice not found: orderId=', orderId, 'paymentId=', paymentId)
     return NextResponse.json({ ok: true, warning: 'Invoice not found' })
   }
 

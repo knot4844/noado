@@ -1,13 +1,26 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
-  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard,
+  Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Invoice, Room } from '@/types'
+
+/* ─── 은행 목록 ─── */
+const VA_BANKS: Record<string, string> = {
+  SHINHAN: '신한은행',
+  KOOKMIN: '국민은행',
+  HANA:    '하나은행',
+  WOORI:   '우리은행',
+  NH:      '농협은행',
+  IBK:     'IBK기업은행',
+  BUSAN:   '부산은행',
+}
 
 /* ─── 타입 ─── */
 interface InvoiceWithRoom extends Invoice {
@@ -16,7 +29,6 @@ interface InvoiceWithRoom extends Invoice {
 
 type FilterStatus = 'ALL' | 'paid' | 'ready' | 'overdue'
 
-/* ─── 엑셀 행 파서 (입금내역 CSV/XLSX) ─── */
 interface BankRow {
   date: string
   amount: number
@@ -24,9 +36,16 @@ interface BankRow {
   raw: Record<string, string>
 }
 
+/* ─── 가상계좌 모달 ─── */
+interface VaModalState {
+  invoiceId: string
+  roomName:  string
+  amount:    number
+}
+
 /* ─── 메인 ─── */
 export default function PaymentsPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const [invoices, setInvoices]   = useState<InvoiceWithRoom[]>([])
@@ -39,6 +58,14 @@ export default function PaymentsPage() {
   const [importing, setImporting] = useState(false)
   const [toast, setToast]         = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [matchResult, setMatchResult] = useState<{ matched: number; unmatched: number } | null>(null)
+
+  // 가상계좌 모달
+  const [vaModal, setVaModal]       = useState<VaModalState | null>(null)
+  const [vaBank, setVaBank]         = useState('SHINHAN')
+  const [vaLoading, setVaLoading]   = useState(false)
+  const [vaResult, setVaResult]     = useState<{
+    accountNumber: string; bank: string; bankLabel: string; expiredAt: string; alreadyIssued?: boolean
+  } | null>(null)
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
@@ -104,7 +131,6 @@ export default function PaymentsPage() {
       const ws  = wb.Sheets[wb.SheetNames[0]]
       const rows: Record<string, string>[] = utils.sheet_to_json(ws, { defval: '' })
 
-      // 컬럼 후보 추론 (날짜, 입금액, 적요)
       const firstRow = rows[0] || {}
       const colKeys  = Object.keys(firstRow)
       const dateKey  = colKeys.find(k => /날짜|일자|date/i.test(k)) ?? colKeys[0]
@@ -132,12 +158,10 @@ export default function PaymentsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const [year, month] = yearMonth.split('-').map(Number)
     let matched   = 0
     let unmatched = 0
 
     for (const row of bankRows) {
-      // 1) 금액 일치 + 호실명/이름 포함 여부로 매칭
       const candidate = invoices.find(inv =>
         inv.status !== 'paid' &&
         inv.amount === row.amount &&
@@ -208,7 +232,6 @@ export default function PaymentsPage() {
 
     const [year, month] = yearMonth.split('-').map(Number)
 
-    // 입주 중인 호실 조회
     const { data: rooms } = await supabase
       .from('rooms').select('id, monthly_rent, owner_id')
       .eq('owner_id', user.id).neq('status', 'VACANT')
@@ -217,7 +240,6 @@ export default function PaymentsPage() {
       showToast('error', '입주 중인 호실이 없습니다.'); setImporting(false); return
     }
 
-    // 이미 있는 청구서 제외
     const existingIds = new Set(invoices.map(i => i.room_id))
     const newRooms = rooms.filter(r => !existingIds.has(r.id))
 
@@ -244,19 +266,49 @@ export default function PaymentsPage() {
     setImporting(false)
   }
 
+  /* ─── 가상계좌 발급 ─── */
+  const issueVirtualAccount = async () => {
+    if (!vaModal) return
+    setVaLoading(true)
+    setVaResult(null)
+    try {
+      const res  = await fetch('/api/portone/virtual-account', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ invoiceId: vaModal.invoiceId, bank: vaBank }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast('error', data.error ?? '가상계좌 발급 실패')
+      } else {
+        setVaResult(data)
+        load() // 목록 갱신
+      }
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : '오류 발생')
+    }
+    setVaLoading(false)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => showToast('success', '복사되었습니다.'))
+  }
+
   /* ─── CSV 다운로드 ─── */
   const downloadCSV = async () => {
     const { utils, writeFile } = await import('xlsx')
     const rows = filtered.map(inv => ({
-      호실:     inv.room?.name       ?? '',
-      세입자:   inv.room?.tenant_name ?? '',
-      연락처:   inv.room?.tenant_phone ?? '',
-      청구금액: inv.amount,
-      수납금액: inv.paid_amount,
-      미납:     inv.amount - inv.paid_amount,
-      상태:     inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : '미납',
-      납부기한: inv.due_date ?? '',
-      납부일:   inv.paid_at ? formatDate(inv.paid_at) : '',
+      호실:       inv.room?.name        ?? '',
+      세입자:     inv.room?.tenant_name  ?? '',
+      연락처:     inv.room?.tenant_phone ?? '',
+      청구금액:   inv.amount,
+      수납금액:   inv.paid_amount,
+      미납:       inv.amount - inv.paid_amount,
+      상태:       inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : '미납',
+      납부기한:   inv.due_date ?? '',
+      납부일:     inv.paid_at ? formatDate(inv.paid_at) : '',
+      가상계좌:   inv.virtual_account_number ?? '',
+      가상계좌은행: inv.virtual_account_bank ? (VA_BANKS[inv.virtual_account_bank] ?? inv.virtual_account_bank) : '',
     }))
     const ws = utils.json_to_sheet(rows)
     const wb = utils.book_new()
@@ -278,6 +330,113 @@ export default function PaymentsPage() {
              style={{ background: toast.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)' }}>
           {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {toast.msg}
+        </div>
+      )}
+
+      {/* 가상계좌 발급 모달 */}
+      {vaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+             onClick={e => { if (e.target === e.currentTarget) { setVaModal(null); setVaResult(null) } }}>
+          <div className="rounded-2xl p-6 w-full max-w-md shadow-2xl"
+               style={{ background: 'var(--color-surface)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Building2 size={18} style={{ color: 'var(--color-primary)' }} />
+                <h2 className="text-base font-bold" style={{ color: 'var(--color-primary)' }}>
+                  가상계좌 발급
+                </h2>
+              </div>
+              <button onClick={() => { setVaModal(null); setVaResult(null) }}
+                      style={{ color: 'var(--color-muted)' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              <div className="flex justify-between text-sm">
+                <span style={{ color: 'var(--color-muted)' }}>호실</span>
+                <span className="font-medium" style={{ color: 'var(--color-text)' }}>{vaModal.roomName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: 'var(--color-muted)' }}>청구금액</span>
+                <span className="font-bold tabular" style={{ color: 'var(--color-primary)' }}>
+                  {formatKRW(vaModal.amount)}
+                </span>
+              </div>
+            </div>
+
+            {!vaResult ? (
+              <>
+                <div className="mb-4">
+                  <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--color-muted)' }}>
+                    가상계좌 은행
+                  </label>
+                  <select value={vaBank} onChange={e => setVaBank(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                    style={{ background: 'var(--color-muted-bg)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)' }}>
+                    {Object.entries(VA_BANKS).map(([code, label]) => (
+                      <option key={code} value={code}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={issueVirtualAccount} disabled={vaLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ background: 'var(--color-primary)' }}>
+                  {vaLoading ? <Loader2 size={15} className="animate-spin" /> : <Building2 size={15} />}
+                  가상계좌 발급하기
+                </button>
+              </>
+            ) : (
+              <div className="space-y-3">
+                {vaResult.alreadyIssued && (
+                  <div className="text-xs px-3 py-2 rounded-lg" style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}>
+                    이미 발급된 가상계좌 정보입니다.
+                  </div>
+                )}
+                <div className="rounded-xl p-4 space-y-2.5"
+                     style={{ background: 'var(--color-muted-bg)', border: '1px solid var(--color-border)' }}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs" style={{ color: 'var(--color-muted)' }}>은행</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
+                      {vaResult.bankLabel}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs" style={{ color: 'var(--color-muted)' }}>계좌번호</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold tabular" style={{ color: 'var(--color-primary)' }}>
+                        {vaResult.accountNumber}
+                      </span>
+                      <button onClick={() => copyToClipboard(vaResult.accountNumber)}
+                              className="p-1 rounded" style={{ color: 'var(--color-muted)' }}>
+                        <Copy size={13} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs" style={{ color: 'var(--color-muted)' }}>입금기한</span>
+                    <span className="text-sm" style={{ color: 'var(--color-text)' }}>
+                      {vaResult.expiredAt ? new Date(vaResult.expiredAt).toLocaleDateString('ko-KR') : '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs" style={{ color: 'var(--color-muted)' }}>금액</span>
+                    <span className="text-sm font-bold tabular" style={{ color: 'var(--color-success)' }}>
+                      {formatKRW(vaModal.amount)}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-center" style={{ color: 'var(--color-muted)' }}>
+                  입금 확인 시 자동으로 수납처리됩니다.
+                </p>
+                <button onClick={() => { setVaModal(null); setVaResult(null) }}
+                  className="w-full py-2.5 rounded-lg text-sm font-medium border"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+                  닫기
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -408,8 +567,9 @@ export default function PaymentsPage() {
             </thead>
             <tbody>
               {filtered.map((inv, i) => {
-                const meta = statusMeta[inv.status] ?? statusMeta.ready
+                const meta   = statusMeta[inv.status] ?? statusMeta.ready
                 const unpaid = inv.amount - inv.paid_amount
+                const hasVA  = !!inv.virtual_account_number
                 return (
                   <tr key={inv.id} style={{ borderBottom: i < filtered.length-1 ? '1px solid var(--color-border)' : 'none' }}>
                     <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-text)' }}>
@@ -438,11 +598,40 @@ export default function PaymentsPage() {
                     </td>
                     <td className="px-4 py-3">
                       {inv.status !== 'paid' && (
-                        <button onClick={() => markPaid(inv)}
-                          className="px-3 py-1 rounded-lg text-xs font-medium text-white"
-                          style={{ background: 'var(--color-primary)' }}>
-                          수납처리
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {/* 가상계좌 발급 / 확인 버튼 */}
+                          <button
+                            onClick={() => {
+                              setVaBank('SHINHAN')
+                              setVaResult(null)
+                              setVaModal({ invoiceId: inv.id, roomName: inv.room?.name ?? '—', amount: inv.amount })
+                              // 이미 발급된 경우 결과 바로 채워주기
+                              if (hasVA) {
+                                setVaResult({
+                                  accountNumber: inv.virtual_account_number!,
+                                  bank:          inv.virtual_account_bank ?? '',
+                                  bankLabel:     VA_BANKS[inv.virtual_account_bank ?? ''] ?? (inv.virtual_account_bank ?? ''),
+                                  expiredAt:     inv.virtual_account_due ?? '',
+                                  alreadyIssued: true,
+                                })
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                            style={{
+                              background: hasVA ? 'var(--color-info-bg)' : 'var(--color-muted-bg)',
+                              color:      hasVA ? 'var(--color-info)'    : 'var(--color-muted)',
+                              border:     '1px solid currentColor',
+                            }}>
+                            <Building2 size={11} />
+                            {hasVA ? '계좌확인' : '가상계좌'}
+                          </button>
+                          {/* 수납처리 버튼 */}
+                          <button onClick={() => markPaid(inv)}
+                            className="px-3 py-1 rounded-lg text-xs font-medium text-white"
+                            style={{ background: 'var(--color-primary)' }}>
+                            수납처리
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

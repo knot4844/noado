@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import React, { useState, useRef, useEffect } from "react";
 import { Bell, Search, User as UserIcon, Menu, LogOut, AlertTriangle, CalendarX } from "lucide-react";

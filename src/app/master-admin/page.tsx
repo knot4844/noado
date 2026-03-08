@@ -1,9 +1,11 @@
-"use client";
+'use client'
+
+export const dynamic = 'force-dynamic'
 
 import React, { useState, useEffect } from 'react';
 import { Building2, Users, Home, TrendingUp, ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation';
 
 export default function MasterAdminPage() {
@@ -18,7 +20,8 @@ export default function MasterAdminPage() {
     useEffect(() => {
         const checkAuthAndFetchStats = async () => {
             try {
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                const supabase = createClient()
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
                 if (sessionError || !session) {
                     router.push('/login');

@@ -1,4 +1,6 @@
-"use client";
+'use client'
+
+export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -44,7 +46,7 @@ export default function TenantPortalPage() {
                     // 데모 유저이거나 아직 호실 매핑이 안된 경우 Mock 데이터 표시
                     setRoomInfo({
                         name: "101호",
-                        businesses: { name: "대우빌딩" },
+                        businesses: { name: "" },
                         deposit: 10000000,
                         monthly_rent: 800000,
                         due_date: "매월 25일",
@@ -143,7 +145,7 @@ export default function TenantPortalPage() {
                         <h3 className="text-rose-800 font-bold text-lg">이번 달 임대료 납부 안내</h3>
                         <p className="text-rose-700/80 text-sm mt-1">임대료 <span className="font-bold">{(roomInfo?.monthly_rent || 0).toLocaleString()}원</span>을 지정된 계좌로 입금해 주세요.</p>
                         <div className="mt-3 bg-white/60 p-3 rounded-lg border border-rose-200/50 inline-block">
-                            <p className="text-sm font-medium text-neutral-600">입금 계좌: <span className="font-bold text-neutral-900">신한은행 110-123-456789 (예금주: 대우빌딩)</span></p>
+                            <p className="text-sm font-medium text-neutral-600">입금 계좌: <span className="font-bold text-neutral-900"></span></p>
                         </div>
                     </div>
                 </div>
