@@ -133,13 +133,25 @@ export default function PaymentsPage() {
       const ab  = await file.arrayBuffer()
       const wb  = read(ab)
       const ws  = wb.Sheets[wb.SheetNames[0]]
-      const rows: Record<string, string>[] = utils.sheet_to_json(ws, { defval: '' })
+
+      // 신한은행 등 상단에 메타데이터 행이 있는 파일 대응: 실제 헤더 행 자동 탐지
+      const rawAll: string[][] = utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
+      const headerRowIdx = rawAll.findIndex(row =>
+        row.some(cell => /내용|입금|거래일자|날짜|일자/i.test(String(cell)))
+      )
+      const parseRange = headerRowIdx >= 0 ? headerRowIdx : 0
+      const rows: Record<string, string>[] = utils.sheet_to_json(ws, { range: parseRange, defval: '' })
 
       const firstRow = rows[0] || {}
       const colKeys  = Object.keys(firstRow)
-      const dateKey  = colKeys.find(k => /날짜|일자|date/i.test(k)) ?? colKeys[0]
-      const amtKey   = colKeys.find(k => /금액|입금|amount/i.test(k)) ?? colKeys[1]
-      const noteKey  = colKeys.find(k => /내용|적요|note|memo/i.test(k)) ?? colKeys[2]
+      const dateKey  = colKeys.find(k => /날짜|일자|거래일자|date/i.test(k)) ?? colKeys[0]
+      // 출금(원)이 아닌 입금(원) 컬럼만 탐지 (출금 제외)
+      const amtKey   = colKeys.find(k => /^입금|입금\(|입금액|amount/i.test(k))
+                    ?? colKeys.find(k => /금액|입금/i.test(k) && !/출금/i.test(k))
+                    ?? colKeys[1]
+      const noteKey  = colKeys.find(k => /^내용$|내용\(|적요|note|memo/i.test(k)) ?? colKeys[2]
+
+      console.log('[매칭 디버그] 탐지된 컬럼:', { dateKey, amtKey, noteKey, headerRowIdx, colKeys })
 
       const bankRows: BankRow[] = rows
         .map(r => ({
