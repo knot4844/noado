@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { BusinessProvider } from '@/components/providers/BusinessProvider'
 
 // 사이드바 없이 렌더링할 경로 prefix
 const PUBLIC_PATHS  = ['/', '/login', '/auth', '/signup', '/pricing', '/terms', '/privacy']
@@ -21,14 +22,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--color-background)' }}>
+    <BusinessProvider>
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 md:ml-60 flex flex-col min-h-screen overflow-x-hidden">
+      <div className="flex-1 md:ml-60 flex flex-col min-h-screen overflow-x-hidden" style={{ background: 'var(--color-background)' }}>
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
         <main className="flex-1 p-6">
           {children}
         </main>
       </div>
-    </div>
+    </BusinessProvider>
   )
 }
