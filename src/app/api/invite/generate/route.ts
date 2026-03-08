@@ -12,9 +12,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'roomId가 필요합니다.' }, { status: 400 });
     }
 
-    // 현재 로그인한 관리자 확인 (데모 버전에서는 클라이언트 측 localStorage에 의존하므로
-    // 서버 사이드 엄격한 세션 체크는 임시로 생략합니다.)
-    /*
+    // 현재 로그인한 관리자 서버 사이드 세션 확인
     const cookieStore = await cookies();
     const supabaseUser = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +21,6 @@ export async function POST(request: NextRequest) {
     );
     const { data: { user } } = await supabaseUser.auth.getUser();
     if (!user) return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
-    */
 
     const supabaseAdmin = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,13 +48,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: '호실을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 데모 버전: 소유권 체크 로직도 임시 우회 (어떤 호실이든 초대 가능하게)
-    /*
+    // 소유권 체크: 요청한 관리자가 해당 호실의 소유자인지 확인
     const ownerIdFromDb = (room.businesses as any)?.owner_id;
     if (ownerIdFromDb && ownerIdFromDb !== user.id) {
         return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
     }
-    */
 
     // 초대 토큰 생성 (7일 유효)
     const token = uuidv4();
