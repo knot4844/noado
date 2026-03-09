@@ -38,16 +38,19 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/portal/') ||   // 임차인 포털 (토큰 기반 접근)
     pathname.startsWith('/invite/')      // 초대 링크
 
-  // 임대인 전용 경로
+  // 임대인 전용 경로 (임차인 role 접근 차단)
   const isLandlordPath =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/units') ||
+    pathname.startsWith('/rooms') ||
     pathname.startsWith('/tenants') ||
     pathname.startsWith('/payments') ||
     pathname.startsWith('/contracts') ||
     pathname.startsWith('/notifications') ||
     pathname.startsWith('/reports') ||
-    pathname.startsWith('/settings')
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/seed-demo') ||
+    pathname.startsWith('/master-admin')
 
   // 비로그인 → 보호된 경로 접근 시 로그인으로
   if (!user && !isPublicPath) {
