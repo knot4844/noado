@@ -28,7 +28,18 @@ interface InvoiceWithRoom extends Invoice {
   room?: Pick<Room, 'name' | 'tenant_name' | 'tenant_phone'>
 }
 
-type FilterStatus = 'ALL' | 'paid' | 'ready' | 'overdue'
+type FilterStatus = 'ALL' | 'paid' | 'upcoming' | 'ready' | 'overdue'
+
+/* ─── 납부 예정 여부: due_date가 오늘보다 미래이면 납부 예정 ─── */
+function isUpcoming(inv: InvoiceWithRoom): boolean {
+  if (inv.status !== 'ready') return false
+  if (!inv.due_date) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(inv.due_date)
+  due.setHours(0, 0, 0, 0)
+  return due > today
+}
 
 interface BankRow {
   date:   string
@@ -121,10 +132,11 @@ export default function PaymentsPage() {
 
   /* ─── 필터 통계 ─── */
   const stats = {
-    ALL:     invoices.length,
-    paid:    invoices.filter(i => i.status === 'paid').length,
-    ready:   invoices.filter(i => i.status === 'ready').length,
-    overdue: invoices.filter(i => i.status === 'overdue').length,
+    ALL:      invoices.length,
+    paid:     invoices.filter(i => i.status === 'paid').length,
+    upcoming: invoices.filter(i => isUpcoming(i)).length,
+    ready:    invoices.filter(i => i.status === 'ready' && !isUpcoming(i)).length,
+    overdue:  invoices.filter(i => i.status === 'overdue').length,
   }
 
   const totalAmount  = invoices.reduce((s, i) => s + (i.amount || 0), 0)
@@ -132,7 +144,12 @@ export default function PaymentsPage() {
   const unpaidAmount = totalAmount - paidAmount
 
   const filtered = invoices.filter(inv => {
-    const matchStatus = filter === 'ALL' || inv.status === filter
+    let matchStatus = false
+    if (filter === 'ALL')      matchStatus = true
+    else if (filter === 'paid')     matchStatus = inv.status === 'paid'
+    else if (filter === 'overdue')  matchStatus = inv.status === 'overdue'
+    else if (filter === 'upcoming') matchStatus = isUpcoming(inv)
+    else if (filter === 'ready')    matchStatus = inv.status === 'ready' && !isUpcoming(inv)
     const q = search.toLowerCase()
     const matchSearch = !q ||
       inv.room?.name?.toLowerCase().includes(q) ||
@@ -488,7 +505,7 @@ export default function PaymentsPage() {
       청구금액:     inv.amount,
       수납금액:     inv.paid_amount,
       미납:         inv.amount - inv.paid_amount,
-      상태:         inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : '미납',
+      상태:         inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : isUpcoming(inv) ? '납부예정' : '미납',
       납부기한:     inv.due_date ?? '',
       납부일:       inv.paid_at ? formatDate(inv.paid_at) : '',
       가상계좌:     inv.virtual_account_number ?? '',
@@ -503,10 +520,15 @@ export default function PaymentsPage() {
   }
 
   const statusMeta: Record<string, { label: string; bg: string; color: string }> = {
-    paid:    { label: '완납', bg: 'var(--color-success-bg)', color: 'var(--color-success)' },
-    ready:   { label: '미납', bg: 'rgba(29,53,87,0.06)',     color: 'var(--color-muted)'   },
-    overdue: { label: '연체', bg: 'var(--color-danger-bg)',  color: 'var(--color-danger)'  },
+    paid:     { label: '완납',     bg: 'var(--color-success-bg)',            color: 'var(--color-success)' },
+    upcoming: { label: '납부 예정', bg: 'rgba(59,130,246,0.08)',              color: '#3b82f6'              },
+    ready:    { label: '미납',     bg: 'rgba(29,53,87,0.06)',                color: 'var(--color-muted)'   },
+    overdue:  { label: '연체',     bg: 'var(--color-danger-bg)',             color: 'var(--color-danger)'  },
   }
+
+  /* ─── 청구서 표시용 상태 키 (isUpcoming 반영) ─── */
+  const getStatusKey = (inv: InvoiceWithRoom) =>
+    isUpcoming(inv) ? 'upcoming' : inv.status
 
   /* ─── 검토 모달 통계 ─── */
   const unpaidInvoiceOptions  = invoices.filter(i => i.status !== 'paid')
@@ -895,10 +917,11 @@ export default function PaymentsPage() {
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-muted-bg)' }}>
           {([
-            { key: 'ALL',     label: '전체' },
-            { key: 'paid',    label: '완납' },
-            { key: 'ready',   label: '미납' },
-            { key: 'overdue', label: '연체' },
+            { key: 'ALL',      label: '전체' },
+            { key: 'paid',     label: '완납' },
+            { key: 'upcoming', label: '납부 예정' },
+            { key: 'ready',    label: '미납' },
+            { key: 'overdue',  label: '연체' },
           ] as { key: FilterStatus; label: string }[]).map(t => (
             <button key={t.key} onClick={() => setFilter(t.key)}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
@@ -945,7 +968,7 @@ export default function PaymentsPage() {
             </thead>
             <tbody>
               {filtered.map((inv, i) => {
-                const meta   = statusMeta[inv.status] ?? statusMeta.ready
+                const meta   = statusMeta[getStatusKey(inv)] ?? statusMeta.ready
                 const unpaid = inv.amount - inv.paid_amount
                 const hasVA  = !!inv.virtual_account_number
                 return (
