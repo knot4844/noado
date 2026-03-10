@@ -7,7 +7,7 @@ import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Home, CreditCard, FileText, Bell,
   BarChart2, CheckCircle2, AlertCircle, Clock, XCircle,
-  User, Building2, Phone, Mail, Calendar,
+  User, Building2, Phone, Mail, Calendar, Send, X,
 } from 'lucide-react'
 
 /* ─── 탭 정의 ─── */
@@ -40,6 +40,13 @@ export default function UserDetailPage() {
   const [error, setError]     = useState('')
   const [data, setData]       = useState<Record<string, unknown> | null>(null)
   const [tab, setTab]         = useState<TabKey>('overview')
+
+  /* ─── 알림톡 발송 모달 상태 ─── */
+  const [modal, setModal]           = useState(false)
+  const [modalType, setModalType]   = useState<'UNPAID_REMINDER' | 'PAYMENT_CONFIRM'>('UNPAID_REMINDER')
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([])
+  const [sending, setSending]       = useState(false)
+  const [sendResult, setSendResult] = useState<{ message: string; results: { roomId: string; room: string; sent: boolean; reason?: string }[] } | null>(null)
 
   const load = useCallback(async () => {
     const supabase = createClient()
@@ -261,41 +268,103 @@ export default function UserDetailPage() {
 
         {/* ── 알림톡 탭 ── */}
         {tab === 'notifications' && (
-          <Card title="알림톡 발송 내역" count={notifications.length}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #334155' }}>
-                  {['발송일시', '호실', '수신자', '연락처', '템플릿', '결과'].map(h => (
-                    <Th key={h}>{h}</Th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {notifications.map((n, i) => {
-                  const room = n.rooms as Record<string, string> | null
-                  const ok   = n.status === 'success'
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid #1e293b' }}>
-                      <Td muted>{fmtDT(n.created_at as string)}</Td>
-                      <Td>{room?.name ?? '—'}</Td>
-                      <Td>{(n.recipient_name as string) || '—'}</Td>
-                      <Td muted>{(n.recipient_phone as string) || '—'}</Td>
-                      <Td><code style={{ background: '#0f172a', color: '#94a3b8', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}>{n.template_key as string}</code></Td>
-                      <Td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          {ok
-                            ? <><CheckCircle2 size={13} color="#34d399" /><span style={{ color: '#34d399', fontSize: '12px' }}>성공</span></>
-                            : <><XCircle size={13} color="#f87171" /><span style={{ color: '#f87171', fontSize: '12px' }}>실패</span></>}
-                        </div>
-                      </Td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+            {/* 발송 버튼 영역 */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => { setModalType('UNPAID_REMINDER'); setSelectedRooms([]); setSendResult(null); setModal(true) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit',
+                  boxShadow: '0 4px 12px rgba(220,38,38,0.35)',
+                }}>
+                <Send size={14} /> 미납 독촉 알림톡
+              </button>
+              <button
+                onClick={() => { setModalType('PAYMENT_CONFIRM'); setSelectedRooms([]); setSendResult(null); setModal(true) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  padding: '10px 18px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #059669, #047857)',
+                  color: '#fff', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit',
+                  boxShadow: '0 4px 12px rgba(5,150,105,0.35)',
+                }}>
+                <Send size={14} /> 수납 완료 알림톡
+              </button>
+            </div>
+
+            {/* 발송 내역 테이블 */}
+            <Card title="알림톡 발송 내역" count={notifications.length}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #334155' }}>
+                    {['발송일시', '호실', '수신자', '연락처', '템플릿', '결과'].map(h => (
+                      <Th key={h}>{h}</Th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {notifications.map((n, i) => {
+                    const room = n.rooms as Record<string, string> | null
+                    const ok   = n.status === 'success'
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #1e293b' }}>
+                        <Td muted>{fmtDT(n.created_at as string)}</Td>
+                        <Td>{room?.name ?? '—'}</Td>
+                        <Td>{(n.recipient_name as string) || '—'}</Td>
+                        <Td muted>{(n.recipient_phone as string) || '—'}</Td>
+                        <Td><code style={{ background: '#0f172a', color: '#94a3b8', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}>{n.template_key as string}</code></Td>
+                        <Td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {ok
+                              ? <><CheckCircle2 size={13} color="#34d399" /><span style={{ color: '#34d399', fontSize: '12px' }}>성공</span></>
+                              : <><XCircle size={13} color="#f87171" /><span style={{ color: '#f87171', fontSize: '12px' }}>실패</span></>}
+                          </div>
+                        </Td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          </div>
         )}
       </main>
+
+      {/* ── 알림톡 발송 모달 ── */}
+      {modal && (
+        <AlimtalkModal
+          type={modalType}
+          rooms={rooms}
+          selectedRooms={selectedRooms}
+          setSelectedRooms={setSelectedRooms}
+          sending={sending}
+          sendResult={sendResult}
+          onClose={() => { setModal(false); setSendResult(null) }}
+          onSend={async () => {
+            if (selectedRooms.length === 0) return
+            setSending(true)
+            setSendResult(null)
+            const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) { setSending(false); return }
+            const res = await fetch(`/api/admin/users/${userId}/send-alimtalk`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ roomIds: selectedRooms, type: modalType }),
+            })
+            const json = await res.json()
+            setSendResult(json)
+            setSending(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -327,4 +396,177 @@ function Td({ children, bold, muted }: { children: React.ReactNode; bold?: boole
 }
 function StatusBadge({ label, color, bg }: { label: string; color: string; bg: string }) {
   return <span style={{ background: bg, color, fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '6px' }}>{label}</span>
+}
+
+/* ─── 알림톡 발송 모달 ─── */
+type SendResult = { message: string; results: { roomId: string; room: string; sent: boolean; reason?: string }[] }
+function AlimtalkModal({
+  type, rooms, selectedRooms, setSelectedRooms,
+  sending, sendResult, onClose, onSend,
+}: {
+  type: 'UNPAID_REMINDER' | 'PAYMENT_CONFIRM'
+  rooms: Record<string, unknown>[]
+  selectedRooms: string[]
+  setSelectedRooms: (ids: string[]) => void
+  sending: boolean
+  sendResult: SendResult | null
+  onClose: () => void
+  onSend: () => void
+}) {
+  const isUnpaid    = type === 'UNPAID_REMINDER'
+  const accentColor = isUnpaid ? '#ef4444' : '#10b981'
+  const title       = isUnpaid ? '미납 독촉 알림톡 발송' : '수납 완료 알림톡 발송'
+
+  // 미납 독촉은 UNPAID 호실만, 수납 완료는 모든 입주 호실
+  const targetRooms = isUnpaid
+    ? rooms.filter(r => r.status === 'UNPAID')
+    : rooms.filter(r => r.status !== 'VACANT')
+
+  const allChecked  = targetRooms.length > 0 && targetRooms.every(r => selectedRooms.includes(r.id as string))
+
+  const toggle = (id: string) =>
+    setSelectedRooms(selectedRooms.includes(id) ? selectedRooms.filter(x => x !== id) : [...selectedRooms, id])
+
+  const toggleAll = () =>
+    setSelectedRooms(allChecked ? [] : targetRooms.map(r => r.id as string))
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
+    }}>
+      <div style={{
+        background: '#1e293b', border: '1px solid #334155', borderRadius: '20px',
+        width: '100%', maxWidth: '520px', maxHeight: '80vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+      }}>
+
+        {/* 헤더 */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 800, margin: 0 }}>{title}</h2>
+            <p style={{ color: '#64748b', fontSize: '12px', marginTop: '4px', margin: '4px 0 0' }}>
+              발송할 호실을 선택하세요
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* 호실 목록 (결과 없을 때만 표시) */}
+        {!sendResult && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+            {targetRooms.length === 0 ? (
+              <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '32px 0' }}>
+                {isUnpaid ? '미납 호실이 없습니다.' : '입주 호실이 없습니다.'}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* 전체 선택 */}
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 14px', borderRadius: '10px', cursor: 'pointer',
+                  background: '#0f172a', border: '1px solid #334155',
+                }}>
+                  <input type="checkbox" checked={allChecked} onChange={toggleAll}
+                    style={{ width: '16px', height: '16px', accentColor, cursor: 'pointer' }} />
+                  <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>전체 선택 ({targetRooms.length}건)</span>
+                </label>
+
+                {targetRooms.map(r => {
+                  const id      = r.id as string
+                  const checked = selectedRooms.includes(id)
+                  return (
+                    <label key={id} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '12px 14px', borderRadius: '10px', cursor: 'pointer',
+                      background: checked ? '#0f172a' : 'transparent',
+                      border: `1px solid ${checked ? accentColor : '#334155'}`,
+                      transition: 'border-color 0.15s',
+                    }}>
+                      <input type="checkbox" checked={checked} onChange={() => toggle(id)}
+                        style={{ width: '16px', height: '16px', accentColor, cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: '#f1f5f9', fontSize: '13px', fontWeight: 600 }}>{r.name as string}</div>
+                        <div style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>
+                          {(r.tenant_name as string) || '—'}
+                          {(r.tenant_contact as string | undefined) && <span style={{ marginLeft: '8px' }}>{r.tenant_contact as string}</span>}
+                          {isUnpaid && (r.unpaid_amount as number | undefined) && (
+                            <span style={{ marginLeft: '8px', color: '#f87171' }}>
+                              미납 ₩{(r.unpaid_amount as number).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {!(r.tenant_contact) && (
+                        <span style={{ color: '#f87171', fontSize: '10px', background: '#450a0a', padding: '2px 6px', borderRadius: '4px' }}>연락처 없음</span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 발송 결과 */}
+        {sendResult && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+            <div style={{
+              background: '#0f172a', border: '1px solid #334155', borderRadius: '12px',
+              padding: '16px 20px', marginBottom: '16px',
+              display: 'flex', alignItems: 'center', gap: '10px',
+            }}>
+              <CheckCircle2 size={18} color="#34d399" />
+              <span style={{ color: '#f1f5f9', fontSize: '14px', fontWeight: 700 }}>{sendResult.message}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {sendResult.results.map((r, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '10px 14px', borderRadius: '8px', background: '#0f172a',
+                }}>
+                  {r.sent
+                    ? <CheckCircle2 size={14} color="#34d399" />
+                    : <XCircle size={14} color="#f87171" />}
+                  <span style={{ color: r.sent ? '#cbd5e1' : '#94a3b8', fontSize: '13px', flex: 1 }}>{r.room}</span>
+                  {r.reason && <span style={{ color: '#64748b', fontSize: '11px' }}>{r.reason}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 하단 버튼 */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #334155', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            padding: '10px 20px', borderRadius: '10px', border: '1px solid #334155', cursor: 'pointer',
+            background: 'transparent', color: '#94a3b8', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit',
+          }}>
+            {sendResult ? '닫기' : '취소'}
+          </button>
+          {!sendResult && (
+            <button
+              onClick={onSend}
+              disabled={sending || selectedRooms.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '7px',
+                padding: '10px 20px', borderRadius: '10px', border: 'none', cursor: sending || selectedRooms.length === 0 ? 'not-allowed' : 'pointer',
+                background: sending || selectedRooms.length === 0 ? '#334155' : `linear-gradient(135deg, ${accentColor}, ${isUnpaid ? '#b91c1c' : '#047857'})`,
+                color: sending || selectedRooms.length === 0 ? '#64748b' : '#fff',
+                fontSize: '13px', fontWeight: 700, fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}>
+              {sending
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> 발송 중…</>
+                : <><Send size={14} /> {selectedRooms.length}건 발송</>}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
