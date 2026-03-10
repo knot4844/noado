@@ -30,7 +30,7 @@ export default function MasterAdminPage() {
   const load = useCallback(async () => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    if (!session) { router.push('/master-admin/login'); return }
     setToken(session.access_token)
 
     try {

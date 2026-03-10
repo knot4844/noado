@@ -8,7 +8,7 @@ import { BusinessProvider } from '@/components/providers/BusinessProvider'
 
 // 사이드바 없이 렌더링할 경로 prefix
 const PUBLIC_PATHS  = ['/', '/login', '/auth', '/signup', '/pricing', '/terms', '/privacy']
-const PORTAL_PATHS  = ['/portal', '/invite', '/tenant', '/tenant-portal']
+const PORTAL_PATHS  = ['/portal', '/invite', '/tenant', '/tenant-portal', '/master-admin/login']
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

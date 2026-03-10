@@ -44,7 +44,7 @@ export default function UserDetailPage() {
   const load = useCallback(async () => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    if (!session) { router.push('/master-admin/login'); return }
 
     const res  = await fetch(`/api/admin/users/${userId}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
