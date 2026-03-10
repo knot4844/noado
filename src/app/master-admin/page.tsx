@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Building2, Users, Home, TrendingUp, ShieldCheck, Loader2,
   ArrowRight, Search, ChevronRight, AlertCircle, CheckCircle2,
+  CreditCard, BarChart2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -115,10 +116,13 @@ export default function MasterAdminPage() {
         {/* KPI */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
           {[
-            { label: '총 임대인 수',    value: `${users.length}명`,          icon: <Users size={18} />,    color: '#3b82f6', bg: '#1e3a5f' },
-            { label: '전체 관리 호실',   value: `${stats.totalRooms ?? 0}개`, icon: <Home size={18} />,     color: '#8b5cf6', bg: '#2d1b69' },
-            { label: '전체 입주사',      value: `${stats.totalTenants ?? 0}명`, icon: <Building2 size={18} />, color: '#10b981', bg: '#064e3b' },
-            { label: '예상 MRR',        value: `₩${fmt(stats.monthlyRecurringRevenue ?? 0)}`, icon: <TrendingUp size={18} />, color: '#f59e0b', bg: '#451a03' },
+            { label: '총 임대인 수',     value: `${users.length}명`,           icon: <Users size={18} />,      color: '#3b82f6', bg: '#1e3a5f' },
+            { label: '전체 관리 호실',   value: `${stats.totalRooms ?? 0}개`,  icon: <Home size={18} />,       color: '#8b5cf6', bg: '#2d1b69' },
+            { label: '입주 / 공실',      value: `${stats.occupiedRooms ?? 0} / ${stats.vacantRooms ?? 0}`, icon: <Building2 size={18} />, color: '#10b981', bg: '#064e3b' },
+            { label: '미납 호실',        value: `${stats.unpaidRooms ?? 0}개`, icon: <AlertCircle size={18} />,color: '#f87171', bg: '#450a0a' },
+            { label: '실 MRR',          value: `₩${fmt(stats.monthlyRecurringRevenue ?? 0)}`, icon: <TrendingUp size={18} />, color: '#f59e0b', bg: '#451a03' },
+            { label: '이번달 수납률',    value: `${stats.collectionRate ?? 0}%`,icon: <BarChart2 size={18} />, color: '#34d399', bg: '#064e3b' },
+            { label: '이번달 청구',      value: `₩${fmt(stats.thisMonthTotal ?? 0)}`, icon: <CreditCard size={18} />, color: '#60a5fa', bg: '#1e3a5f' },
           ].map((c, i) => (
             <div key={i} style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '16px', padding: '20px 24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
