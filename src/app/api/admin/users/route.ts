@@ -58,9 +58,11 @@ export async function GET(req: NextRequest) {
   })
 
   const result = landlords.map(u => {
-    const biz  = bizMap.get(u.id)
-    const rm   = roomMap.get(u.id)   ?? { total: 0, vacant: 0, unpaid: 0 }
-    const inv  = invoiceMap.get(u.id) ?? { total: 0, unpaid: 0 }
+    const biz       = bizMap.get(u.id)
+    const rm        = roomMap.get(u.id)   ?? { total: 0, vacant: 0, unpaid: 0 }
+    const inv       = invoiceMap.get(u.id) ?? { total: 0, unpaid: 0 }
+    const bannedUntil = (u as unknown as { banned_until?: string }).banned_until
+    const isBanned  = !!bannedUntil && new Date(bannedUntil) > new Date()
     return {
       id:           u.id,
       email:        u.email ?? '',
@@ -69,6 +71,7 @@ export async function GET(req: NextRequest) {
       bizName:      biz?.name ?? '',
       createdAt:    u.created_at,
       lastSignIn:   u.last_sign_in_at ?? null,
+      isBanned,
       rooms:        rm,
       invoices:     inv,
     }

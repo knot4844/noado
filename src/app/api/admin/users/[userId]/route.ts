@@ -80,6 +80,9 @@ export async function GET(
   const occupiedRooms = roomList.filter(r => r.status !== 'VACANT').length
   const totalRooms    = roomList.length
 
+  const bannedUntil = (user as unknown as { banned_until?: string }).banned_until
+  const isBanned    = !!bannedUntil && new Date(bannedUntil) > new Date()
+
   return NextResponse.json({
     user: {
       id:         user.id,
@@ -88,6 +91,7 @@ export async function GET(
       phone:      user.user_metadata?.phone ?? '',
       createdAt:  user.created_at,
       lastSignIn: user.last_sign_in_at ?? null,
+      isBanned,
     },
     businesses:    businesses ?? [],
     rooms:         roomList,

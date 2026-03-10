@@ -8,6 +8,7 @@ import {
   ArrowLeft, Loader2, Home, CreditCard, FileText, Bell,
   BarChart2, CheckCircle2, AlertCircle, Clock, XCircle,
   User, Building2, Phone, Mail, Calendar, Send, X,
+  ShieldOff, ShieldCheck, Trash2,
 } from 'lucide-react'
 
 /* ─── 탭 정의 ─── */
@@ -41,6 +42,11 @@ export default function UserDetailPage() {
   const [data, setData]       = useState<Record<string, unknown> | null>(null)
   const [tab, setTab]         = useState<TabKey>('overview')
 
+  /* ─── 계정 관리 상태 ─── */
+  const [manageAction, setManageAction]   = useState<'suspend' | 'activate' | 'delete' | null>(null)
+  const [manageLoading, setManageLoading] = useState(false)
+  const [manageResult, setManageResult]   = useState('')
+
   /* ─── 알림톡 발송 모달 상태 ─── */
   const [modal, setModal]           = useState(false)
   const [modalType, setModalType]   = useState<'UNPAID_REMINDER' | 'PAYMENT_CONFIRM'>('UNPAID_REMINDER')
@@ -64,6 +70,31 @@ export default function UserDetailPage() {
 
   useEffect(() => { load() }, [load])
 
+  const handleManage = useCallback(async (action: 'suspend' | 'activate' | 'delete') => {
+    setManageLoading(true)
+    setManageResult('')
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setManageLoading(false); return }
+
+    const res  = await fetch(`/api/admin/users/${userId}/manage`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body:    JSON.stringify({ action }),
+    })
+    const json = await res.json()
+    setManageResult(json.message ?? json.error ?? '처리 완료')
+    setManageLoading(false)
+    setManageAction(null)
+    if (res.ok) {
+      if (action === 'delete') {
+        router.push('/master-admin')
+      } else {
+        load() // 데이터 새로고침
+      }
+    }
+  }, [userId, router, load])
+
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px' }}>
       <Loader2 size={34} color="#60a5fa" style={{ animation: 'spin 1s linear infinite' }} />
@@ -77,7 +108,8 @@ export default function UserDetailPage() {
     </div>
   )
 
-  const user          = data.user          as Record<string, string>
+  const user          = data.user          as Record<string, string & { isBanned?: boolean }>
+  const isBanned      = !!(data.user as Record<string, unknown>)?.isBanned
   const kpi           = data.kpi           as Record<string, number>
   const rooms         = data.rooms         as Record<string, unknown>[]
   const invoices      = data.invoices      as Record<string, unknown>[]
@@ -119,6 +151,34 @@ export default function UserDetailPage() {
           {businesses[0] && <InfoChip icon={<Building2 size={13} />} label={(businesses[0] as Record<string, string>).name} />}
           <InfoChip icon={<Calendar size={13} />} label={`가입: ${fmtDate(user.createdAt)}`} />
           {user.lastSignIn && <InfoChip icon={<Clock size={13} />} label={`최근: ${fmtDT(user.lastSignIn)}`} />}
+        </div>
+
+        {/* 계정 관리 */}
+        <div style={{ background: '#1e293b', border: `1px solid ${isBanned ? '#991b1b' : '#334155'}`, borderRadius: '16px', padding: '16px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {isBanned
+              ? <><ShieldOff size={16} color="#f87171" /><span style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 700 }}>이 계정은 현재 정지 상태입니다.</span></>
+              : <><ShieldCheck size={16} color="#34d399" /><span style={{ color: '#94a3b8', fontSize: '13px' }}>계정 상태: <span style={{ color: '#34d399', fontWeight: 600 }}>정상</span></span></>}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {isBanned ? (
+              <button onClick={() => setManageAction('activate')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit' }}>
+                <ShieldCheck size={14} /> 계정 활성화
+              </button>
+            ) : (
+              <button onClick={() => setManageAction('suspend')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer', background: 'transparent', color: '#f87171', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit' }}>
+                <ShieldOff size={14} /> 계정 정지
+              </button>
+            )}
+            <button onClick={() => setManageAction('delete')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', border: '1px solid #450a0a', cursor: 'pointer', background: '#450a0a', color: '#f87171', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit' }}>
+              <Trash2 size={14} /> 계정 삭제
+            </button>
+          </div>
+          {manageResult && (
+            <div style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#94a3b8', fontSize: '12px' }}>
+              {manageResult}
+            </div>
+          )}
         </div>
 
         {/* 탭 */}
@@ -333,6 +393,62 @@ export default function UserDetailPage() {
           </div>
         )}
       </main>
+
+      {/* ── 계정 관리 확인 모달 ── */}
+      {manageAction && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '20px', width: '100%', maxWidth: '420px', padding: '28px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              {manageAction === 'delete'
+                ? <Trash2 size={20} color="#f87171" />
+                : manageAction === 'suspend'
+                ? <ShieldOff size={20} color="#f59e0b" />
+                : <ShieldCheck size={20} color="#34d399" />}
+              <h3 style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                {manageAction === 'delete' ? '계정 삭제 확인' : manageAction === 'suspend' ? '계정 정지 확인' : '계정 활성화 확인'}
+              </h3>
+            </div>
+            <p style={{ color: '#94a3b8', fontSize: '13px', lineHeight: 1.7, marginBottom: '8px' }}>
+              <strong style={{ color: '#f1f5f9' }}>{user.name || user.email}</strong> 계정을
+              {manageAction === 'delete'
+                ? ' 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.'
+                : manageAction === 'suspend'
+                ? ' 정지합니다. 해당 임대인은 로그인할 수 없게 됩니다.'
+                : ' 다시 활성화합니다.'}
+            </p>
+            {manageAction === 'delete' && (
+              <div style={{ background: '#450a0a', border: '1px solid #991b1b', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+                <p style={{ color: '#fca5a5', fontSize: '12px', margin: 0 }}>⚠️ 삭제된 계정과 데이터는 복구할 수 없습니다.</p>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button onClick={() => setManageAction(null)} disabled={manageLoading} style={{ padding: '10px 20px', borderRadius: '10px', border: '1px solid #334155', cursor: 'pointer', background: 'transparent', color: '#94a3b8', fontSize: '13px', fontWeight: 600, fontFamily: 'inherit' }}>
+                취소
+              </button>
+              <button
+                onClick={() => handleManage(manageAction)}
+                disabled={manageLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 20px', borderRadius: '10px', border: 'none', cursor: manageLoading ? 'not-allowed' : 'pointer',
+                  background: manageAction === 'activate'
+                    ? 'linear-gradient(135deg, #059669, #047857)'
+                    : manageAction === 'suspend'
+                    ? 'linear-gradient(135deg, #d97706, #b45309)'
+                    : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff', fontSize: '13px', fontWeight: 700, fontFamily: 'inherit',
+                  opacity: manageLoading ? 0.6 : 1,
+                }}>
+                {manageLoading
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> 처리 중…</>
+                  : manageAction === 'delete' ? <><Trash2 size={14} /> 삭제 확인</>
+                  : manageAction === 'suspend' ? <><ShieldOff size={14} /> 정지 확인</>
+                  : <><ShieldCheck size={14} /> 활성화</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 알림톡 발송 모달 ── */}
       {modal && (

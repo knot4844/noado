@@ -12,7 +12,7 @@ import Link from 'next/link'
 
 interface LandlordRow {
   id: string; email: string; name: string; phone: string; bizName: string
-  createdAt: string; lastSignIn: string | null
+  createdAt: string; lastSignIn: string | null; isBanned?: boolean
   rooms: { total: number; vacant: number; unpaid: number }
   invoices: { total: number; unpaid: number }
 }
@@ -173,7 +173,10 @@ export default function MasterAdminPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '14px 20px' }}>
-                      <div style={{ color: '#f1f5f9', fontWeight: 600, marginBottom: '2px' }}>{u.name || '—'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                        <span style={{ color: u.isBanned ? '#94a3b8' : '#f1f5f9', fontWeight: 600 }}>{u.name || '—'}</span>
+                        {u.isBanned && <span style={{ background: '#450a0a', color: '#f87171', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.3px' }}>정지됨</span>}
+                      </div>
                       <div style={{ color: '#64748b', fontSize: '12px' }}>{u.email}</div>
                     </td>
                     <td style={{ padding: '14px 20px', color: '#cbd5e1' }}>{u.bizName || '—'}</td>
