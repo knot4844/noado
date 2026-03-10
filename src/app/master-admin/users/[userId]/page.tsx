@@ -8,7 +8,7 @@ import {
   ArrowLeft, Loader2, Home, CreditCard, FileText, Bell,
   BarChart2, CheckCircle2, AlertCircle, Clock, XCircle,
   User, Building2, Phone, Mail, Calendar, Send, X,
-  ShieldOff, ShieldCheck, Trash2,
+  ShieldOff, ShieldCheck, Trash2, LogOut,
 } from 'lucide-react'
 
 /* ─── 탭 정의 ─── */
@@ -131,6 +131,17 @@ export default function UserDetailPage() {
           {user.name || user.email}
         </span>
         <span style={{ color: '#64748b', fontSize: '12px' }}>{user.email}</span>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={async () => {
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            router.push('/master-admin/login')
+          }}
+          title="로그아웃"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '13px', padding: '6px 12px', fontFamily: 'inherit' }}>
+          <LogOut size={14} /> 로그아웃
+        </button>
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 24px' }}>

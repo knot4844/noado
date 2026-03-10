@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   Building2, Users, Home, TrendingUp, ShieldCheck, Loader2,
   ArrowRight, Search, ChevronRight, AlertCircle, CheckCircle2,
-  CreditCard, BarChart2,
+  CreditCard, BarChart2, LogOut,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -106,9 +106,21 @@ export default function MasterAdminPage() {
           <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px' }}>noado 백오피스</span>
           <span style={{ background: '#1d4ed8', color: '#bfdbfe', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '100px', letterSpacing: '1px' }}>ADMIN</span>
         </div>
-        <Link href="/dashboard" style={{ color: '#94a3b8', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}>
-          일반 대시보드 <ArrowRight size={14} />
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Link href="/dashboard" style={{ color: '#94a3b8', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}>
+            일반 대시보드 <ArrowRight size={14} />
+          </Link>
+          <button
+            onClick={async () => {
+              const supabase = createClient()
+              await supabase.auth.signOut()
+              router.push('/master-admin/login')
+            }}
+            title="로그아웃"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '13px', padding: '6px 12px', fontFamily: 'inherit' }}>
+            <LogOut size={14} /> 로그아웃
+          </button>
+        </div>
       </header>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
