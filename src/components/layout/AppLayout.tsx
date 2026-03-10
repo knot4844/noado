@@ -15,7 +15,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   const isPublic = PUBLIC_PATHS.some(p => pathname === p || pathname?.startsWith(p + '/'))
-  const isPortal = PORTAL_PATHS.some(p => pathname?.startsWith(p))
+  const isPortal = PORTAL_PATHS.some(p => pathname === p || pathname?.startsWith(p + '/'))
 
   if (isPublic || isPortal) {
     return <>{children}</>
