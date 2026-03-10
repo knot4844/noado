@@ -4,9 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useBusiness } from "@/components/providers/BusinessProvider";
-import { useAuth } from "@/components/providers/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { allRooms as mockRooms, businesses as mockBusinesses } from "@/lib/data";
 import {
     Clock,
     CheckCircle2,
@@ -22,53 +21,111 @@ import {
 import Link from "next/link";
 import * as XLSX from "xlsx";
 
-export default function TenantPortalPage() {
-    const params = useParams();
-    const router = useRouter();
-    const { rooms, currentBusiness } = useBusiness();
-    const { user } = useAuth();
-    const [authState, setAuthState] = useState<"loading" | "allowed" | "denied" | "unauthenticated">("loading");
+/* ── 포털에서 사용할 정규화된 Room 타입 ── */
+interface PortalRoom {
+    id: string;
+    name: string;
+    status: string;
+    tenantName: string;
+    tenantCompany: string;
+    monthlyRent: number;
+    deposit: number;
+    dueDate: string;
+    leaseStart: string;
+    leaseEnd: string;
+    unpaidMonths: number;
+    unpaidAmount: number;
+    businessName: string;
+}
 
+export default function TenantPortalPage() {
+    const params  = useParams();
+    const router  = useRouter();
     const id = params?.tenantId as string;
-    const room = rooms.find(r => r.id === id);
+
+    const [authState, setAuthState] = useState<"loading" | "allowed" | "denied">("loading");
+    const [room, setRoom] = useState<PortalRoom | null>(null);
 
     useEffect(() => {
+        if (!id) return;
+
         const check = async () => {
-            // 데모 호실 바이패스
-            if (id?.startsWith('r_')) {
-                setAuthState("allowed");
+            /* ── 데모 호실 바이패스 (r_ prefix) ── */
+            if (id.startsWith('r_')) {
+                const mockRoom = mockRooms.find(r => r.id === id);
+                if (mockRoom && mockRoom.status !== 'VACANT') {
+                    const biz = mockBusinesses.find(b => b.id === mockRoom.businessId);
+                    setRoom({
+                        id:            mockRoom.id,
+                        name:          mockRoom.name,
+                        status:        mockRoom.status,
+                        tenantName:    mockRoom.tenant?.name        ?? '미확인',
+                        tenantCompany: mockRoom.tenant?.companyName ?? '',
+                        monthlyRent:   mockRoom.paymentInfo?.monthlyRent ?? 0,
+                        deposit:       mockRoom.paymentInfo?.deposit      ?? 0,
+                        dueDate:       mockRoom.paymentInfo?.dueDate      ?? '매월 15일',
+                        leaseStart:    mockRoom.leaseStart ?? '2024-01-01',
+                        leaseEnd:      mockRoom.leaseEnd   ?? '2025-12-31',
+                        unpaidMonths:  mockRoom.unpaidMonths ?? 0,
+                        unpaidAmount:  mockRoom.unpaidAmount ?? 0,
+                        businessName:  biz?.name ?? 'noado',
+                    });
+                    setAuthState("allowed");
+                } else {
+                    setAuthState("denied");
+                }
                 return;
             }
 
-            const { data } = await supabase.auth.getSession();
-            const sessionUser = data.session?.user;
+            /* ── Supabase 실데이터 ── */
+            const { data: sessionData } = await supabase.auth.getSession();
+            const sessionUser = sessionData.session?.user;
 
             if (!sessionUser) {
-                // 미로그인: 임차인 로그인 페이지로
                 router.push(`/tenant/login?redirect=/portal/${id}`);
                 return;
             }
 
-            // 관리자(rooms owner)이면 허용
-            if (user) {
-                setAuthState("allowed");
-                return;
-            }
-
-            // 임차인: 본인 방인지 확인
-            const { data: linkedRoom } = await supabase
+            // 호실 정보 조회
+            const { data: row } = await supabase
                 .from("rooms")
-                .select("id")
-                .eq("tenant_auth_id", sessionUser.id)
+                .select("id, name, status, owner_id, tenant_auth_id, tenant_name, tenant_company_name, monthly_rent, deposit, due_date, lease_start, lease_end, unpaid_months, unpaid_amount, businesses(name)")
                 .eq("id", id)
                 .single();
 
-            if (linkedRoom) setAuthState("allowed");
-            else setAuthState("denied");
-        };
-        if (id) check();
-    }, [id, user, router]);
+            if (!row || row.status === "VACANT") { setAuthState("denied"); return; }
 
+            // 관리자(owner) 또는 본인 임차인이면 허용
+            const isOwner  = row.owner_id       === sessionUser.id;
+            const isTenant = row.tenant_auth_id === sessionUser.id;
+            if (!isOwner && !isTenant) { setAuthState("denied"); return; }
+
+            const bizName = Array.isArray(row.businesses)
+                ? (row.businesses[0] as { name: string })?.name ?? ''
+                : (row.businesses as { name: string } | null)?.name ?? '';
+
+            setRoom({
+                id:            row.id,
+                name:          row.name,
+                status:        row.status,
+                tenantName:    row.tenant_name         ?? '미확인',
+                tenantCompany: row.tenant_company_name ?? '',
+                monthlyRent:   row.monthly_rent        ?? 0,
+                deposit:       row.deposit             ?? 0,
+                dueDate:       row.due_date            ?? '매월 15일',
+                leaseStart:    row.lease_start         ?? '',
+                leaseEnd:      row.lease_end           ?? '',
+                unpaidMonths:  row.unpaid_months       ?? 0,
+                unpaidAmount:  row.unpaid_amount       ?? 0,
+                businessName:  bizName,
+            });
+            setAuthState("allowed");
+        };
+
+        check();
+    }, [id, router]);
+
+    /* ── 로딩 ── */
     if (authState === "loading") {
         return (
             <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -77,64 +134,52 @@ export default function TenantPortalPage() {
         );
     }
 
-    if (authState === "denied") {
+    /* ── 접근 거부 ── */
+    if (authState === "denied" || !room) {
         return (
             <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-sm w-full border border-neutral-200">
                     <Lock className="mx-auto text-rose-500 mb-4" size={48} />
                     <h2 className="text-xl font-bold text-neutral-900 mb-2">접근 권한 없음</h2>
                     <p className="text-neutral-500 text-sm mb-6">본인의 계약 페이지만 확인할 수 있습니다.</p>
-                    <Link href="/tenant/login" className="text-blue-600 font-semibold text-sm hover:underline">로그인 페이지로</Link>
+                    <Link href="/tenant/login" className="text-blue-600 font-semibold text-sm hover:underline">
+                        로그인 페이지로
+                    </Link>
                 </div>
             </div>
         );
     }
 
-    if (!room || room.status === "VACANT") {
-        return (
-            <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4">
-                <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-sm w-full border border-neutral-200">
-                    <AlertCircle className="mx-auto text-rose-500 mb-4" size={48} />
-                    <h2 className="text-xl font-bold text-neutral-900 mb-2">접근할 수 없습니다</h2>
-                    <p className="text-neutral-500 text-sm mb-6">존재하지 않거나 유효하지 않은 임대차 계약 링크입니다.</p>
-                </div>
-            </div>
-        );
-    }
-
-    const { tenant, paymentInfo, status } = room;
-
+    /* ── 목 납부 내역 ── */
     const mockPaymentHistory = Array.from({ length: 3 }).map((_, i) => {
         const date = new Date();
         date.setMonth(date.getMonth() - i);
         const monthStr = `${date.getFullYear()}년 ${String(date.getMonth() + 1).padStart(2, '0')}월`;
 
         let paymentStatus: "PAID" | "UNPAID" | "PENDING" = "PAID";
-        if (status === "UNPAID" && i < (room.unpaidMonths || 1)) {
-            paymentStatus = "UNPAID";
-        } else if (i === 0 && (room.id.length % 2 === 0)) {
-            paymentStatus = "PENDING";
-        }
+        if (room.status === "UNPAID" && i < (room.unpaidMonths || 1)) paymentStatus = "UNPAID";
+        else if (i === 0 && room.id.length % 2 === 0) paymentStatus = "PENDING";
 
         return {
-            id: `p_${i}`,
-            month: monthStr,
-            amount: paymentInfo?.monthlyRent || 0,
-            dueDate: paymentInfo?.dueDate || "매월 15일",
-            status: paymentStatus,
-            paidDate: paymentStatus === "PAID" ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-15` : null
+            id:      `p_${i}`,
+            month:   monthStr,
+            amount:  room.monthlyRent,
+            dueDate: room.dueDate,
+            status:  paymentStatus,
+            paidDate: paymentStatus === "PAID"
+                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-15`
+                : null,
         };
     });
 
     const handleExportExcel = () => {
-        const exportData = mockPaymentHistory.map((row) => ({
-            "청구 월": row.month,
+        const exportData = mockPaymentHistory.map(row => ({
+            "청구 월":       row.month,
             "납부 금액(원)": row.amount,
-            "약정일": row.dueDate,
-            "수납 상태": row.status === "PAID" ? "납부 완료" : row.status === "UNPAID" ? "미납" : "수납 대기",
-            "수납 완료일": row.paidDate || "-",
+            "약정일":        row.dueDate,
+            "수납 상태":     row.status === "PAID" ? "납부 완료" : row.status === "UNPAID" ? "미납" : "수납 대기",
+            "수납 완료일":   row.paidDate ?? "-",
         }));
-
         const ws = XLSX.utils.json_to_sheet(exportData);
         ws["!cols"] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }];
         const wb = XLSX.utils.book_new();
@@ -147,7 +192,9 @@ export default function TenantPortalPage() {
             {/* Minimal Header */}
             <header className="bg-white border-b border-neutral-200 px-4 py-4 sticky top-0 z-10 shadow-sm">
                 <div className="max-w-md mx-auto flex items-center justify-between">
-                    <span className="font-exrabold text-lg text-neutral-900 tracking-tight">{currentBusiness?.name || 'noado'}</span>
+                    <span className="font-extrabold text-lg text-neutral-900 tracking-tight">
+                        {room.businessName || 'noado'}
+                    </span>
                     <UserCircle size={24} className="text-neutral-400" />
                 </div>
             </header>
@@ -156,19 +203,19 @@ export default function TenantPortalPage() {
                 {/* Greeting Card */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200 animate-in fade-in duration-500">
                     <h1 className="text-2xl font-black text-neutral-900 tracking-tight mb-1">
-                        안녕하세요, <span className="text-blue-600">{tenant?.name}</span>님
+                        안녕하세요, <span className="text-blue-600">{room.tenantName}</span>님
                     </h1>
                     <p className="text-neutral-500 text-sm">{room.name} 계약 현황입니다.</p>
                 </div>
 
                 {/* Status Alert Card */}
-                {status === "UNPAID" && (
+                {room.status === "UNPAID" && (
                     <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-bottom-2 duration-500">
                         <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={24} />
                         <div>
                             <h3 className="font-bold text-rose-800 text-base mb-1">미납된 임대료가 있습니다</h3>
                             <p className="text-rose-600 text-sm mb-3">
-                                {room.unpaidMonths}개월분 (₩ {room.unpaidAmount?.toLocaleString()})이 미납되었습니다.
+                                {room.unpaidMonths}개월분 (₩ {room.unpaidAmount.toLocaleString()})이 미납되었습니다.
                             </p>
                             <Link
                                 href={`/portal/${room.id}/pay`}
@@ -201,11 +248,11 @@ export default function TenantPortalPage() {
                         <div className="flex bg-neutral-50 rounded-xl p-4 divide-x divide-neutral-200">
                             <div className="flex-1 pr-4">
                                 <span className="text-xs font-bold text-neutral-400 block mb-1">보증금</span>
-                                <span className="font-bold text-neutral-900 block text-lg">₩ {paymentInfo?.deposit.toLocaleString()}</span>
+                                <span className="font-bold text-neutral-900 block text-lg">₩ {room.deposit.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 pl-4">
-                                <span className="text-xs font-bold text-neutral-400 block mb-1">월임대료 ({paymentInfo?.dueDate})</span>
-                                <span className="font-bold text-blue-600 block text-lg">₩ {paymentInfo?.monthlyRent.toLocaleString()}</span>
+                                <span className="text-xs font-bold text-neutral-400 block mb-1">월임대료 ({room.dueDate})</span>
+                                <span className="font-bold text-blue-600 block text-lg">₩ {room.monthlyRent.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -226,13 +273,14 @@ export default function TenantPortalPage() {
                         {mockPaymentHistory.map((history) => (
                             <div key={history.id} className="p-5 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm ${history.status === "PAID" ? "bg-emerald-100 text-emerald-600" :
-                                        history.status === "UNPAID" ? "bg-rose-100 text-rose-600" :
-                                            "bg-neutral-100 text-neutral-500"
-                                        }`}>
-                                        {history.status === "PAID" ? <CheckCircle2 size={20} /> :
-                                            history.status === "UNPAID" ? <AlertCircle size={20} /> :
-                                                <Clock size={20} />}
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 border-white shadow-sm ${
+                                        history.status === "PAID"   ? "bg-emerald-100 text-emerald-600" :
+                                        history.status === "UNPAID" ? "bg-rose-100 text-rose-600"       :
+                                                                      "bg-neutral-100 text-neutral-500"
+                                    }`}>
+                                        {history.status === "PAID"   ? <CheckCircle2 size={20} /> :
+                                         history.status === "UNPAID" ? <AlertCircle  size={20} /> :
+                                                                       <Clock        size={20} />}
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-neutral-900">{history.month} 청구분</h4>
@@ -240,13 +288,9 @@ export default function TenantPortalPage() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    {history.status === "PAID" ? (
-                                        <span className="text-sm font-bold text-emerald-600">수납완료</span>
-                                    ) : history.status === "UNPAID" ? (
-                                        <span className="text-sm font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">미납</span>
-                                    ) : (
-                                        <span className="text-sm font-bold text-neutral-500">납부대기</span>
-                                    )}
+                                    {history.status === "PAID"   ? <span className="text-sm font-bold text-emerald-600">수납완료</span> :
+                                     history.status === "UNPAID" ? <span className="text-sm font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded">미납</span> :
+                                                                   <span className="text-sm font-bold text-neutral-500">납부대기</span>}
                                 </div>
                             </div>
                         ))}

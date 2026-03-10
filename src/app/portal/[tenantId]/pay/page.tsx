@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic'
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useBusiness } from "@/components/providers/BusinessProvider";
+import { supabase } from "@/lib/supabase";
+import { allRooms as mockRooms } from "@/lib/data";
 import { TossCheckout } from "@/components/payments/TossCheckout";
 import {
     ArrowLeft,
@@ -14,29 +15,77 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+interface PayRoom {
+    id: string;
+    name: string;
+    status: string;
+    tenantName: string;
+    tenantCompany: string;
+    monthlyRent: number;
+    unpaidAmount: number;
+}
+
 export default function TenantPaymentPage() {
     const params = useParams();
     const router = useRouter();
-    const { rooms } = useBusiness();
+    const id = params?.tenantId as string;
 
+    const [room, setRoom]           = useState<PayRoom | null>(null);
     const [isSuccess, setIsSuccess] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
-    const id = params?.tenantId as string;
-    const room = rooms.find(r => r.id === id);
+    useEffect(() => {
+        if (!id) return;
+
+        const load = async () => {
+            /* 데모 */
+            if (id.startsWith('r_')) {
+                const mockRoom = mockRooms.find(r => r.id === id);
+                if (mockRoom) {
+                    setRoom({
+                        id:            mockRoom.id,
+                        name:          mockRoom.name,
+                        status:        mockRoom.status,
+                        tenantName:    mockRoom.tenant?.name        ?? '미확인',
+                        tenantCompany: mockRoom.tenant?.companyName ?? '',
+                        monthlyRent:   mockRoom.paymentInfo?.monthlyRent ?? 0,
+                        unpaidAmount:  mockRoom.unpaidAmount ?? 0,
+                    });
+                }
+                return;
+            }
+
+            /* Supabase */
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (!sessionData.session) { router.push('/tenant/login'); return; }
+
+            const { data: row } = await supabase
+                .from("rooms")
+                .select("id, name, status, tenant_name, tenant_company_name, monthly_rent, unpaid_amount")
+                .eq("id", id)
+                .single();
+
+            if (row) {
+                setRoom({
+                    id:            row.id,
+                    name:          row.name,
+                    status:        row.status,
+                    tenantName:    row.tenant_name         ?? '미확인',
+                    tenantCompany: row.tenant_company_name ?? '',
+                    monthlyRent:   row.monthly_rent        ?? 0,
+                    unpaidAmount:  row.unpaid_amount       ?? 0,
+                });
+            }
+        };
+
+        load();
+    }, [id, router]);
 
     if (!room) return null;
 
-    const { tenant, paymentInfo } = room;
     const paymentAmount = room.status === "UNPAID" && room.unpaidAmount
         ? room.unpaidAmount
-        : paymentInfo?.monthlyRent || 0;
-
-    const handlePaymentSuccess = () => {
-        setIsSuccess(true);
-        // In a real app, Toss Payments redirect handles the success logic.
-        // After redirect validation, backend updates DB `status = 'PAID'`
-    };
+        : room.monthlyRent;
 
     if (isSuccess) {
         return (
@@ -49,7 +98,6 @@ export default function TenantPaymentPage() {
                     <p className="text-neutral-500 mb-8 leading-relaxed">
                         이번 달 임대료 납부가 정상적으로 처리되었습니다.<br />이용해 주셔서 감사합니다.
                     </p>
-
                     <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 mb-8 text-left space-y-3">
                         <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
                             <span className="text-sm font-bold text-neutral-500">결제 금액</span>
@@ -60,7 +108,6 @@ export default function TenantPaymentPage() {
                             <span className="text-sm font-bold text-neutral-900">신용카드 (토스페이먼츠)</span>
                         </div>
                     </div>
-
                     <Link
                         href={`/portal/${room.id}`}
                         className="w-full block py-4 bg-neutral-900 text-white rounded-xl font-bold text-lg hover:bg-neutral-800 transition-colors"
@@ -80,7 +127,7 @@ export default function TenantPaymentPage() {
                     <button onClick={() => router.back()} className="p-2 -ml-2 text-neutral-500 hover:text-neutral-900 transition-colors rounded-full hover:bg-neutral-100">
                         <ArrowLeft size={24} />
                     </button>
-                    <span className="font-exrabold text-lg text-neutral-900 tracking-tight flex items-center gap-2">
+                    <span className="font-extrabold text-lg text-neutral-900 tracking-tight flex items-center gap-2">
                         <CreditCard size={20} className="text-neutral-400" />
                         임대료 카드 결제
                     </span>
@@ -99,11 +146,10 @@ export default function TenantPaymentPage() {
                             <h2 className="text-xl font-black text-neutral-900 tracking-tight">당월 임대료 결제</h2>
                         </div>
                     </div>
-
                     <div className="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium text-neutral-500">청구 대상</span>
-                            <span className="text-sm font-bold text-neutral-900">{tenant?.name} ({tenant?.companyName})</span>
+                            <span className="text-sm font-bold text-neutral-900">{room.tenantName} ({room.tenantCompany})</span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-medium text-neutral-500">총 결제 금액</span>
@@ -115,7 +161,7 @@ export default function TenantPaymentPage() {
                     </p>
                 </div>
 
-                {/* Toss Payments Widget Injection */}
+                {/* Toss Payments Widget */}
                 <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div className="p-5 border-b border-neutral-100 bg-neutral-50/50">
                         <h3 className="font-bold text-neutral-900">결제 진행</h3>
