@@ -99,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, isLoading, pathname, router]);
 
     const signOut = async () => {
-        setIsLoading(true);
         await supabase.auth.signOut();
         router.push('/login');
     };
