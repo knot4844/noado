@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard,
-  FileText, Bell, Settings, LogOut, BarChart3, Receipt, X, CalendarClock,
+  FileText, Bell, Settings, LogOut, BarChart3, Receipt, X, CalendarClock, ScrollText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/tenants',        label: '입주사 관리', icon: Users },
   { href: '/payments',       label: '수납 매칭',   icon: CreditCard },
   { href: '/billing',        label: '정기 청구',     icon: CalendarClock },
+  { href: '/invoices',       label: '세금계산서',  icon: ScrollText },
   { href: '/contracts',      label: '전자계약',    icon: FileText },
   { href: '/notifications',  label: '알림톡',      icon: Bell },
   { href: '/reports',        label: '보고서',      icon: BarChart3 },
