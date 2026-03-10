@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
   let query = admin
     .from('invoices')
-    .select('*, rooms(id, name, status, tenant_name, monthly_rent, business_id)')
+    .select('*, rooms(id, name, status, tenant_name, tenant_contact, monthly_rent, business_id)')
     .eq('owner_id', user.id)
     .eq('year', year)
     .eq('month', month)
