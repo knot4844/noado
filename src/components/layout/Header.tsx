@@ -180,7 +180,8 @@ export function Header({ onMenuClick }: HeaderProps) {
                         </div>
                     </Link>
                     <button
-                        onClick={async () => {
+                        onClick={async (e) => {
+                            e.preventDefault();
                             if (user?.id === 'demo-user-123') {
                                 toggleDemoLogin(false);
                             } else {
@@ -191,7 +192,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                             }
                         }}
                         title="로그아웃"
-                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 cursor-pointer"
                     >
                         <LogOut size={18} />
                     </button>

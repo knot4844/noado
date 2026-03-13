@@ -34,9 +34,16 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const isActive = (href: string) => pathname?.startsWith(href)
 
   async function handleSignOut() {
+    // Clear demo cookies/storage
+    localStorage.removeItem('local_demo_login')
+    document.cookie = "noado_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    
+    // Clear Supabase Session
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    
+    // Hard refresh to login to purge client hooks and auth states
+    window.location.href = '/login'
   }
 
   const sidebarContent = (
@@ -114,12 +121,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all w-full text-left"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all w-full text-left group"
           style={{ color: 'var(--color-sidebar-text)' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--color-sidebar-hover)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.1)';
+            (e.currentTarget as HTMLElement).style.color = 'rgb(239, 68, 68)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+            (e.currentTarget as HTMLElement).style.color = 'var(--color-sidebar-text)';
+          }}
         >
-          <LogOut size={18} />
+          <LogOut size={18} className="group-hover:text-red-500 transition-colors" />
           로그아웃
         </button>
       </div>
