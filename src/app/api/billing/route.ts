@@ -88,11 +88,16 @@ export async function POST(req: NextRequest) {
 
   if (action === 'common_fee') {
     // 해당 businessId 의 이번 달 모든 청구서 조회
-    const { data: roomIds } = await admin
+    let roomQuery = admin
       .from('rooms')
       .select('id')
-      .eq('business_id', businessId)
       .eq('owner_id', user.id)
+
+    if (businessId && businessId !== 'ALL') {
+      roomQuery = roomQuery.eq('business_id', businessId)
+    }
+
+    const { data: roomIds } = await roomQuery
 
     if (!roomIds || roomIds.length === 0) {
       return NextResponse.json({ error: '호실 없음' }, { status: 400 })
