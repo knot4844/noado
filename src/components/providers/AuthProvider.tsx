@@ -99,8 +99,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, isLoading, pathname, router]);
 
     const signOut = async () => {
-        await supabase.auth.signOut();
-        router.push('/login');
+        setIsLoading(true);
+        try {
+            await supabase.auth.signOut();
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            setUser(null);
+            // Complete clean up and hard redirect to prevent client-side cache issues
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            } else {
+                router.push('/login');
+            }
+        }
     };
 
     return (
