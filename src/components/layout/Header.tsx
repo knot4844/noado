@@ -180,11 +180,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                         </div>
                     </Link>
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             if (user?.id === 'demo-user-123') {
                                 toggleDemoLogin(false);
                             } else {
-                                signOut();
+                                // Clear demo cookies/storage completely as backup
+                                localStorage.removeItem('local_demo_login');
+                                document.cookie = "noado_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+                                await signOut();
                             }
                         }}
                         title="로그아웃"
