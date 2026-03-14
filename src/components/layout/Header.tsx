@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Bell, Search, User as UserIcon, Menu, LogOut, AlertTriangle, CalendarX, Building2 } from "lucide-react";
-import { useAuth, toggleDemoLogin } from "@/components/providers/AuthProvider";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { useBusiness } from "@/components/providers/BusinessProvider";
 import Link from "next/link";
 
@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-    const { user, signOut } = useAuth();
+    const { user } = useAuth();
     const { currentBusiness, rooms } = useBusiness();
     const [showNotifications, setShowNotifications] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
@@ -57,6 +57,15 @@ export function Header({ onMenuClick }: HeaderProps) {
         if (showNotifications) document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
     }, [showNotifications]);
+
+    const handleLogout = (e: React.MouseEvent) => {
+        e.preventDefault();
+        // Clear demo cookies/storage
+        localStorage.removeItem('local_demo_login');
+        document.cookie = "noado_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        // 서버 사이드 signout 라우트로 이동 (쿠키 완전 삭제 후 /login 리다이렉트)
+        window.location.href = '/api/auth/signout';
+    };
 
     return (
         <header className="h-16 px-4 md:px-8 border-b border-neutral-200 bg-white flex items-center justify-between sticky top-0 z-10 w-full">
@@ -179,23 +188,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                             </p>
                         </div>
                     </Link>
-                    <button
-                        onClick={async (e) => {
-                            e.preventDefault();
-                            if (user?.id === 'demo-user-123') {
-                                toggleDemoLogin(false);
-                            } else {
-                                // Clear demo cookies/storage completely as backup
-                                localStorage.removeItem('local_demo_login');
-                                document.cookie = "noado_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-                                await signOut();
-                            }
-                        }}
+                    <div
+                        role="button"
+                        onClick={handleLogout}
                         title="로그아웃"
-                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors relative z-50 cursor-pointer"
+                        className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                     >
-                        <LogOut size={18} />
-                    </button>
+                        <LogOut size={18} className="pointer-events-none" />
+                    </div>
                 </div>
             </div>
         </header>

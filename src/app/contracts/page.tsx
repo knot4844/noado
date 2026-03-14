@@ -82,9 +82,19 @@ export default function ContractsPage() {
   /* ─── 계약 삭제 ─── */
   const deleteContract = async (id: string) => {
     if (!confirm('계약서를 삭제하시겠습니까?')) return
-    const { error } = await supabase.from('contracts').delete().eq('id', id)
+    const { error, data } = await supabase.from('contracts').delete().eq('id', id).select()
     if (error) return showToast('error', error.message)
+    if (!data || data.length === 0) return showToast('error', '삭제 권한이 없거나 이미 삭제된 계약서입니다.')
     showToast('success', '삭제되었습니다.')
+    load()
+  }
+
+  /* ─── 계약 발송 ─── */
+  const sendContract = async (id: string) => {
+    if (!confirm('계약서를 임차인에게 발송(전송대기 상태로 변경) 하시겠습니까?')) return
+    const { error } = await supabase.from('contracts').update({ status: 'sent' }).eq('id', id)
+    if (error) return showToast('error', error.message)
+    showToast('success', '발송 완료되었습니다. 서명 링크를 복사하여 전달해주세요.')
     load()
   }
 
@@ -219,7 +229,7 @@ export default function ContractsPage() {
                           <Eye size={13} />
                         </button>
                         {c.status === 'draft' && (
-                          <button onClick={() => showToast('success', '발송 기능은 준비 중입니다.')}
+                          <button onClick={() => sendContract(c.id)}
                             className="p-1.5 rounded-lg text-xs"
                             style={{ color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.15)' }}
                             title="발송">

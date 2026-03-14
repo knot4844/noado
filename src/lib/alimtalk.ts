@@ -22,6 +22,8 @@ export const TEMPLATES = {
   PAYMENT_DONE:    process.env.SOLAPI_TEMPLATE_PAYMENT_DONE    ?? '',
   /** 일일 브리핑 (Gemini AI) */
   DAILY_BRIEFING:  process.env.SOLAPI_TEMPLATE_DAILY_BRIEFING  ?? '',
+  /** 청구서 발행 안내 (결제 링크 포함) */
+  INVOICE_ISSUED:  process.env.SOLAPI_TEMPLATE_INVOICE_ISSUED  ?? '',
 } as const
 
 export type TemplateKey = keyof typeof TEMPLATES

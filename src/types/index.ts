@@ -10,6 +10,7 @@ export interface Room {
   tenant_phone: string | null
   tenant_email: string | null
   monthly_rent: number
+  payment_day?: number    // 정기 납부일 (1~31)
   deposit:      number
   lease_start:  string | null
   lease_end:    string | null

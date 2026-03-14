@@ -32,6 +32,7 @@ export default function ContractPage() {
     const [realTenantName, setRealTenantName] = useState<string | null>(null);
     const [realTenantPhone, setRealTenantPhone] = useState<string | null>(null);
     const [realTenantAddress, setRealTenantAddress] = useState<string | null>(null);
+    const [contractId, setContractId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -56,6 +57,19 @@ export default function ContractPage() {
                     setRealTenantName(data.name);
                     setRealTenantPhone(data.phone);
                     setRealTenantAddress(data.address);
+                }
+
+                // Fetch latest active or draft contract ID for this room
+                const { data: contractData } = await supabase
+                    .from("contracts")
+                    .select("id")
+                    .eq("room_id", roomId)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (contractData) {
+                    setContractId(contractData.id);
                 }
 
                 setIsLoading(false);
@@ -106,10 +120,13 @@ export default function ContractPage() {
         setSaveError(null);
 
         try {
+            if (!contractId) throw new Error('연결된 계약서를 찾을 수 없습니다.');
+            
             const res = await fetch('/api/contracts/sign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    contractId,
                     roomId,
                     signature: base64Data,
                     tenantName: displayTenantName,

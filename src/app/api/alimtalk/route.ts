@@ -26,10 +26,18 @@ import { sendKakaoAlimtalk, normalizePhone, type TemplateKey } from '@/lib/alimt
  * ─────────────────────────────────────────────────────────────────────── */
 function getVariables(
   templateKey: string,
-  params: { roomName: string; tenantName: string; amount: string; dueDate: string }
+  params: { roomName: string; tenantName: string; amount: string; dueDate: string; paymentLink: string }
 ): Record<string, string> {
-  const { roomName, tenantName, amount, dueDate } = params
+  const { roomName, tenantName, amount, dueDate, paymentLink } = params
   switch (templateKey) {
+    case 'INVOICE_ISSUED':
+      return {
+        '#{세입자}': tenantName,
+        '#{호실}':  roomName,
+        '#{금액}':  amount,
+        '#{기한}':  dueDate,
+        '#{결제링크}': paymentLink,
+      }
     case 'UNPAID_REMINDER':
       return {
         '#{세입자}': tenantName,
@@ -71,6 +79,7 @@ export async function POST(req: NextRequest) {
     amount     = '',
     dueDate    = '매월 10일',
     roomId,
+    paymentLink = '',
   } = body as {
     templateKey: string
     phone:       string
@@ -79,6 +88,7 @@ export async function POST(req: NextRequest) {
     amount?:     string
     dueDate?:    string
     roomId?:     string
+    paymentLink?: string
   }
 
   if (!templateKey || !phone) {
@@ -86,7 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   const normalizedPhone = normalizePhone(phone)
-  const variables = getVariables(templateKey, { roomName, tenantName, amount, dueDate })
+  const variables = getVariables(templateKey, { roomName, tenantName, amount, dueDate, paymentLink: paymentLink ?? '' })
 
   let status: 'success' | 'failed' = 'success'
   try {

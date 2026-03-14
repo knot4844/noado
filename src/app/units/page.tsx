@@ -43,6 +43,7 @@ function RoomModal({
     tenant_phone: room?.tenant_phone ?? '',
     tenant_email: room?.tenant_email ?? '',
     monthly_rent: String(room?.monthly_rent ?? ''),
+    payment_day:  String(room?.payment_day  ?? '10'),
     deposit:      String(room?.deposit      ?? ''),
     lease_start:  room?.lease_start  ?? '',
     lease_end:    room?.lease_end    ?? '',
@@ -69,6 +70,7 @@ function RoomModal({
       tenant_phone: form.tenant_phone || null,
       tenant_email: form.tenant_email || null,
       monthly_rent: Number(form.monthly_rent) || 0,
+      payment_day:  Number(form.payment_day)  || 10,
       deposit:      Number(form.deposit)      || 0,
       lease_start:  form.lease_start  || null,
       lease_end:    form.lease_end    || null,
@@ -143,7 +145,7 @@ function RoomModal({
               className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={inputSty} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>월세 (원)</label>
               <input value={form.monthly_rent} onChange={set('monthly_rent')} type="number" placeholder="500000"
@@ -152,6 +154,11 @@ function RoomModal({
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>보증금 (원)</label>
               <input value={form.deposit} onChange={set('deposit')} type="number" placeholder="5000000"
+                className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={inputSty} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>정기 납부일 (일)</label>
+              <input value={form.payment_day} onChange={set('payment_day')} type="number" placeholder="10" min="1" max="31"
                 className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={inputSty} />
             </div>
           </div>

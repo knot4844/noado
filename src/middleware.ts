@@ -36,7 +36,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/portal/') ||   // 임차인 포털 (토큰 기반 접근)
-    pathname.startsWith('/invite/')      // 초대 링크
+    pathname.startsWith('/invite/') ||   // 초대 링크
+    pathname.startsWith('/pay/')         // 세입자 결제 페이지
 
   // 임대인 전용 경로 (임차인 role 접근 차단)
   const isLandlordPath =

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, CheckCircle2, AlertCircle, PenTool, RotateCcw } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, PenTool, RotateCcw, Download } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Contract } from '@/types'
 
@@ -25,6 +25,8 @@ export default function InvitePage() {
   const [drawing, setDrawing]   = useState(false)
   const [hasSig, setHasSig]     = useState(false)
   const [saving, setSaving]     = useState(false)
+  const [signDate, setSignDate] = useState<string | null>(null)
+  const [contentHash, setContentHash] = useState<string | null>(null)
 
   /* ─── 계약서 조회 ─── */
   useEffect(() => {
@@ -99,18 +101,39 @@ export default function InvitePage() {
     const canvas   = canvasRef.current!
     const dataUrl  = canvas.toDataURL('image/png')
 
-    // 클라이언트 IP는 서버에서만 가능하므로 placeholder
-    const { error } = await supabase.from('contracts').update({
-      status:             'signed',
-      signed_at:          new Date().toISOString(),
-      signature_data_url: dataUrl,
-    }).eq('id', contract.id)
+    try {
+      const res = await fetch('/api/contracts/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: contract.id,
+          roomId: contract.room_id,
+          signature: dataUrl,
+          tenantName: contract.tenant_name || '임차인',
+          contractContent: contract.contract_snapshot,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '서버 오류');
 
-    if (error) { setSaving(false); alert('서명 저장 중 오류가 발생했습니다.'); return }
+      const now = new Date(data.signedAt);
+      setSignDate(`${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+      setContentHash(data.contentHash);
 
-    // 호실 상태 갱신은 임대인이 확인 후 처리
-    setSaving(false)
-    setStep('done')
+      // 초대한 토큰 계약 상태도 갱신
+      await supabase.from('contracts').update({
+        status: 'signed',
+        signed_at: new Date().toISOString(),
+        signature_data_url: dataUrl
+      }).eq('id', contract.id);
+
+      setStep('done');
+    } catch (error) {
+      const err = error as { message?: string };
+      alert(`서명 저장 중 오류가 발생했습니다: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const snap = contract?.contract_snapshot as Record<string, string | number> | null
@@ -133,8 +156,42 @@ export default function InvitePage() {
   )
 
   if (step === 'done') return (
-    <FullPage icon={<CheckCircle2 size={48} />} iconColor="var(--color-success)"
-      title="서명이 완료되었습니다" desc="전자서명이 성공적으로 저장되었습니다. 임대인에게 전달됩니다." />
+    <div className="min-h-screen py-10 px-4 flex items-center justify-center font-sans" style={{ background: 'var(--color-background)' }}>
+      <div className="w-full max-w-lg rounded-3xl p-8 md:p-12 text-center"
+           style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--color-border)' }}>
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+             style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+          <CheckCircle2 size={40} />
+        </div>
+        <h1 className="text-2xl font-bold mb-3" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+          전자 서명이 완료되었습니다
+        </h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--color-muted)' }}>
+          계약서에 서명이 안전하게 기록되었으며,<br /> 전자서명법에 따라 법적 효력이 발생합니다.
+        </p>
+        
+        {/* 법적 증거 정보 */}
+        <div className="rounded-xl p-5 mb-8 text-left space-y-3" style={{ background: 'var(--color-muted-bg)' }}>
+          <div>
+            <span className="text-xs font-bold block mb-0.5" style={{ color: 'var(--color-muted)' }}>📅 서명 일시 (타임스탬프)</span>
+            <span className="text-sm font-mono font-bold" style={{ color: 'var(--color-text)' }}>{signDate}</span>
+          </div>
+          {contentHash && (
+            <div>
+              <span className="text-xs font-bold block mb-0.5" style={{ color: 'var(--color-muted)' }}>🔐 계약 내용 해시 (SHA-256)</span>
+              <span className="text-[11px] font-mono break-all" style={{ color: 'var(--color-muted)' }}>{contentHash}</span>
+            </div>
+          )}
+        </div>
+        
+        <button onClick={() => window.print()}
+          className="w-full py-4 rounded-xl text-md font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+          style={{ background: 'var(--color-primary)' }}>
+          <Download size={20} />
+          계약서 PDF 다운로드 (화면 인쇄)
+        </button>
+      </div>
+    </div>
   )
 
   return (

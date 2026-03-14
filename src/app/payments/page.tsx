@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
   Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw, Trash2,
-  GitMerge, Eye, AlertTriangle,
+  GitMerge, Eye, AlertTriangle, MessageSquare,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Invoice, Room } from '@/types'
@@ -425,6 +425,31 @@ export default function PaymentsPage() {
     load()
   }
 
+  /* ─── 청구서 카톡 발송 (수동) ─── */
+  const sendInvoiceKakao = async (inv: InvoiceWithRoom) => {
+    if (!inv.room?.tenant_phone) return showToast('error', '연락처가 없습니다.')
+    try {
+      const res = await fetch('/api/alimtalk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateKey: 'INVOICE_ISSUED',
+          phone:       inv.room.tenant_phone,
+          roomName:    inv.room.name,
+          tenantName:  inv.room.tenant_name || '입주자님',
+          amount:      String(inv.amount),
+          dueDate:     inv.due_date || '',
+          paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
+          roomId:      inv.room_id
+        })
+      })
+      if (!res.ok) throw new Error('발송 실패')
+      showToast('success', '청구서 알림톡을 발송했습니다.')
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : '발송 오류')
+    }
+  }
+
   /* ─── 청구서 일괄생성 ─── */
   const generateInvoices = async () => {
     setImporting(true)
@@ -434,7 +459,7 @@ export default function PaymentsPage() {
     const [year, month] = yearMonth.split('-').map(Number)
 
     const { data: rooms } = await supabase
-      .from('rooms').select('id, monthly_rent, owner_id')
+      .from('rooms').select('id, monthly_rent, owner_id, payment_day, tenant_name, tenant_phone, name')
       .eq('owner_id', user.id).neq('status', 'VACANT')
 
     if (!rooms || rooms.length === 0) {
@@ -448,8 +473,7 @@ export default function PaymentsPage() {
       showToast('error', '이미 모든 청구서가 생성되어 있습니다.'); setImporting(false); return
     }
 
-    const dueDate = new Date(year, month - 1, 10).toISOString().split('T')[0]
-    const { error } = await supabase.from('invoices').insert(
+    const { data: insertedInvoices, error } = await supabase.from('invoices').insert(
       newRooms.map(r => ({
         owner_id:    user.id,
         room_id:     r.id,
@@ -458,10 +482,39 @@ export default function PaymentsPage() {
         amount:      r.monthly_rent,
         paid_amount: 0,
         status:      'ready',
-        due_date:    dueDate,
+        due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
       }))
-    )
+    ).select()
+    
     if (error) { showToast('error', error.message); setImporting(false); return }
+
+    // 알림톡 발송
+    if (insertedInvoices) {
+      for (const inv of insertedInvoices) {
+        const room = newRooms.find(r => r.id === inv.room_id)
+        if (room && room.tenant_phone) {
+          try {
+            await fetch('/api/alimtalk', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                templateKey: 'INVOICE_ISSUED',
+                phone:       room.tenant_phone,
+                roomName:    room.name,
+                tenantName:  room.tenant_name || '입주자님',
+                amount:      String(room.monthly_rent),
+                dueDate:     inv.due_date,
+                paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
+                roomId:      room.id
+              })
+            })
+          } catch (e) {
+            console.error('알림톡 발송 실패', e)
+          }
+        }
+      }
+    }
+
     showToast('success', `${newRooms.length}건 청구서를 생성했습니다.`)
     load()
     setImporting(false)
@@ -1041,6 +1094,12 @@ export default function PaymentsPage() {
                           </button>
                         ) : (
                           <>
+                            <button onClick={() => sendInvoiceKakao(inv)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                              style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid currentColor' }}>
+                              <MessageSquare size={11} />
+                              카톡재발송
+                            </button>
                             <button
                               onClick={() => {
                                 setVaBank('SHINHAN'); setVaResult(null)

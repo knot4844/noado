@@ -59,8 +59,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // PAID 이벤트만 처리
-  if (type !== 'Transaction.Paid' || !data?.paymentId) {
+  // PAID, FAILED, CANCELLED 등 상태 업데이트가 필요한 이벤트만 처리
+  const validEvents = ['Transaction.Paid', 'Transaction.Failed', 'Transaction.Cancelled', 'Transaction.Expired']
+  if (!validEvents.includes(type) || !data?.paymentId) {
     return NextResponse.json({ ok: true, skipped: true })
   }
 
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
   const supabase = createClient()
 
   /* ─── 멱등성 체크: 이미 처리된 결제인지 확인 ─── */
+  // 동시성 제어 1차 방어막: 조회
   const { data: existing } = await supabase
     .from('payments')
     .select('id')
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (existing) {
+    console.log(`[Webhook] 중복 웹훅 수신 방어 (PaymentID: ${paymentId})`);
     return NextResponse.json({ ok: true, duplicate: true })
   }
 
@@ -109,34 +112,54 @@ export async function POST(req: NextRequest) {
   const paidAmount = amount?.total ?? 0
   const now        = paidAt ?? new Date().toISOString()
 
-  /* ─── payments 삽입 ─── */
-  const { error: payErr } = await supabase.from('payments').insert({
-    owner_id:           invoice.owner_id,
-    invoice_id:         invoice.id,
-    room_id:            invoice.room_id,
-    portone_payment_id: paymentId,
-    amount:             paidAmount,
-    paid_at:            now,
-    note:               `PortOne V2 자동수납 (${paymentId})`,
-  })
+  /* ─── 상태별 분기 처리 ─── */
+  if (type === 'Transaction.Paid') {
+    /* ─── payments 삽입 ─── */
+    const { error: payErr } = await supabase.from('payments').insert({
+      owner_id:           invoice.owner_id,
+      invoice_id:         invoice.id,
+      room_id:            invoice.room_id,
+      portone_payment_id: paymentId,
+      amount:             paidAmount,
+      paid_at:            now,
+      note:               `PortOne V2 자동수납 (${paymentId})`,
+    })
 
-  if (payErr) {
-    // UNIQUE 위반은 멱등성 처리로 무시
-    if (payErr.code === '23505') return NextResponse.json({ ok: true, duplicate: true })
-    console.error('[Webhook] payments insert error:', payErr)
-    return NextResponse.json({ error: payErr.message }, { status: 500 })
-  }
+    if (payErr) {
+      if (payErr.code === '23505') return NextResponse.json({ ok: true, duplicate: true })
+      console.error('[Webhook] payments insert error:', payErr)
+      return NextResponse.json({ error: payErr.message }, { status: 500 })
+    }
 
-  /* ─── invoice 상태 업데이트 ─── */
-  await supabase.from('invoices').update({
-    paid_amount: paidAmount,
-    status:      paidAmount >= invoice.amount ? 'paid' : 'ready',
-    paid_at:     now,
-  }).eq('id', invoice.id)
+    /* ─── invoice 상태 업데이트 ─── */
+    await supabase.from('invoices').update({
+      paid_amount: paidAmount,
+      status:      paidAmount >= invoice.amount ? 'paid' : 'ready',
+      paid_at:     now,
+    }).eq('id', invoice.id)
 
-  /* ─── room 상태 업데이트 ─── */
-  if (paidAmount >= invoice.amount) {
-    await supabase.from('rooms').update({ status: 'PAID' }).eq('id', invoice.room_id)
+    /* ─── room 상태 업데이트 ─── */
+    if (paidAmount >= invoice.amount) {
+      await supabase.from('rooms').update({ status: 'PAID' }).eq('id', invoice.room_id)
+    }
+
+    console.log(`[Webhook] 수납완료: invoice=${invoice.id} amount=${paidAmount}`)
+  } 
+  else {
+    // FAILED, CANCELLED, EXPIRED 등
+    console.log(`[Webhook] 결제 실패/취소 이벤트 수신: ${type} (PaymentID: ${paymentId})`)
+    
+    // 해당 인보이스가 이미 'paid'가 아니라면, 상태를 'overdue' 나 다시 발급 가능하도록 초기화.
+    // 여기서는 실패한 결제 ID(portone_payment_id)를 null로 비워주어 다시 재발급/재결제 할 수 있게 열어줍니다.
+    await supabase.from('invoices').update({
+      portone_payment_id: null,
+      virtual_account_number: null,
+      virtual_account_bank: null,
+      virtual_account_due: null,
+    }).eq('id', invoice.id).neq('status', 'paid') 
+
+    // payments 테이블에도 실패 기록을 남기려면 여기서 insert 하거나, 현행대로 생략합니다.
+    // 지금은 인보이스 초기화만 진행합니다.
   }
 
   console.log(`[Webhook] 수납완료: invoice=${invoice.id} amount=${paidAmount}`)

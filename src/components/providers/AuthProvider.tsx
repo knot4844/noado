@@ -82,7 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const publicRoutes = ['/', '/login', '/signup', '/master-admin', '/terms', '/privacy'];
-            const isPublicPath = publicRoutes.includes(pathname) || pathname?.startsWith('/pricing') || pathname?.startsWith('/auth/');
+            const isPublicPath = publicRoutes.some(p => pathname === p || pathname?.startsWith(p + '/'))
+                || pathname?.startsWith('/pricing') || pathname?.startsWith('/auth/');
 
             // Allow tenant flows to manage their own auth (they have local guards)
             const isTenantPath = pathname?.startsWith('/invite') || pathname?.startsWith('/tenant') || pathname?.startsWith('/portal') || pathname?.startsWith('/contracts');
@@ -99,19 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, isLoading, pathname, router]);
 
     const signOut = async () => {
-        setIsLoading(true);
-        try {
-            await supabase.auth.signOut();
-        } catch (error) {
-            console.error('Logout error:', error);
-        } finally {
-            setUser(null);
-            // Complete clean up and hard redirect to prevent client-side cache issues
-            if (typeof window !== 'undefined') {
-                window.location.href = '/login';
-            } else {
-                router.push('/login');
-            }
+        // 서버 사이드 signout 라우트를 통해 쿠키를 완전히 삭제
+        if (typeof window !== 'undefined') {
+            window.location.href = '/api/auth/signout';
+        } else {
+            router.push('/api/auth/signout');
         }
     };
 

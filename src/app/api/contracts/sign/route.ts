@@ -4,9 +4,9 @@ import { createHash } from 'crypto';
 
 export async function POST(request: NextRequest) {
     const body = await request.json();
-    const { roomId, signature, tenantName, contractContent } = body;
+    const { contractId, roomId, signature, tenantName, contractContent } = body;
 
-    if (!roomId || !signature || !tenantName || !contractContent) {
+    if (!contractId || !roomId || !signature || !tenantName || !contractContent) {
         return NextResponse.json({ error: '필수 항목 누락' }, { status: 400 });
     }
 
@@ -30,15 +30,15 @@ export async function POST(request: NextRequest) {
 
     const { error } = await supabaseAdmin
         .from('contracts')
-        .upsert({
-            room_id: roomId,
-            tenant_name: tenantName,
-            signature,                          // base64 PNG 서명 이미지
+        .update({
+            signature_data_url: signature,       // base64 PNG 서명 이미지
             signed_at: new Date().toISOString(), // UTC 타임스탬프
             signer_ip: signerIp,                // 서명자 IP
             content_hash: contentHash,           // 계약 내용 해시
             contract_snapshot: contractContent,  // 계약 내용 스냅샷 (JSON)
-        }, { onConflict: 'room_id' });
+            status: 'signed',                    // 상태 변경
+        })
+        .eq('id', contractId);
 
     if (error) {
         console.error('계약서 저장 오류:', error);

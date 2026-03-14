@@ -37,11 +37,11 @@ export async function POST(req: NextRequest) {
     }
 
     const apiSecret    = process.env.PORTONE_API_SECRET
-    const channelKey   = process.env.PORTONE_CHANNEL_KEY_VIRTUAL
+    const channelKey   = process.env.PORTONE_CHANNEL_KEY
 
     if (!apiSecret || !channelKey || channelKey === 'your_virtual_account_channel_key_here') {
       return NextResponse.json(
-        { error: 'PortOne 가상계좌 채널키가 설정되지 않았습니다. .env.local의 PORTONE_CHANNEL_KEY_VIRTUAL을 확인하세요.' },
+        { error: 'PortOne 가상계좌 채널키가 설정되지 않았습니다. .env.local의 PORTONE_CHANNEL_KEY를 확인하세요.' },
         { status: 500 }
       )
     }

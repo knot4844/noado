@@ -6,7 +6,6 @@ import {
   LayoutDashboard, Building2, Users, CreditCard,
   FileText, Bell, Settings, LogOut, BarChart3, Receipt, X, CalendarClock, ScrollText,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 const NAV_ITEMS = [
@@ -33,17 +32,13 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   const isActive = (href: string) => pathname?.startsWith(href)
 
-  async function handleSignOut() {
+  async function handleSignOut(e?: React.MouseEvent) {
+    if (e) e.preventDefault()
     // Clear demo cookies/storage
     localStorage.removeItem('local_demo_login')
     document.cookie = "noado_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-    
-    // Clear Supabase Session
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    
-    // Hard refresh to login to purge client hooks and auth states
-    window.location.href = '/login'
+    // 서버 사이드 signout 라우트로 이동해 쿠키를 완전히 삭제 후 /login 으로 리다이렉트
+    window.location.href = '/api/auth/signout'
   }
 
   const sidebarContent = (
