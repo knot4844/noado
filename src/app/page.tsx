@@ -350,39 +350,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA + FOOTER */}
+      {/* FOOTER */}
       <section style={{
-        position: 'relative', zIndex: 1, padding: '60px 24px 0',
+        position: 'relative', zIndex: 1,
         height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
       }}>
-        <div style={{
-          maxWidth: '700px', margin: '0 auto', textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(69,123,157,0.14), rgba(168,218,220,0.07))',
-          border: '1px solid rgba(168,218,220,0.18)', borderRadius: '32px',
-          padding: '70px 40px', position: 'relative', overflow: 'hidden',
-        }}>
-          <div style={{
-            position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
-            width: '400px', height: '300px', borderRadius: '50%', pointerEvents: 'none',
-            background: 'radial-gradient(circle, rgba(168,218,220,0.1), transparent 70%)',
-          }} />
-          <h2 style={{ color: '#fff', fontSize: 'clamp(26px,4vw,44px)', fontWeight: 800, letterSpacing: '-1px', marginBottom: '14px' }}>
-            지금 바로 시작하세요
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '15px', marginBottom: '40px', lineHeight: 1.75 }}>
-            신용카드 없이 무료로 시작. 언제든 취소 가능.
-          </p>
-          {isLoggedIn
-            ? <PrimaryBtn large onClick={() => router.push('/dashboard')}>대시보드로 가기 →</PrimaryBtn>
-            : <PrimaryBtn large onClick={() => router.push('/signup')}>무료 계정 만들기 →</PrimaryBtn>
-          }
-        </div>
-
-        {/* FOOTER */}
         <footer style={{
           position: 'relative', zIndex: 1, padding: '32px 40px 28px',
-          borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: '40px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
         }}>
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -416,6 +392,7 @@ export default function LandingPage() {
           </div>
         </footer>
       </section>
+
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&display=swap');
