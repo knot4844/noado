@@ -258,12 +258,16 @@ export default function LandingPage() {
 
       {/* STATS */}
       <section ref={statsRef} style={{
-        position: 'relative', zIndex: 1, padding: '40px 24px 80px',
+        position: 'relative', zIndex: 1, padding: '60px 24px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
       }}>
-        <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '20px' }}>
-          {STATS.map((s, i) => <StatCard key={i} {...s} i={i} show={showStats} />)}
+        <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
+          <SectionTag>숫자로 보는 노아도</SectionTag>
+          <SectionTitle>임대 관리, 이렇게 달라집니다</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '20px', marginTop: '52px' }}>
+            {STATS.map((s, i) => <StatCard key={i} {...s} i={i} show={showStats} />)}
+          </div>
         </div>
       </section>
 
@@ -379,48 +383,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <section style={{
-        position: 'relative', zIndex: 1,
-        height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        scrollSnapAlign: 'start', flexShrink: 0,
+      {/* FOOTER — 스냅 없이 자연스럽게 */}
+      <footer style={{
+        position: 'relative', zIndex: 1, padding: '36px 40px 32px',
+        borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
       }}>
-        <footer style={{
-          position: 'relative', zIndex: 1, padding: '32px 40px 28px',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '4px 40px', marginBottom: '20px',
+          color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
         }}>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '4px 40px', marginBottom: '20px',
-            color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
-          }}>
-            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
-            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
-            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
-              경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
-            </div>
-            <div>
-              <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
-              <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
-            </div>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
+            경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
           </div>
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            flexWrap: 'wrap', gap: '10px',
-            borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px',
-          }}>
-            <LogoMark />
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-              <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
-              <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
-              <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
-            </div>
-            <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
+          <div>
+            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
+            <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
           </div>
-        </footer>
-      </section>
+        </div>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: '10px',
+          borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px',
+        }}>
+          <LogoMark />
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+            <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
+            <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
+            <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
+        </div>
+      </footer>
 
 
       <style>{`
