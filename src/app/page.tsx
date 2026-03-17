@@ -128,8 +128,9 @@ export default function LandingPage() {
     return () => el.removeEventListener('scroll', fn)
   }, [])
 
-  /* 섹션 진입 감지 — IntersectionObserver */
+  /* 섹션 진입 감지 — IntersectionObserver (checking 끝난 후 실행) */
   useEffect(() => {
+    if (checking) return
     const root = containerRef.current
     if (!root) return
     const obs = new IntersectionObserver(
@@ -142,11 +143,11 @@ export default function LandingPage() {
           if (e.target === pricingRef.current)  setShowPricing(true)
         })
       },
-      { root, threshold: 0.3 }
+      { root, threshold: 0.2 }
     )
     ;[statsRef, featuresRef, stepsRef, pricingRef].forEach(r => { if (r.current) obs.observe(r.current) })
     return () => obs.disconnect()
-  }, [])
+  }, [checking])
 
   if (checking) return null
 
