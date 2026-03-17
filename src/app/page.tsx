@@ -592,15 +592,33 @@ function FeatureCard({ icon, title, desc, color, i, show }: {
 
 /* ─── 단계 ─── */
 function StepRow({ step, title, desc, i, last }: { step: string; title: string; desc: string; i: number; last: boolean }) {
+  const [h, setH] = useState(false)
   return (
-    <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+    <div
+      onMouseEnter={() => setH(true)}
+      onMouseLeave={() => setH(false)}
+      style={{
+        display: 'flex', gap: '24px', alignItems: 'flex-start',
+        background: h ? 'rgba(168,218,220,0.05)' : 'transparent',
+        border: `1px solid ${h ? 'rgba(168,218,220,0.2)' : 'transparent'}`,
+        borderRadius: '16px', padding: '16px 20px', marginBottom: last ? 0 : '8px',
+        transform: h ? 'translateY(-4px)' : 'translateY(0)',
+        boxShadow: h ? '0 12px 40px rgba(168,218,220,0.1)' : 'none',
+        transition: 'all 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+        cursor: 'default',
+      }}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
         <div style={{
           width: '48px', height: '48px', borderRadius: '50%', flexShrink: 0, position: 'relative',
-          background: 'linear-gradient(135deg,rgba(168,218,220,0.15),rgba(69,123,157,0.15))',
-          border: '1px solid rgba(168,218,220,0.4)',
+          background: h
+            ? 'linear-gradient(135deg,rgba(168,218,220,0.3),rgba(69,123,157,0.3))'
+            : 'linear-gradient(135deg,rgba(168,218,220,0.15),rgba(69,123,157,0.15))',
+          border: `1px solid ${h ? 'rgba(168,218,220,0.7)' : 'rgba(168,218,220,0.4)'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#a8dadc', fontSize: '13px', fontWeight: 800,
+          boxShadow: h ? '0 0 20px rgba(168,218,220,0.3)' : 'none',
+          transition: 'all 0.25s ease',
         }}>
           {step}
           <div style={{
@@ -609,11 +627,19 @@ function StepRow({ step, title, desc, i, last }: { step: string; title: string; 
             animation: 'pulseRing 2.8s ease-out infinite', animationDelay: `${i * 0.9}s`,
           }} />
         </div>
-        {!last && <div style={{ width: '1px', height: '60px', background: 'linear-gradient(to bottom, rgba(168,218,220,0.3), transparent)' }} />}
+        {!last && <div style={{ width: '1px', height: '32px', background: 'linear-gradient(to bottom, rgba(168,218,220,0.3), transparent)', marginTop: '8px' }} />}
       </div>
-      <div style={{ paddingTop: '10px', paddingBottom: last ? 0 : '28px' }}>
-        <h3 style={{ color: '#fff', fontSize: '17px', fontWeight: 700, marginBottom: '8px' }}>{title}</h3>
-        <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px', lineHeight: 1.75 }}>{desc}</p>
+      <div style={{ paddingTop: '10px' }}>
+        <h3 style={{
+          color: h ? '#a8dadc' : '#fff',
+          fontSize: h ? '18px' : '17px', fontWeight: 700, marginBottom: '8px',
+          transition: 'all 0.2s ease',
+        }}>{title}</h3>
+        <p style={{
+          color: h ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.42)',
+          fontSize: '14px', lineHeight: 1.75,
+          transition: 'color 0.2s ease',
+        }}>{desc}</p>
       </div>
     </div>
   )
