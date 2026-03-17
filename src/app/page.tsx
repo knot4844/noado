@@ -20,6 +20,7 @@ export default function LandingPage() {
   const bgFrameRef   = useRef<number>(0)
   const bgStarsRef   = useRef<BgStar[]>([])
   const idRef        = useRef(0)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [scrollY, setScrollY]     = useState(0)
   const [visible, setVisible]     = useState(false)
   const [checking, setChecking]   = useState(true)
@@ -112,16 +113,22 @@ export default function LandingPage() {
 
   /* 스크롤 */
   useEffect(() => {
-    const fn = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', fn)
-    return () => window.removeEventListener('scroll', fn)
+    const el = containerRef.current
+    if (!el) return
+    const fn = () => setScrollY(el.scrollTop)
+    el.addEventListener('scroll', fn)
+    return () => el.removeEventListener('scroll', fn)
   }, [])
 
   if (checking) return null
 
 
   return (
-    <div style={{ background: '#070d1a', minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Space Grotesk',sans-serif" }}>
+    <div ref={containerRef} style={{
+      background: '#070d1a', height: '100vh', overflowY: 'scroll', overflowX: 'hidden',
+      fontFamily: "'Space Grotesk',sans-serif",
+      scrollSnapType: 'y mandatory', scrollBehavior: 'smooth',
+    }}>
       <canvas ref={bgCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
       <canvas ref={canvasRef}   style={{ position: 'fixed', inset: 0, zIndex: 10, pointerEvents: 'none' }} />
 
@@ -149,9 +156,10 @@ export default function LandingPage() {
 
       {/* HERO */}
       <section style={{
-        position: 'relative', zIndex: 1, minHeight: '100vh',
+        position: 'relative', zIndex: 1, height: '100vh',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', textAlign: 'center', padding: '120px 24px 80px',
+        scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         {/* orb glow */}
         <div style={{
@@ -220,14 +228,22 @@ export default function LandingPage() {
       </section>
 
       {/* STATS */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '40px 24px 80px' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '20px' }}>
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '40px 24px 80px',
+        height: '100vh', display: 'flex', alignItems: 'center',
+        scrollSnapAlign: 'start', flexShrink: 0,
+      }}>
+        <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '20px' }}>
           {STATS.map((s, i) => <StatCard key={i} {...s} i={i} show={scrollY > 350} />)}
         </div>
       </section>
 
       {/* FEATURES */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 120px' }}>
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '60px 24px 80px',
+        height: '100vh', display: 'flex', alignItems: 'center',
+        scrollSnapAlign: 'start', flexShrink: 0,
+      }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <SectionTag>핵심 기능</SectionTag>
           <SectionTitle>공간 관리의 모든 것</SectionTitle>
@@ -238,8 +254,12 @@ export default function LandingPage() {
       </section>
 
       {/* STEPS */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 120px' }}>
-        <div style={{ maxWidth: '760px', margin: '0 auto', textAlign: 'center' }}>
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '60px 24px 80px',
+        height: '100vh', display: 'flex', alignItems: 'center',
+        scrollSnapAlign: 'start', flexShrink: 0,
+      }}>
+        <div style={{ maxWidth: '760px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
           <SectionTag>워크플로우</SectionTag>
           <SectionTitle>딱 3단계면 끝납니다</SectionTitle>
           <div style={{ marginTop: '64px', textAlign: 'left' }}>
@@ -249,8 +269,12 @@ export default function LandingPage() {
       </section>
 
       {/* PRICING */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 120px' }}>
-        <div style={{ maxWidth: '1020px', margin: '0 auto' }}>
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '60px 24px 80px',
+        height: '100vh', display: 'flex', alignItems: 'center',
+        scrollSnapAlign: 'start', flexShrink: 0,
+      }}>
+        <div style={{ maxWidth: '1020px', width: '100%', margin: '0 auto' }}>
           <SectionTag>요금제</SectionTag>
           <SectionTitle>합리적인 가격, 투명한 구조</SectionTitle>
           <div style={{
@@ -326,13 +350,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px 140px' }}>
+      {/* CTA + FOOTER */}
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '60px 24px 0',
+        height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        scrollSnapAlign: 'start', flexShrink: 0,
+      }}>
         <div style={{
           maxWidth: '700px', margin: '0 auto', textAlign: 'center',
           background: 'linear-gradient(135deg, rgba(69,123,157,0.14), rgba(168,218,220,0.07))',
           border: '1px solid rgba(168,218,220,0.18)', borderRadius: '32px',
-          padding: '80px 40px', position: 'relative', overflow: 'hidden',
+          padding: '70px 40px', position: 'relative', overflow: 'hidden',
         }}>
           <div style={{
             position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
@@ -350,46 +378,44 @@ export default function LandingPage() {
             : <PrimaryBtn large onClick={() => router.push('/signup')}>무료 계정 만들기 →</PrimaryBtn>
           }
         </div>
-      </section>
 
-      {/* FOOTER */}
-      <footer style={{
-        position: 'relative', zIndex: 1, padding: '40px 40px 36px',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        {/* 사업자 정보 */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '6px 40px', marginBottom: '28px',
-          color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
+        {/* FOOTER */}
+        <footer style={{
+          position: 'relative', zIndex: 1, padding: '32px 40px 28px',
+          borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: '40px',
         }}>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
-            경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '4px 40px', marginBottom: '20px',
+            color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
+          }}>
+            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
+            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
+            <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
+              경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
+            </div>
+            <div>
+              <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
+              <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
+            </div>
           </div>
-          <div>
-            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
-            <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexWrap: 'wrap', gap: '10px',
+            borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px',
+          }}>
+            <LogoMark />
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+              <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
+              <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
+              <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
           </div>
-        </div>
-        {/* 정책 링크 + 카피라이트 */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          flexWrap: 'wrap', gap: '10px',
-          borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px',
-        }}>
-          <LogoMark />
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
-            <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
-            <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
-          </div>
-          <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
-        </div>
-      </footer>
+        </footer>
+      </section>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&display=swap');
