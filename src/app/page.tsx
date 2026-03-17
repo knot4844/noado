@@ -523,20 +523,31 @@ function SectionTitle({ children }: { children: string }) {
 
 /* ─── 통계 카드 ─── */
 function StatCard({ num, label, sub, i, show }: { num: string; label: string; sub: string; i: number; show: boolean }) {
+  const [h, setH] = useState(false)
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(168,218,220,0.1)',
-      borderRadius: '20px', padding: '32px 24px', textAlign: 'center',
-      opacity: show ? 1 : 0, transform: show ? 'translateY(0)' : 'translateY(32px)',
-      transition: `all 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s`,
+    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
+      background: h ? 'rgba(168,218,220,0.07)' : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${h ? 'rgba(168,218,220,0.35)' : 'rgba(168,218,220,0.1)'}`,
+      borderRadius: '20px', padding: h ? '36px 28px' : '32px 24px', textAlign: 'center',
+      opacity: show ? 1 : 0,
+      transform: show ? (h ? 'translateY(-8px) scale(1.03)' : 'translateY(0) scale(1)') : 'translateY(32px) scale(1)',
+      boxShadow: h ? '0 24px 60px rgba(168,218,220,0.12), 0 0 0 1px rgba(168,218,220,0.2)' : 'none',
+      transition: show
+        ? `background 0.25s ease, border 0.25s ease, box-shadow 0.25s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), padding 0.3s ease`
+        : `opacity 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s, transform 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s`,
+      cursor: 'default',
     }}>
       <div style={{
-        fontSize: '46px', fontWeight: 800, letterSpacing: '-2px', marginBottom: '8px',
+        fontSize: h ? '54px' : '46px', fontWeight: 800, letterSpacing: '-2px', marginBottom: '10px',
         background: 'linear-gradient(135deg,#a8dadc,#457b9d)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+        transition: 'font-size 0.3s cubic-bezier(0.34,1.56,0.64,1)',
       }}>{num}</div>
-      <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px', marginBottom: '6px' }}>{label}</div>
-      <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: '13px' }}>{sub}</div>
+      <div style={{
+        color: '#fff', fontWeight: 700, fontSize: h ? '16px' : '14px', marginBottom: '6px',
+        transition: 'font-size 0.25s ease',
+      }}>{label}</div>
+      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px' }}>{sub}</div>
     </div>
   )
 }
@@ -548,21 +559,33 @@ function FeatureCard({ icon, title, desc, color, i, show }: {
   const [h, setH] = useState(false)
   return (
     <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
-      background: h ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.025)',
-      border: `1px solid ${h ? color + '55' : 'rgba(255,255,255,0.07)'}`,
-      borderRadius: '16px', padding: '22px 20px',
+      background: h ? `linear-gradient(145deg, rgba(255,255,255,0.07), ${color}11)` : 'rgba(255,255,255,0.025)',
+      border: `1px solid ${h ? color + '60' : 'rgba(255,255,255,0.07)'}`,
+      borderRadius: '16px', padding: h ? '26px 24px' : '22px 20px',
       opacity: show ? 1 : 0,
-      transform: show ? (h ? 'translateY(-6px)' : 'translateY(0)') : 'translateY(40px)',
-      transition: `opacity 0.75s ease ${i * 0.08}s, transform ${h ? '0.2s ease' : `0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s`}`,
-      boxShadow: h ? `0 22px 60px ${color}22` : 'none',
+      transform: show
+        ? (h ? 'translateY(-10px) scale(1.02)' : 'translateY(0) scale(1)')
+        : 'translateY(40px) scale(1)',
+      transition: show
+        ? `background 0.25s ease, border 0.25s ease, padding 0.3s ease, box-shadow 0.25s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1)`
+        : `opacity 0.75s ease ${i * 0.08}s, transform 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s`,
+      boxShadow: h ? `0 28px 70px ${color}25, 0 0 0 1px ${color}20` : 'none',
+      cursor: 'default',
     }}>
       <div style={{
-        width: '40px', height: '40px', borderRadius: '12px', fontSize: '18px',
-        background: color + '18', border: `1px solid ${color}30`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px',
+        width: h ? '48px' : '40px', height: h ? '48px' : '40px',
+        borderRadius: '14px', fontSize: h ? '22px' : '18px',
+        background: color + '22', border: `1px solid ${color}40`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
+        boxShadow: h ? `0 8px 24px ${color}30` : 'none',
+        transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
       }}>{icon}</div>
-      <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.3px' }}>{title}</h3>
-      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '13px', lineHeight: 1.65 }}>{desc}</p>
+      <h3 style={{
+        color: h ? '#fff' : 'rgba(255,255,255,0.9)',
+        fontSize: h ? '16px' : '15px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.3px',
+        transition: 'font-size 0.25s ease, color 0.2s ease',
+      }}>{title}</h3>
+      <p style={{ color: h ? 'rgba(255,255,255,0.58)' : 'rgba(255,255,255,0.42)', fontSize: '13px', lineHeight: 1.65, transition: 'color 0.2s ease' }}>{desc}</p>
     </div>
   )
 }
