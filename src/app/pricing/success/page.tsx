@@ -24,7 +24,9 @@ function SuccessContent() {
                 setStatus("success");
             }, 1500);
         } else {
-            setStatus("error");
+            setTimeout(() => {
+                setStatus("error");
+            }, 0);
         }
     }, [paymentKey, orderId, amount]);
 

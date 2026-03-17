@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useBusiness } from '@/components/providers/BusinessProvider';
 import { Bot, X, Sparkles, Send, Loader2, AlertCircle } from 'lucide-react';
-import { Room } from '@/lib/data';
 
 interface Issue {
     roomId: string;
@@ -92,8 +91,8 @@ export default function AIAutoAgent() {
             }
 
             setMessages(data.messages || []);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
         } finally {
             setIsGenerating(false);
         }

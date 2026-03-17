@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 소유권 체크: 요청한 관리자가 해당 호실의 소유자인지 확인
-    const ownerIdFromDb = (room.businesses as any)?.owner_id;
+    const ownerIdFromDb = (room.businesses as { owner_id?: string } | null)?.owner_id;
     if (ownerIdFromDb && ownerIdFromDb !== user.id) {
         return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
     }

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import TenantPaymentView from './TenantPaymentView'
-import type { Invoice, Room } from '@/types'
+import type { Invoice, Room, Contract } from '@/types'
 
 // Revalidate this page dynamically
 export const dynamic = 'force-dynamic'
@@ -37,13 +37,24 @@ export default async function TenantPaymentPage({ params }: PageProps) {
     notFound()
   }
 
+  // 계약서 조회 (contract_id가 있을 때만)
+  let contract: Contract | null = null
+  if (invoice.contract_id) {
+    const { data: contractData } = await supabase
+      .from('contracts')
+      .select('id, tenant_name, monthly_rent, deposit, lease_start, lease_end, address, special_terms, status, signed_at')
+      .eq('id', invoice.contract_id)
+      .single()
+    contract = (contractData as Contract) ?? null
+  }
+
   // 데이터 가공 (타입 단언)
   const room = invoice.rooms as unknown as Room
 
   return (
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-blue-100">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
-        <TenantPaymentView invoice={invoice as Invoice} room={room} />
+        <TenantPaymentView invoice={invoice as Invoice} room={room} contract={contract} />
       </div>
     </div>
   )

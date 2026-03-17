@@ -28,7 +28,7 @@ export default function ProfilePage() {
 
     // 로그인 유저 확인
     useEffect(() => {
-        const handleSession = (user: any) => {
+        const handleSession = (user: { id: string; email?: string }) => {
             setUserId(user.id);
             setForm(f => ({ ...f, email: user.email ?? "" }));
             setIsCheckingAuth(false);

@@ -50,8 +50,8 @@ export function RoomStatusList() {
             setShowModal(false);
             setForm({ name: '', tenantName: '', tenantContact: '', monthlyRent: 0, businessId: '' });
             showNotif(`${form.name} 호실이 추가되었습니다!`);
-        } catch (e: any) {
-            showNotif(e.message);
+        } catch (e: unknown) {
+            showNotif(e instanceof Error ? e.message : '오류가 발생했습니다.');
         } finally {
             setSaving(false);
         }

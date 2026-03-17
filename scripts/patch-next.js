@@ -14,7 +14,9 @@
  * Run automatically via: "postinstall": "node scripts/patch-next.js"
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 const TARGET = path.join(

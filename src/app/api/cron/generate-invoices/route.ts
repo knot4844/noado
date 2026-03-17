@@ -47,17 +47,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, created: 0 })
   }
 
+  /* ─── 현재 활성 입주사 조회 (임대료·연락처·tenant_id 세팅용) ─── */
+  const today = now.toISOString().split('T')[0]
+  const { data: activeTenants } = await supabase
+    .from('tenants')
+    .select('id, room_id, name, phone, monthly_rent')
+    .in('room_id', newRooms.map(r => r.id))
+    .or(`lease_end.is.null,lease_end.gte.${today}`)
+
+  type ActiveTenant = { id: string; room_id: string; name: string; phone: string | null; monthly_rent: number }
+  const tenantByRoom: Record<string, ActiveTenant> = {}
+  for (const t of (activeTenants || []) as ActiveTenant[]) tenantByRoom[t.room_id] = t
+
   const { data: insertedInvoices, error: insertErr } = await supabase.from('invoices').insert(
-    newRooms.map(r => ({
-      owner_id:    r.owner_id,
-      room_id:     r.id,
-      year,
-      month,
-      amount:      r.monthly_rent,
-      paid_amount: 0,
-      status:      'ready',
-      due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
-    }))
+    newRooms.map(r => {
+      const tenant = tenantByRoom[r.id]
+      return {
+        owner_id:    r.owner_id,
+        room_id:     r.id,
+        tenant_id:   tenant?.id || null,
+        year,
+        month,
+        // tenants.monthly_rent 우선, 없으면 rooms.monthly_rent 폴백
+        amount:      tenant?.monthly_rent ?? r.monthly_rent,
+        paid_amount: 0,
+        status:      'ready',
+        due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
+      }
+    })
   ).select()
 
   if (insertErr) {
@@ -69,23 +86,28 @@ export async function GET(req: NextRequest) {
   if (insertedInvoices && insertedInvoices.length > 0) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.noado.kr'
     for (const inv of insertedInvoices) {
-      const room = newRooms.find(r => r.id === inv.room_id)
-      if (room && room.tenant_phone) {
+      const room   = newRooms.find(r => r.id === inv.room_id)
+      const tenant = tenantByRoom[inv.room_id]
+      // 연락처: tenants.phone 우선, 없으면 rooms.tenant_phone 폴백
+      const phone     = tenant?.phone || room?.tenant_phone
+      const name      = tenant?.name  || room?.tenant_name || '입주자님'
+      const amount    = inv.amount ?? tenant?.monthly_rent ?? room?.monthly_rent ?? 0
+      if (room && phone) {
         const paymentLink = `${baseUrl}/pay/${inv.id}`
-        
+
         // 1. 카카오톡 발송
         let status: 'success' | 'failed' = 'success'
         try {
           const ok = await sendKakaoAlimtalk({
-             templateKey: 'INVOICE_ISSUED',
-             to: room.tenant_phone,
-             variables: {
-               '#{세입자}': room.tenant_name || '입주자님',
-               '#{호실}': room.name,
-               '#{금액}': String(room.monthly_rent),
-               '#{기한}': inv.due_date || '',
-               '#{결제링크}': paymentLink
-             }
+            templateKey: 'INVOICE_ISSUED',
+            to: phone,
+            variables: {
+              '#{세입자}':   name,
+              '#{호실}':     room.name,
+              '#{금액}':     String(amount),
+              '#{기한}':     inv.due_date || '',
+              '#{결제링크}': paymentLink,
+            }
           })
           if (!ok) status = 'failed'
         } catch (e) {
@@ -95,12 +117,12 @@ export async function GET(req: NextRequest) {
 
         // 2. 발송 로그 DB 기록
         await supabase.from('notification_logs').insert({
-           owner_id: room.owner_id,
-           room_id: room.id,
-           template_key: 'INVOICE_ISSUED',
-           recipient_name: room.tenant_name || null,
-           recipient_phone: room.tenant_phone.replace(/[\s\-]/g, ''),
-           status
+          owner_id:        room.owner_id,
+          room_id:         room.id,
+          template_key:    'INVOICE_ISSUED',
+          recipient_name:  name,
+          recipient_phone: phone.replace(/[\s\-]/g, ''),
+          status,
         })
       }
     }

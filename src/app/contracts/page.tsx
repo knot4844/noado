@@ -55,7 +55,7 @@ export default function ContractsPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setTimeout(() => load(), 0) }, [load])
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 3500)
@@ -89,12 +89,27 @@ export default function ContractsPage() {
     load()
   }
 
-  /* ─── 계약 발송 ─── */
+  /* ─── 계약 발송 + 알림톡 ─── */
   const sendContract = async (id: string) => {
-    if (!confirm('계약서를 임차인에게 발송(전송대기 상태로 변경) 하시겠습니까?')) return
-    const { error } = await supabase.from('contracts').update({ status: 'sent' }).eq('id', id)
-    if (error) return showToast('error', error.message)
-    showToast('success', '발송 완료되었습니다. 서명 링크를 복사하여 전달해주세요.')
+    const c = contracts.find(c => c.id === id)
+    const hasPhone = !!(c?.tenant_phone)
+    const msg = hasPhone
+      ? `계약서를 발송하고 ${c?.tenant_name ?? '세입자'}에게 서명 링크 알림톡을 전송하시겠습니까?`
+      : '계약서를 발송하시겠습니까? (연락처 없음 — 알림톡 미발송)'
+    if (!confirm(msg)) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return showToast('error', '로그인이 필요합니다.')
+
+    const res  = await fetch('/api/contracts/send', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body:    JSON.stringify({ contractId: id }),
+    })
+    const data = await res.json()
+    if (!res.ok) return showToast('error', data.error ?? '발송 실패')
+
+    showToast('success', data.message)
     load()
   }
 

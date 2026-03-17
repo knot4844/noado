@@ -33,6 +33,7 @@ export async function middleware(request: NextRequest) {
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/signup' ||
+    pathname === '/master-admin/login' || // 마스터 어드민 로그인 페이지
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/portal/') ||   // 임차인 포털 (토큰 기반 접근)

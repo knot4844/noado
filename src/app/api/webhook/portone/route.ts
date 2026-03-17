@@ -9,7 +9,9 @@
  * 2) paymentId 로 invoices.portone_payment_id 조회 (서버 가상계좌 발급 흐름)
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/service'
+import { sendKakaoAlimtalk, normalizePhone } from '@/lib/alimtalk'
 
 /* ─── HMAC 서명 검증 ─── */
 async function verifyWebhookSignature(
@@ -144,7 +146,59 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[Webhook] 수납완료: invoice=${invoice.id} amount=${paidAmount}`)
-  } 
+
+    /* ─── 관리자 알림톡 발송 ─── */
+    try {
+      // room 정보 조회 (호실명, 입주사명)
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('name, tenant_name')
+        .eq('id', invoice.room_id)
+        .single()
+
+      // 관리자(owner) 전화번호 조회: auth.users.phone 또는 user_metadata.phone
+      const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+      const { data: { user: ownerUser } } = await supabaseAdmin.auth.admin.getUserById(invoice.owner_id)
+      const ownerPhone =
+        ownerUser?.phone ||
+        (ownerUser?.user_metadata as { phone?: string } | undefined)?.phone
+
+      if (ownerPhone) {
+        await sendKakaoAlimtalk({
+          templateKey: 'PAYMENT_NOTIFY_ADMIN',
+          to: normalizePhone(ownerPhone),
+          variables: {
+            '#{호실}':   room?.name ?? '미확인',
+            '#{입주사}': room?.tenant_name ?? '미확인',
+            '#{금액}':   paidAmount.toLocaleString('ko-KR'),
+          },
+        })
+        console.log(`[Webhook] 관리자 알림톡 발송: ${ownerPhone}`)
+      } else {
+        // PAYMENT_NOTIFY_ADMIN 템플릿이 미승인이면 PAYMENT_DONE(기승인)으로 fallback
+        const fallbackPhone = process.env.ADMIN_PHONE
+        if (fallbackPhone) {
+          await sendKakaoAlimtalk({
+            templateKey: 'PAYMENT_DONE',
+            to: normalizePhone(fallbackPhone),
+            variables: {
+              '#{호실}':   room?.name ?? '미확인',
+              '#{입주사}': room?.tenant_name ?? '미확인',
+              '#{금액}':   paidAmount.toLocaleString('ko-KR'),
+            },
+          })
+        }
+        console.warn('[Webhook] 관리자 전화번호 없음 — 알림톡 미발송')
+      }
+    } catch (notifyErr) {
+      // 알림 실패는 수납 처리에 영향 없도록 catch
+      console.error('[Webhook] 관리자 알림톡 에러:', notifyErr)
+    }
+  }
   else {
     // FAILED, CANCELLED, EXPIRED 등
     console.log(`[Webhook] 결제 실패/취소 이벤트 수신: ${type} (PaymentID: ${paymentId})`)

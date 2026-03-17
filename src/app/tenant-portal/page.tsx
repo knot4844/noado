@@ -13,8 +13,13 @@ export default function TenantPortalPage() {
     const router = useRouter();
     const { user, signOut } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [roomInfo, setRoomInfo] = useState<any>(null);
-    const [payments, setPayments] = useState<any[]>([]);
+    const [roomInfo, setRoomInfo] = useState<{
+      name?: string; deposit?: number; monthly_rent?: number;
+      lease_start?: string; lease_end?: string; due_date?: string;
+      businesses?: { name?: string };
+      [key: string]: unknown;
+    } | null>(null);
+    const [payments, setPayments] = useState<Record<string, unknown>[]>([]);
 
     useEffect(() => {
         if (!user) return;
@@ -163,11 +168,11 @@ export default function TenantPortalPage() {
                         ) : payments.map((p, i) => (
                             <div key={i} className="p-4 sm:px-6 flex items-center justify-between hover:bg-neutral-50 transition-colors">
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                                    <span className="font-bold text-neutral-900 min-w-24">{p.month}</span>
-                                    <span className="text-sm text-neutral-500">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '-'} 결제완료</span>
+                                    <span className="font-bold text-neutral-900 min-w-24">{p.month as string}</span>
+                                    <span className="text-sm text-neutral-500">{p.paid_at ? new Date(p.paid_at as string).toLocaleDateString() : '-'} 결제완료</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="font-bold text-neutral-900">{p.amount.toLocaleString()}원</span>
+                                    <span className="font-bold text-neutral-900">{(p.amount as number).toLocaleString()}원</span>
                                     <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-md">수납완료</span>
                                 </div>
                             </div>

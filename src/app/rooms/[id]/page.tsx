@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useBusiness } from "@/components/providers/BusinessProvider";
 import {
@@ -17,15 +17,46 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
+import { createClient } from "@/lib/supabase/client";
+
+interface InvoiceRow {
+    id: string
+    year: number
+    month: number
+    amount: number
+    status: string
+    paid_at: string | null
+    due_date: string | null
+}
 
 export default function RoomDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { rooms } = useBusiness();
+    const supabase = createClient();
+
+    const [invoiceHistory, setInvoiceHistory] = useState<InvoiceRow[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     // Find matching room
     const id = params?.id as string;
     const room = rooms.find(r => r.id === id);
+
+    useEffect(() => {
+        if (!id) return;
+        setTimeout(() => setHistoryLoading(true), 0);
+        supabase
+            .from('invoices')
+            .select('id, year, month, amount, status, paid_at, due_date')
+            .eq('room_id', id)
+            .order('year', { ascending: false })
+            .order('month', { ascending: false })
+            .limit(24)
+            .then(({ data }) => {
+                setInvoiceHistory(data ?? []);
+                setHistoryLoading(false);
+            });
+    }, [id]);
 
     if (!room) {
         return (
@@ -48,37 +79,13 @@ export default function RoomDetailPage() {
     const { tenant, paymentInfo, status } = room;
     const isVacant = status === "VACANT";
 
-    // Mock payment history for the last 6 months
-    const mockPaymentHistory = Array.from({ length: 6 }).map((_, i) => {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const monthStr = `${date.getFullYear()}년 ${String(date.getMonth() + 1).padStart(2, '0')}월`;
-
-        // Let's create a realistic mock history based on the current status
-        let paymentStatus: "PAID" | "UNPAID" | "PENDING" = "PAID";
-        if (status === "UNPAID" && i < (room.unpaidMonths || 1)) {
-            paymentStatus = "UNPAID";
-        } else if (i === 0 && (room.id.length % 2 === 0)) { // use stable condition
-            paymentStatus = "PENDING";
-        }
-
-        return {
-            id: `p_${i}`,
-            month: monthStr,
-            amount: paymentInfo?.monthlyRent || 0,
-            dueDate: paymentInfo?.dueDate || "매월 15일",
-            status: paymentStatus,
-            paidDate: paymentStatus === "PAID" ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-15` : null
-        };
-    });
-
     const handleExportExcel = () => {
-        const exportData = mockPaymentHistory.map((row) => ({
-            "청구 월": row.month,
+        const exportData = invoiceHistory.map((row) => ({
+            "청구 월": `${row.year}년 ${String(row.month).padStart(2, '0')}월`,
             "납부 금액(원)": row.amount,
-            "약정일": row.dueDate,
-            "수납 상태": row.status === "PAID" ? "납부 완료" : row.status === "UNPAID" ? "미납" : "수납 대기",
-            "수납 완료일": row.paidDate || "-",
+            "납기일": row.due_date ?? "-",
+            "수납 상태": row.status === "paid" ? "납부 완료" : row.status === "overdue" ? "미납" : "미수납",
+            "수납 완료일": row.paid_at ? row.paid_at.slice(0, 10) : "-",
         }));
 
         const ws = XLSX.utils.json_to_sheet(exportData);
@@ -192,49 +199,58 @@ export default function RoomDetailPage() {
                             </button>
                         </div>
                         <div className="divide-y divide-neutral-100">
-                            {mockPaymentHistory.map((history) => (
+                            {historyLoading ? (
+                                <div className="p-8 text-center text-neutral-400 text-sm">불러오는 중...</div>
+                            ) : invoiceHistory.length === 0 ? (
+                                <div className="p-8 text-center text-neutral-400 text-sm">수납 이력이 없습니다.</div>
+                            ) : invoiceHistory.map((history) => (
                                 <div key={history.id} className="p-5 flex items-center justify-between hover:bg-neutral-50 transition-colors group">
                                     <div className="flex items-center gap-5">
                                         {/* Status Icon */}
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-sm ${history.status === "PAID" ? "bg-emerald-100 text-emerald-600" :
-                                            history.status === "UNPAID" ? "bg-rose-100 text-rose-600" :
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border-4 border-white shadow-sm ${history.status === "paid" ? "bg-emerald-100 text-emerald-600" :
+                                            history.status === "overdue" ? "bg-rose-100 text-rose-600" :
                                                 "bg-amber-100 text-amber-600"
                                             }`}>
-                                            {history.status === "PAID" ? <CheckCircle2 size={24} /> :
-                                                history.status === "UNPAID" ? <AlertCircle size={24} /> :
+                                            {history.status === "paid" ? <CheckCircle2 size={24} /> :
+                                                history.status === "overdue" ? <AlertCircle size={24} /> :
                                                     <Clock size={24} />}
                                         </div>
 
                                         {/* Month & Amount */}
                                         <div>
-                                            <h4 className="font-bold text-neutral-900 mb-1">{history.month} 임대료</h4>
+                                            <h4 className="font-bold text-neutral-900 mb-1">
+                                                {history.year}년 {String(history.month).padStart(2, '0')}월 임대료
+                                            </h4>
                                             <div className="flex items-center gap-3 text-sm">
                                                 <span className="font-bold text-neutral-700">₩ {history.amount.toLocaleString()}</span>
-                                                <span className="text-neutral-300">|</span>
-                                                <span className="text-neutral-500">약정일: {history.dueDate}</span>
+                                                {history.due_date && (
+                                                    <>
+                                                        <span className="text-neutral-300">|</span>
+                                                        <span className="text-neutral-500">납기일: {history.due_date.slice(0, 10)}</span>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Action/Paid Date */}
                                     <div className="text-right">
-                                        {history.status === "PAID" ? (
+                                        {history.status === "paid" ? (
                                             <div>
                                                 <span className="block text-xs text-neutral-400 font-medium mb-1">수납 완료일</span>
-                                                <span className="text-sm font-bold text-emerald-700">{history.paidDate}</span>
+                                                <span className="text-sm font-bold text-emerald-700">
+                                                    {history.paid_at ? history.paid_at.slice(0, 10) : "-"}
+                                                </span>
                                             </div>
-                                        ) : history.status === "UNPAID" ? (
+                                        ) : history.status === "overdue" ? (
                                             <div className="flex flex-col items-end gap-2">
                                                 <span className="px-2.5 py-1 rounded text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">
                                                     미납 상태
                                                 </span>
-                                                <button className="text-xs font-bold text-blue-600 hover:underline">
-                                                    알림톡 재발송
-                                                </button>
                                             </div>
                                         ) : (
                                             <div>
-                                                <span className="block text-xs text-neutral-400 font-medium mb-1">수납 대기 (예정일 도래 전)</span>
+                                                <span className="block text-xs text-neutral-400 font-medium mb-1">미수납</span>
                                                 <span className="text-sm font-bold text-amber-600">-</span>
                                             </div>
                                         )}

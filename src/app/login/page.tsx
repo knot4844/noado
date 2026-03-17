@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Phone, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 type Tab = 'email' | 'kakao' | 'phone'
 
@@ -89,15 +90,15 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-col justify-between w-[440px] shrink-0 p-12"
            style={{ background: 'var(--color-primary)' }}>
         <div>
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm"
+          <Link href="/" className="flex items-center gap-3 mb-16 w-fit group transition-opacity hover:opacity-75">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-transform group-hover:scale-95"
                  style={{ background: 'var(--color-accent)', color: 'var(--color-primary)' }}>
               N
             </div>
             <span className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
               noado
             </span>
-          </div>
+          </Link>
           <h2 className="text-3xl font-bold text-white leading-snug mb-4"
               style={{ fontFamily: 'var(--font-display)' }}>
             복잡한 임대관리,<br />이제 자동으로
@@ -124,11 +125,11 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
 
           {/* 모바일 로고 */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm"
+          <Link href="/" className="flex items-center gap-2 mb-8 lg:hidden w-fit group transition-opacity hover:opacity-75">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-transform group-hover:scale-95"
                  style={{ background: 'var(--color-primary)', color: 'var(--color-accent)' }}>N</div>
             <span className="text-lg font-bold" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-display)' }}>noado</span>
-          </div>
+          </Link>
 
           <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
             로그인

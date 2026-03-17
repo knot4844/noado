@@ -210,7 +210,7 @@ export default function InvitePage() {
         {step === 'review' && (
           <>
             <h1 className="text-xl font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-              임대차 계약서 검토
+              이용 계약서 검토
             </h1>
             <p className="text-sm mb-6" style={{ color: 'var(--color-muted)' }}>
               아래 계약 내용을 확인 후 서명해주세요.
@@ -219,10 +219,10 @@ export default function InvitePage() {
             <div className="rounded-2xl p-5 mb-6 space-y-4"
                  style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)' }}>
               {[
-                { label: '세입자',   value: contract?.tenant_name ?? '—' },
+                { label: '이용자',   value: contract?.tenant_name ?? '—' },
                 { label: '소재지',   value: snap?.address as string ?? '—' },
-                { label: '보증금',   value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
-                { label: '월세',     value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
+                { label: '선납금',   value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
+                { label: '월 이용료', value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
                 { label: '계약 시작',value: contract?.lease_start ? formatDate(contract.lease_start) : '—' },
                 { label: '계약 만료',value: contract?.lease_end   ? formatDate(contract.lease_end)   : '—' },
               ].map(({ label, value }) => (

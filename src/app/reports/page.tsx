@@ -47,7 +47,7 @@ export default function ReportsPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { setTimeout(() => fetchData(), 0) }, [fetchData])
 
   // ── 통계 계산 ──
   const totalRooms   = rooms.length

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, Eye, EyeOff, User, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -58,15 +59,15 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--color-background)' }}>
       <div className="w-full max-w-sm">
         {/* 로고 */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+        <Link href="/" className="flex items-center gap-3 mb-8 w-fit group transition-opacity hover:opacity-75">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg transition-transform group-hover:scale-95"
                style={{ background: 'var(--color-primary)' }}>
             N
           </div>
-          <span className="text-xl font-bold" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-display)' }}>
+          <span className="text-xl font-bold transition-colors" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-display)' }}>
             noado
           </span>
-        </div>
+        </Link>
 
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--color-foreground)' }}>회원가입</h1>
         <p className="text-sm mb-8" style={{ color: 'var(--color-muted)' }}>무료로 시작하세요.</p>

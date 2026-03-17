@@ -2,167 +2,340 @@
 
 export const dynamic = 'force-dynamic'
 
-import React, { useState } from "react";
-import { CheckCircle2, Star, Zap, Building2, ArrowRight } from "lucide-react";
-import { TossCheckout } from "@/components/payments/TossCheckout";
-import Link from "next/link";
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle2, Zap, Building2, Crown, ArrowRight, X } from 'lucide-react'
+import Link from 'next/link'
+
+/* ── TossCheckout import ── */
+import { TossCheckout } from '@/components/payments/TossCheckout'
+
+/* ── 요금제 데이터 ── */
+const PLANS = [
+  {
+    key: 'starter',
+    icon: <Building2 size={20} />,
+    name: '스타터',
+    sub: 'Starter',
+    desc: '소규모 공간 관리를 막 시작하신 분',
+    price: null,
+    priceLabel: '무료',
+    priceSub: '평생 무료',
+    cta: '현재 사용 중',
+    ctaDisabled: true,
+    featured: false,
+    features: [
+      '사업장 1개 관리',
+      '호실 최대 3개',
+      '기본 대시보드 & 통계',
+      '수동 수납 관리',
+    ],
+  },
+  {
+    key: 'beginner',
+    icon: <Zap size={20} />,
+    name: '비기너',
+    sub: 'Beginner',
+    desc: '생업과 공간 관리를 병행하는 알짜 사업자',
+    price: 9900,
+    priceLabel: '₩9,900',
+    priceSub: '/ 월',
+    cta: 'Beginner로 업그레이드',
+    ctaDisabled: false,
+    featured: true,
+    badge: '가장 많이 선택',
+    orderName: 'noado Beginner 요금제 (월정액)',
+    features: [
+      '사업장 1개 관리',
+      '호실 최대 5개',
+      'AI 통장 입금 자동 매칭',
+      '전자세금계산서 자동 발행',
+      '카카오 자동 알림톡 제공',
+    ],
+  },
+  {
+    key: 'pro',
+    icon: <Crown size={20} />,
+    name: '프로',
+    sub: 'Pro',
+    desc: '중대형 공간·다수 오피스를 운영하는 전문가',
+    price: 19900,
+    priceLabel: '₩19,900',
+    priceSub: '/ 월',
+    cta: 'Pro로 업그레이드',
+    ctaDisabled: false,
+    featured: false,
+    orderName: 'noado Pro 요금제 (월정액)',
+    features: [
+      '사업장 최대 3개 관리',
+      '호실 최대 50개',
+      '스마트 카드/가상계좌 수납',
+      '전자세금계산서 자동 발행',
+      '전용 전자계약 & 서명',
+    ],
+  },
+]
 
 export default function PricingPage() {
-    const [selectedPlan, setSelectedPlan] = useState<{ amount: number, name: string } | null>(null);
+  const router = useRouter()
+  const [selectedPlan, setSelectedPlan] = useState<{ amount: number; name: string } | null>(null)
 
-    return (
-        <div className="bg-neutral-50 pb-24 relative">
+  return (
+    <div style={{
+      background: '#070d1a',
+      minHeight: '100vh',
+      fontFamily: "'Space Grotesk', -apple-system, sans-serif",
+      overflowX: 'hidden',
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+        .fade-up-1 { animation-delay: 0.05s; }
+        .fade-up-2 { animation-delay: 0.15s; }
+        .fade-up-3 { animation-delay: 0.25s; }
+        .fade-up-4 { animation-delay: 0.35s; }
+        .plan-card:hover { transform: translateY(-4px); }
+        .plan-card { transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), box-shadow 0.3s; }
+      `}</style>
 
-            {/* Background Decorations */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-blue-100/50 to-transparent blur-3xl -z-10 rounded-full"></div>
+      {/* ── 배경 오브 글로우 ── */}
+      <div style={{
+        position: 'fixed', top: '5%', left: '50%', transform: 'translateX(-50%)',
+        width: '900px', height: '500px', borderRadius: '50%', pointerEvents: 'none', zIndex: 0,
+        background: 'radial-gradient(circle, rgba(29,53,87,0.35) 0%, rgba(168,218,220,0.06) 55%, transparent 75%)',
+        filter: 'blur(60px)',
+      }} />
 
-            {/* Home Logo Button */}
-            <div className="absolute top-6 left-6 z-10">
-                <Link href="/" className="flex items-center gap-2 group">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md group-hover:bg-blue-700 transition-colors">
-                        <Building2 size={20} className="text-white" />
-                    </div>
-                    <span className="font-extrabold text-xl tracking-tight text-neutral-900 group-hover:text-blue-600 transition-colors">noado</span>
-                </Link>
-            </div>
-
-
-            <div className="max-w-7xl mx-auto px-4 md:px-8 pt-16 md:pt-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold mb-4">
-                        <Star size={14} className="fill-blue-700" /> B2B SaaS 정식 오픈
-                    </div>
-                    <h1 className="text-4xl md:text-5xl font-black text-neutral-900 tracking-tight leading-tight">
-                        부동산 관리를 완전히 <br className="hidden md:block" />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">자동화</span>하세요.
-                    </h1>
-                    <p className="text-lg text-neutral-500">
-                        귀하의 비즈니스 규모에 맞는 요금제를 선택하세요.<br className="hidden md:block" />
-                        수납 확인부터 세금계산서 발행까지, 모든 것이 Zero-Touch로 이루어집니다.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-
-                    {/* Starter Plan */}
-                    <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative group">
-                        <div className="w-12 h-12 rounded-xl bg-neutral-100 flex flex-col items-center justify-center text-neutral-600 mb-6 group-hover:bg-neutral-200 transition-colors">
-                            <Building2 size={24} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-neutral-900 mb-2">스타터 (Starter)</h3>
-                        <p className="text-neutral-500 text-sm mb-6 h-10">소규모 임대업을 막 시작하신 분들을 위한 기본 요금제</p>
-
-                        <div className="mb-8">
-                            <span className="text-4xl font-black text-neutral-900">무료</span>
-                            <span className="text-neutral-500 font-medium">/ 평생</span>
-                        </div>
-
-                        <button className="w-full py-4 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-xl transition-colors mb-8">
-                            현재 사용 중
-                        </button>
-
-                        <div className="space-y-4">
-                            {[
-                                "사업장 1개 한정 관리",
-                                "호실 최대 3개까지 등록 가능",
-                                "기본 대시보드와 통계 확인",
-                                "수동 수납 관리 지원"
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3 text-sm text-neutral-700 font-medium">
-                                    <CheckCircle2 size={18} className="text-neutral-400 shrink-0 mt-0.5" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Pro Plan */}
-                    <div className="bg-white rounded-3xl p-8 border-2 border-blue-600 shadow-xl shadow-blue-900/5 hover:-translate-y-1 transition-transform duration-300 relative">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                            가장 많이 선택하는 요금제
-                        </div>
-
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex flex-col items-center justify-center text-white mb-6 shadow-md">
-                            <Zap size={24} className="fill-white/20" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-neutral-900 mb-2">비기너 (Beginner)</h3>
-                        <p className="text-neutral-500 text-sm mb-6 h-10">생업과 임대업을 병행하는 알짜 임대사업자</p>
-
-                        <div className="mb-8 flex items-baseline gap-1">
-                            <span className="text-4xl font-black text-neutral-900">₩9,900</span>
-                            <span className="text-neutral-500 font-medium">/ 월</span>
-                        </div>
-
-                        <button
-                            onClick={() => setSelectedPlan({ amount: 9900, name: 'noado Beginner 요금제 (월정액)' })}
-                            className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all flex justify-center items-center gap-2 mb-8 group"
-                        >
-                            Beginner 요금제로 업그레이드
-                            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-
-                        <div className="space-y-4">
-                            {[
-                                "사업장 1개 한정 관리",
-                                "호실 최대 5개까지 유연한 등록",
-                                "AI 통장 입금 내역 실시간 자동 매칭",
-                                "입금 확인 즉시 전자세금계산서 자동 발행 (건당 300원 실비)",
-                                "카톡/문자 자동 알림 템플릿 제공"
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3 text-sm text-neutral-900 font-bold">
-                                    <CheckCircle2 size={20} className="text-blue-600 shrink-0" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Enterprise Plan */}
-                    <div className="bg-white rounded-3xl p-8 border border-neutral-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative group">
-                        <div className="w-12 h-12 rounded-xl bg-neutral-900 flex flex-col items-center justify-center text-white mb-6 shadow-md">
-                            <Star size={24} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-neutral-900 mb-2">프로 (Pro)</h3>
-                        <p className="text-neutral-500 text-sm mb-6 h-10">중대형 건물 및 다수 임대주택을 운영하는 전문 임대사업자</p>
-
-                        <div className="mb-8 flex items-baseline gap-1">
-                            <span className="text-4xl font-black text-neutral-900">₩19,900</span>
-                            <span className="text-neutral-500 font-medium">/ 월</span>
-                        </div>
-
-                        <button
-                            onClick={() => setSelectedPlan({ amount: 19900, name: 'noado Pro 요금제 (월정액)' })}
-                            className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all flex justify-center items-center gap-2 mb-8 group"
-                        >
-                            Pro 요금제로 업그레이드
-                            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-
-                        <div className="space-y-4">
-                            {[
-                                "사업장 최대 3개까지 완벽 관리",
-                                "호실 최대 50개까지 넉넉한 등록",
-                                "스마트 간편결제(카드/페이) 월세 수납",
-                                "입금 확인 즉시 전자세금계산서 자동 발행 (건당 300원 실비)"
-                            ].map((feature, i) => (
-                                <div key={i} className="flex items-start gap-3 text-sm text-neutral-700 font-medium">
-                                    <CheckCircle2 size={18} className="text-neutral-900 shrink-0 mt-0.5" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            {selectedPlan && (
-                <TossCheckout
-                    amount={selectedPlan.amount}
-                    orderName={selectedPlan.name}
-                    onClose={() => setSelectedPlan(null)}
-                />
-            )}
+      {/* ── NAV ── */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        padding: '0 40px', height: '64px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(7,13,26,0.80)', backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(168,218,220,0.08)',
+      }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="8" fill="#a8dadc" fillOpacity="0.13" />
+            <path d="M7 20V10l7-4 7 4v10" stroke="#a8dadc" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="11" y="14" width="6" height="6" rx="1" stroke="#a8dadc" strokeWidth="1.6" />
+          </svg>
+          <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.4px' }}>noado</span>
+        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => router.push('/login')} style={{
+            padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
+            color: 'rgba(255,255,255,0.6)', background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer',
+          }}>로그인</button>
+          <button onClick={() => router.push('/signup')} style={{
+            padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
+            color: '#070d1a', background: '#a8dadc', border: 'none', cursor: 'pointer',
+          }}>무료 시작</button>
         </div>
-    );
+      </nav>
+
+      {/* ── 헤더 ── */}
+      <div className="fade-up fade-up-1" style={{
+        position: 'relative', zIndex: 1,
+        textAlign: 'center', padding: '80px 24px 60px',
+      }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: '7px',
+          background: 'rgba(168,218,220,0.08)', border: '1px solid rgba(168,218,220,0.2)',
+          borderRadius: '100px', padding: '5px 16px', marginBottom: '28px',
+        }}>
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#a8dadc', display: 'inline-block' }} />
+          <span style={{ color: '#a8dadc', fontSize: '12px', fontWeight: 600, letterSpacing: '0.5px' }}>B2B SaaS 정식 오픈</span>
+        </div>
+
+        <h1 style={{
+          fontSize: 'clamp(36px, 6vw, 64px)', fontWeight: 800,
+          lineHeight: 1.1, letterSpacing: '-2px', marginBottom: '20px',
+        }}>
+          <span style={{ color: '#ffffff' }}>공간 관리, </span>
+          <span style={{
+            background: 'linear-gradient(135deg, #a8dadc 0%, #7bbfc1 45%, #457b9d 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>가격은 합리적으로.</span>
+        </h1>
+        <p style={{
+          color: 'rgba(255,255,255,0.42)', fontSize: 'clamp(14px, 1.8vw, 17px)',
+          lineHeight: 1.8, maxWidth: '480px', margin: '0 auto',
+        }}>
+          수납 확인부터 전자계약·세금계산서 발행까지<br />
+          모든 것이 Zero-Touch로 자동화됩니다.
+        </p>
+      </div>
+
+      {/* ── 카드 그리드 ── */}
+      <div className="fade-up fade-up-2" style={{
+        position: 'relative', zIndex: 1,
+        maxWidth: '1020px', margin: '0 auto', padding: '0 24px 80px',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px',
+      }}>
+        {PLANS.map((plan) => (
+          <div
+            key={plan.key}
+            className="plan-card"
+            style={{
+              position: 'relative',
+              borderRadius: '20px',
+              padding: '32px 28px 28px',
+              background: plan.featured
+                ? 'linear-gradient(145deg, rgba(29,53,87,0.7), rgba(69,123,157,0.3))'
+                : 'rgba(255,255,255,0.04)',
+              border: plan.featured
+                ? '1px solid rgba(168,218,220,0.35)'
+                : '1px solid rgba(255,255,255,0.07)',
+              boxShadow: plan.featured
+                ? '0 0 40px rgba(168,218,220,0.08), 0 20px 40px rgba(0,0,0,0.3)'
+                : '0 4px 20px rgba(0,0,0,0.2)',
+            }}
+          >
+            {/* 추천 배지 */}
+            {plan.badge && (
+              <div style={{
+                position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)',
+                background: 'linear-gradient(135deg, #a8dadc, #7bbfc1)',
+                color: '#070d1a', fontSize: '11px', fontWeight: 700,
+                padding: '4px 14px', borderRadius: '100px', whiteSpace: 'nowrap',
+                letterSpacing: '0.2px',
+              }}>
+                {plan.badge}
+              </div>
+            )}
+
+            {/* 아이콘 */}
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '12px', marginBottom: '20px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: plan.featured ? 'rgba(168,218,220,0.18)' : 'rgba(255,255,255,0.07)',
+              color: plan.featured ? '#a8dadc' : 'rgba(255,255,255,0.5)',
+            }}>
+              {plan.icon}
+            </div>
+
+            {/* 타이틀 */}
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{ color: '#fff', fontSize: '20px', fontWeight: 700 }}>{plan.name}</span>
+              <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '13px', marginLeft: '8px' }}>{plan.sub}</span>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.38)', fontSize: '13px', marginBottom: '24px', lineHeight: 1.6 }}>
+              {plan.desc}
+            </p>
+
+            {/* 가격 */}
+            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span style={{
+                fontSize: plan.price ? '36px' : '32px', fontWeight: 800,
+                color: plan.featured ? '#a8dadc' : '#fff',
+              }}>{plan.priceLabel}</span>
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '14px' }}>{plan.priceSub}</span>
+            </div>
+
+            {/* CTA 버튼 */}
+            <button
+              disabled={plan.ctaDisabled}
+              onClick={() => {
+                if (!plan.ctaDisabled && plan.price && plan.orderName) {
+                  setSelectedPlan({ amount: plan.price, name: plan.orderName })
+                }
+              }}
+              style={{
+                width: '100%', padding: '13px', borderRadius: '12px',
+                fontSize: '14px', fontWeight: 700, cursor: plan.ctaDisabled ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                marginBottom: '24px', transition: 'all 0.2s',
+                background: plan.ctaDisabled
+                  ? 'rgba(255,255,255,0.07)'
+                  : plan.featured
+                    ? 'linear-gradient(135deg, #a8dadc, #7bbfc1)'
+                    : 'rgba(168,218,220,0.12)',
+                color: plan.ctaDisabled
+                  ? 'rgba(255,255,255,0.3)'
+                  : plan.featured ? '#070d1a' : '#a8dadc',
+                border: plan.ctaDisabled
+                  ? '1px solid rgba(255,255,255,0.07)'
+                  : plan.featured ? 'none' : '1px solid rgba(168,218,220,0.3)',
+              }}
+            >
+              {plan.cta}
+              {!plan.ctaDisabled && <ArrowRight size={15} />}
+            </button>
+
+            {/* 기능 목록 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
+              {plan.features.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <CheckCircle2 size={15} style={{
+                    flexShrink: 0, marginTop: '1px',
+                    color: plan.featured ? '#a8dadc' : 'rgba(255,255,255,0.3)',
+                  }} />
+                  <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>{f}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── FAQ 한 줄 ── */}
+      <div className="fade-up fade-up-3" style={{
+        position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 24px 80px',
+      }}>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>
+          언제든지 취소 가능 · 숨겨진 비용 없음 ·{' '}
+          <Link href="/refund" style={{ color: '#a8dadc', textDecoration: 'none' }}>결제 후 7일 이내 전액 환불</Link>
+        </p>
+      </div>
+
+      {/* ── FOOTER 사업자 정보 ── */}
+      <footer className="fade-up fade-up-4" style={{
+        position: 'relative', zIndex: 1,
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        padding: '32px 40px',
+      }}>
+        <div style={{
+          maxWidth: '1020px', margin: '0 auto',
+          display: 'flex', flexDirection: 'column', gap: '16px',
+        }}>
+          {/* 사업자 정보 */}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '6px 28px',
+            fontSize: '11px', color: 'rgba(255,255,255,0.28)', lineHeight: '1.8',
+          }}>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>상호</span> 대우오피스</span>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>사업자등록번호</span> 127-44-85045</span>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>대표전화</span> 031-970-0600</span>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>주소</span> 경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호</span>
+          </div>
+          {/* 링크 + 카피라이트 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '20px' }}>
+              {[['이용약관', '/terms'], ['개인정보처리방침', '/privacy'], ['환불정책', '/refund']].map(([label, href]) => (
+                <Link key={href} href={href} style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px', textDecoration: 'none' }}>
+                  {label}
+                </Link>
+              ))}
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: '11px' }}>© 2025 noado. All rights reserved.</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── TossCheckout 모달 ── */}
+      {selectedPlan && (
+        <TossCheckout
+          amount={selectedPlan.amount}
+          orderName={selectedPlan.name}
+          onClose={() => setSelectedPlan(null)}
+        />
+      )}
+    </div>
+  )
 }

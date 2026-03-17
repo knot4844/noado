@@ -37,8 +37,9 @@ ${query}
 
         return NextResponse.json({ reply: responseText });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("AI Chat DB Error:", error);
-        return NextResponse.json({ error: error.message || '서버 오류 발생' }, { status: 500 });
+        const message = error instanceof Error ? error.message : '서버 오류 발생';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

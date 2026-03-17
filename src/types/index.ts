@@ -1,3 +1,19 @@
+// ── 입주사 ────────────────────────────────────────────────
+export interface Tenant {
+  id:           string
+  owner_id:     string
+  room_id:      string
+  name:         string
+  phone:        string | null
+  email:        string | null
+  monthly_rent: number
+  deposit:      number
+  lease_start:  string | null
+  lease_end:    string | null   // null = 현재 입주 중
+  memo:         string | null
+  created_at:   string
+}
+
 // ── 호실 ──────────────────────────────────────────────
 export type RoomStatus = 'PAID' | 'UNPAID' | 'VACANT'
 
@@ -6,7 +22,7 @@ export interface Room {
   owner_id:     string
   name:         string
   status:       RoomStatus
-  tenant_name:  string | null
+  tenant_name:  string | null   // 현재 입주사 캐시 (tenants 테이블과 동기화)
   tenant_phone: string | null
   tenant_email: string | null
   monthly_rent: number
@@ -27,6 +43,7 @@ export interface Invoice {
   id:          string
   owner_id:    string
   room_id:     string
+  tenant_id:   string | null   // 청구 시점의 입주사 (tenants.id)
   year:        number
   month:       number
   amount:      number
@@ -40,6 +57,8 @@ export interface Invoice {
   virtual_account_number: string | null
   virtual_account_bank:   string | null
   virtual_account_due:    string | null
+  // 납부 요청 시 연결된 계약서 (납부 완료 후 다운로드 게이팅용)
+  contract_id:            string | null
 }
 
 // ── 결제 로그 ──────────────────────────────────────────

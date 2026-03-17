@@ -54,8 +54,9 @@ ${JSON.stringify(issues, null, 2)}
             return NextResponse.json({ error: 'AI 응답을 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
         }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Gemini API Error:', error);
-        return NextResponse.json({ error: error.message || '서버 오류가 발생했습니다.' }, { status: 500 });
+        const message = error instanceof Error ? error.message : '서버 오류가 발생했습니다.';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

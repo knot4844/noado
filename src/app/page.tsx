@@ -23,15 +23,17 @@ export default function LandingPage() {
   const [scrollY, setScrollY]     = useState(0)
   const [visible, setVisible]     = useState(false)
   const [checking, setChecking]   = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  /* 로그인 체크 */
+  /* 로그인 체크 — 리다이렉트 하지 않고 상태만 기록 */
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) { router.replace('/dashboard') }
-      else { setChecking(false); setTimeout(() => setVisible(true), 80) }
+      if (user) setIsLoggedIn(true)
+      setChecking(false)
+      setTimeout(() => setVisible(true), 80)
     })
-  }, [router])
+  }, [])
 
   /* 배경 별 */
   useEffect(() => {
@@ -117,6 +119,7 @@ export default function LandingPage() {
 
   if (checking) return null
 
+
   return (
     <div style={{ background: '#070d1a', minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Space Grotesk',sans-serif" }}>
       <canvas ref={bgCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
@@ -133,8 +136,14 @@ export default function LandingPage() {
       }}>
         <LogoMark />
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <PlainBtn onClick={() => router.push('/login')}>로그인</PlainBtn>
-          <PrimaryBtn onClick={() => router.push('/signup')}>무료 시작하기</PrimaryBtn>
+          {isLoggedIn ? (
+            <PrimaryBtn onClick={() => router.push('/dashboard')}>대시보드 →</PrimaryBtn>
+          ) : (
+            <>
+              <PlainBtn onClick={() => router.push('/login')}>로그인</PlainBtn>
+              <PrimaryBtn onClick={() => router.push('/signup')}>무료 시작하기</PrimaryBtn>
+            </>
+          )}
         </div>
       </nav>
 
@@ -159,7 +168,7 @@ export default function LandingPage() {
             borderRadius: '100px', padding: '6px 18px', marginBottom: '36px',
           }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a8dadc', display: 'inline-block' }} />
-            <span style={{ color: '#a8dadc', fontSize: '13px', fontWeight: 600 }}>임대 관리 자동화 SaaS</span>
+            <span style={{ color: '#a8dadc', fontSize: '13px', fontWeight: 600 }}>공간 관리 자동화 SaaS</span>
           </div>
         </Fade>
 
@@ -168,7 +177,7 @@ export default function LandingPage() {
             fontSize: 'clamp(44px, 7.5vw, 84px)', fontWeight: 800,
             lineHeight: 1.08, letterSpacing: '-2.5px', marginBottom: '28px',
           }}>
-            <span style={{ color: '#ffffff' }}>임대 관리,</span><br />
+            <span style={{ color: '#ffffff' }}>공간 관리,</span><br />
             <GradText>이제 자동으로.</GradText>
           </h1>
         </Fade>
@@ -179,14 +188,23 @@ export default function LandingPage() {
             lineHeight: 1.75, maxWidth: '540px', marginBottom: '52px',
           }}>
             수납 매칭, 전자계약, 알림톡 발송까지<br />
-            복잡한 임대 업무를 한 곳에서 자동화합니다.
+            복잡한 공간 관리 업무를 한 곳에서 자동화합니다.
           </p>
         </Fade>
 
         <Fade show={visible} delay={0.3}>
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <PrimaryBtn large onClick={() => router.push('/signup')}>무료로 시작하기 →</PrimaryBtn>
-            <GhostBtn onClick={() => router.push('/login')}>로그인</GhostBtn>
+            {isLoggedIn ? (
+              <>
+                <PrimaryBtn large onClick={() => router.push('/dashboard')}>대시보드로 가기 →</PrimaryBtn>
+                <GhostBtn onClick={() => router.push('/pricing')}>요금제 보기</GhostBtn>
+              </>
+            ) : (
+              <>
+                <PrimaryBtn large onClick={() => router.push('/signup')}>무료로 시작하기 →</PrimaryBtn>
+                <GhostBtn onClick={() => router.push('/login')}>로그인</GhostBtn>
+              </>
+            )}
           </div>
         </Fade>
 
@@ -212,7 +230,7 @@ export default function LandingPage() {
       <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 120px' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           <SectionTag>핵심 기능</SectionTag>
-          <SectionTitle>임대 관리의 모든 것</SectionTitle>
+          <SectionTitle>공간 관리의 모든 것</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '20px', marginTop: '56px' }}>
             {FEATURES.map((f, i) => <FeatureCard key={i} {...f} i={i} show={scrollY > 720} />)}
           </div>
@@ -227,6 +245,84 @@ export default function LandingPage() {
           <div style={{ marginTop: '64px', textAlign: 'left' }}>
             {STEPS.map((s, i) => <StepRow key={i} {...s} i={i} last={i === STEPS.length - 1} />)}
           </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 120px' }}>
+        <div style={{ maxWidth: '1020px', margin: '0 auto' }}>
+          <SectionTag>요금제</SectionTag>
+          <SectionTitle>합리적인 가격, 투명한 구조</SectionTitle>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+            gap: '20px', marginTop: '56px',
+          }}>
+            {[
+              {
+                name: '스타터', sub: 'Starter', price: '무료', priceSub: '평생 무료',
+                featured: false, badge: null,
+                features: ['사업장 1개 관리', '호실 최대 3개', '기본 대시보드 & 통계', '수동 수납 관리'],
+                cta: '무료로 시작', ctaHref: '/signup',
+              },
+              {
+                name: '비기너', sub: 'Beginner', price: '₩9,900', priceSub: '/ 월',
+                featured: true, badge: '인기',
+                features: ['사업장 1개 관리', '호실 최대 5개', 'AI 통장 입금 자동 매칭', '전자세금계산서 자동 발행', '카카오 자동 알림톡'],
+                cta: '시작하기', ctaHref: '/pricing',
+              },
+              {
+                name: '프로', sub: 'Pro', price: '₩19,900', priceSub: '/ 월',
+                featured: false, badge: null,
+                features: ['사업장 최대 3개 관리', '호실 최대 50개', '스마트 카드/가상계좌 수납', '전자세금계산서 자동 발행', '전자계약 & 서명'],
+                cta: '자세히 보기', ctaHref: '/pricing',
+              },
+            ].map((plan, pi) => (
+              <div key={pi} style={{
+                position: 'relative', borderRadius: '20px', padding: '28px',
+                background: plan.featured
+                  ? 'linear-gradient(145deg, rgba(29,53,87,0.7), rgba(69,123,157,0.3))'
+                  : 'rgba(255,255,255,0.04)',
+                border: plan.featured
+                  ? '1px solid rgba(168,218,220,0.35)'
+                  : '1px solid rgba(255,255,255,0.07)',
+                transition: 'transform 0.3s', cursor: 'default',
+              }}>
+                {plan.badge && (
+                  <div style={{
+                    position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
+                    background: 'linear-gradient(135deg,#a8dadc,#7bbfc1)', color: '#070d1a',
+                    fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '100px',
+                  }}>{plan.badge}</div>
+                )}
+                <div style={{ marginBottom: '6px' }}>
+                  <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>{plan.name}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px', marginLeft: '7px' }}>{plan.sub}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', margin: '16px 0 20px' }}>
+                  <span style={{ fontSize: plan.price === '무료' ? '28px' : '32px', fontWeight: 800, color: plan.featured ? '#a8dadc' : '#fff' }}>{plan.price}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>{plan.priceSub}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '24px' }}>
+                  {plan.features.map((f, fi) => (
+                    <div key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <span style={{ color: plan.featured ? '#a8dadc' : 'rgba(255,255,255,0.3)', fontSize: '14px', marginTop: '1px' }}>✓</span>
+                      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => router.push(plan.ctaHref)} style={{
+                  width: '100%', padding: '11px', borderRadius: '10px',
+                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  background: plan.featured ? 'linear-gradient(135deg,#a8dadc,#7bbfc1)' : 'rgba(168,218,220,0.1)',
+                  color: plan.featured ? '#070d1a' : '#a8dadc',
+                  border: plan.featured ? 'none' : '1px solid rgba(168,218,220,0.25)',
+                }}>{plan.cta} →</button>
+              </div>
+            ))}
+          </div>
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '12px', marginTop: '28px' }}>
+            언제든 취소 가능 · 숨겨진 비용 없음 · 결제 후 7일 이내 전액 환불
+          </p>
         </div>
       </section>
 
@@ -249,18 +345,50 @@ export default function LandingPage() {
           <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '15px', marginBottom: '40px', lineHeight: 1.75 }}>
             신용카드 없이 무료로 시작. 언제든 취소 가능.
           </p>
-          <PrimaryBtn large onClick={() => router.push('/signup')}>무료 계정 만들기 →</PrimaryBtn>
+          {isLoggedIn
+            ? <PrimaryBtn large onClick={() => router.push('/dashboard')}>대시보드로 가기 →</PrimaryBtn>
+            : <PrimaryBtn large onClick={() => router.push('/signup')}>무료 계정 만들기 →</PrimaryBtn>
+          }
         </div>
       </section>
 
       {/* FOOTER */}
       <footer style={{
-        position: 'relative', zIndex: 1, padding: '36px 40px',
+        position: 'relative', zIndex: 1, padding: '40px 40px 36px',
         borderTop: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px',
       }}>
-        <LogoMark />
-        <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
+        {/* 사업자 정보 */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '6px 40px', marginBottom: '28px',
+          color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
+        }}>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
+          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
+            경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
+          </div>
+          <div>
+            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
+            <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
+          </div>
+        </div>
+        {/* 정책 링크 + 카피라이트 */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: '10px',
+          borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px',
+        }}>
+          <LogoMark />
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+            <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
+            <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
+            <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
+        </div>
       </footer>
 
       <style>{`

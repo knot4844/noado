@@ -78,16 +78,19 @@ export async function POST(req: NextRequest) {
     /* ─── paymentId = invoice.id (UUID)로 고정 ─── */
     const paymentId = invoiceId
 
-    /* ─── 입금기한: due_date 또는 오늘 + 7일 ─── */
-    const expiredAt = invoice.due_date
-      ? new Date(`${invoice.due_date}T23:59:59+09:00`).toISOString()
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    /* ─── 입금기한: due_date가 미래면 사용, 과거/없으면 오늘 + 7일 ─── */
+    const fallbackExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const expiredAt = (() => {
+      if (!invoice.due_date) return fallbackExpiry
+      const d = new Date(`${invoice.due_date}T23:59:59+09:00`)
+      return d > new Date() ? d.toISOString() : fallbackExpiry
+    })()
 
     const room = invoice.rooms as { name: string; tenant_name: string | null; tenant_phone: string | null } | null
 
-    /* ─── PortOne V2 가상계좌 발급 ─── */
+    /* ─── PortOne V2 가상계좌 발급 (instant API) ─── */
     const portoneRes = await fetch(
-      `${PORTONE_API_URL}/payments/${encodeURIComponent(paymentId)}/virtual-account`,
+      `${PORTONE_API_URL}/payments/${encodeURIComponent(paymentId)}/instant`,
       {
         method: 'POST',
         headers: {
@@ -96,17 +99,20 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           channelKey,
-          bank,
-          expiredAt,
-          amount: {
-            total:    invoice.amount,
-            currency: 'KRW',
-          },
-          currency:  'KRW',
           orderName: `${invoice.year}년 ${invoice.month}월 월세 - ${room?.name ?? ''}`,
+          amount:    { total: invoice.amount },
+          currency:  'KRW',
           customer:  {
-            fullName:    room?.tenant_name    || '세입자',
-            phoneNumber: room?.tenant_phone   || '',
+            name:        { full: room?.tenant_name || '세입자' },
+            email:       'noreply@noado.kr',
+            phoneNumber: room?.tenant_phone || '',
+          },
+          method: {
+            virtualAccount: {
+              bank,
+              expiry:  { dueDate: expiredAt },
+              option:  { type: 'NORMAL' },
+            },
           },
         }),
       }
@@ -120,11 +126,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: msg }, { status: 502 })
     }
 
-    /* ─── 응답 구조 파싱 ─── */
-    // PortOne V2 응답: { status, id, virtualAccount: { bank, accountNumber, accountName, expiredAt } }
-    const va = portoneBody?.virtualAccount ?? portoneBody
+    /* ─── 발급 후 결제 단건 조회로 계좌번호 확인 ─── */
+    const detailRes  = await fetch(`${PORTONE_API_URL}/payments/${encodeURIComponent(paymentId)}`, {
+      headers: { 'Authorization': `PortOne ${apiSecret}` },
+    })
+    const detailBody = await detailRes.json()
 
-    const accountNumber = va?.accountNumber ?? va?.account_number
+    // V2 응답: { method: { type: "PaymentMethodVirtualAccount", bank, accountNumber, expiredAt } }
+    const va = detailBody?.method
+
+    const accountNumber = va?.accountNumber
     const bankCode      = va?.bank ?? bank
     const vaExpiredAt   = va?.expiredAt ?? expiredAt
 

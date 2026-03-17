@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 export const dynamic = 'force-dynamic'
 import React from 'react';
 import Link from 'next/link';

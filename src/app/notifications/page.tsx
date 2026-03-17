@@ -78,7 +78,7 @@ export default function NotificationsPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setTimeout(() => load(), 0) }, [load])
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 3500)

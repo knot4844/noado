@@ -68,7 +68,7 @@ export default function UserDetailPage() {
     setLoading(false)
   }, [userId, router])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setTimeout(() => load(), 0) }, [load])
 
   const handleManage = useCallback(async (action: 'suspend' | 'activate' | 'delete') => {
     setManageLoading(true)

@@ -48,8 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         // Check for demo login first (Local UI testing bypassing Supabase)
         if (typeof window !== 'undefined' && localStorage.getItem('local_demo_login') === 'true') {
-            setUser({ id: 'demo-user-123', email: 'demo@noado.kr' } as any);
-            setIsLoading(false);
+            setTimeout(() => {
+                setUser({ id: 'demo-user-123', email: 'demo@noado.kr' } as User);
+                setIsLoading(false);
+            }, 0);
             return;
         }
 

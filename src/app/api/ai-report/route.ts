@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         const textArea = response.text();
 
         return NextResponse.json({ text: textArea });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("AI Report Generation Error:", error);
         return NextResponse.json({ error: "Failed to generate report" }, { status: 500 });
     }

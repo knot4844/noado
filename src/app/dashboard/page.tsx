@@ -156,7 +156,7 @@ export default function DashboardPage() {
     setLoading(false)
   }, [supabase, thisYear, thisMonth, today])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { setTimeout(() => fetchData(), 0) }, [fetchData])
 
   // ── KPI 계산 ──
   const paid   = rooms.filter(r => r.status === 'PAID')

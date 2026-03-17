@@ -7,10 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
   Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw, Trash2,
-  GitMerge, Eye, AlertTriangle, MessageSquare,
+  GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
-import type { Invoice, Room } from '@/types'
+import type { Invoice, Room, Tenant } from '@/types'
 
 /* ─── 은행 목록 ─── */
 const VA_BANKS: Record<string, string> = {
@@ -29,6 +29,42 @@ interface InvoiceWithRoom extends Invoice {
 }
 
 type FilterStatus = 'ALL' | 'paid' | 'upcoming' | 'ready' | 'overdue'
+
+/* ─── 은행 입금일 문자열 → { year, month, isoDate } 파싱 ─── */
+function parseBankDate(dateStr: string): { year: number; month: number; isoDate: string } {
+  if (!dateStr) {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() + 1, isoDate: now.toISOString() }
+  }
+
+  // 1) Excel 시리얼 숫자 (SheetJS가 날짜를 숫자로 반환 시, e.g. 45373)
+  const asNum = Number(String(dateStr).trim())
+  if (!isNaN(asNum) && asNum > 40000 && asNum < 60000) {
+    const d = new Date((asNum - 25569) * 86400000)
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, isoDate: d.toISOString() }
+  }
+
+  // 2) 구분자 제거 후 YYYYMMDD 파싱 (2025.01.15 / 2025-01-15 / 20250115 등)
+  const clean = String(dateStr).replace(/[.\-\/\s]/g, '')
+  if (clean.length >= 8) {
+    const year  = parseInt(clean.slice(0, 4))
+    const month = parseInt(clean.slice(4, 6))
+    const day   = parseInt(clean.slice(6, 8))
+    if (year > 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { year, month, isoDate: `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T00:00:00.000Z` }
+    }
+  }
+
+  // 3) JS Date 문자열 파싱 (SheetJS Date 객체 → String 변환 결과 등)
+  const parsed = new Date(dateStr)
+  if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 2000) {
+    return { year: parsed.getFullYear(), month: parsed.getMonth() + 1, isoDate: parsed.toISOString() }
+  }
+
+  // 4) 폴백
+  const now = new Date()
+  return { year: now.getFullYear(), month: now.getMonth() + 1, isoDate: now.toISOString() }
+}
 
 /* ─── 납부 예정 여부: due_date가 오늘보다 미래이면 납부 예정 ─── */
 function isUpcoming(inv: InvoiceWithRoom): boolean {
@@ -56,6 +92,9 @@ interface PendingMatch {
   selectedInvoiceId:  string | null  // 사용자 선택
   included:           boolean        // 체크박스 포함 여부
   isDuplicate:        boolean        // 이미 완납된 중복
+  duplicateLabel:     string | null  // 완납 매칭 호실 표시용 (호실명 + 입주사명)
+  aiSuggestedId:      string | null  // AI 제안
+  aiReason:           string | null  // AI 추론 이유
 }
 
 /* ─── 가상계좌 모달 ─── */
@@ -73,6 +112,8 @@ export default function PaymentsPage() {
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const [invoices, setInvoices] = useState<InvoiceWithRoom[]>([])
+  const [allRooms,    setAllRooms]    = useState<{ id: string; name: string; tenant_name: string | null }[]>([])
+  const [allTenants,  setAllTenants]  = useState<Pick<Tenant, 'id' | 'room_id' | 'name' | 'monthly_rent' | 'lease_start' | 'lease_end'>[]>([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState<FilterStatus>('ALL')
   const [search, setSearch]     = useState('')
@@ -88,6 +129,9 @@ export default function PaymentsPage() {
   const [pendingMatches, setPendingMatches] = useState<PendingMatch[]>([])
   const [showReview, setShowReview]         = useState(false)
   const [executing, setExecuting]           = useState(false)
+  const [aiMatching, setAiMatching]         = useState(false)
+  const [sortCol, setSortCol]   = useState<'date' | 'amount' | 'note' | 'room' | 'status'>('date')
+  const [sortAsc, setSortAsc]   = useState(true)
 
   /* ─── 청구금액 인라인 수정 ─── */
   const [editingId, setEditingId]   = useState<string | null>(null)
@@ -120,10 +164,27 @@ export default function PaymentsPage() {
       ...inv,
       room: inv.rooms,
     })))
+
+    const { data: roomsData, error: roomsErr } = await supabase
+      .from('rooms')
+      .select('id, name, tenant_name')
+      .eq('owner_id', user.id)
+      .order('name')
+    if (roomsErr) console.error('[load] allRooms 쿼리 에러:', JSON.stringify(roomsErr))
+    setAllRooms(roomsData ?? [])
+
+    // 입주사 테이블 로드 (계약기간 포함)
+    const { data: tenantsData } = await supabase
+      .from('tenants')
+      .select('id, room_id, name, monthly_rent, lease_start, lease_end')
+      .eq('owner_id', user.id)
+    setAllTenants(tenantsData ?? [])
+
     setLoading(false)
   }, [supabase, yearMonth])
 
   useEffect(() => { load() }, [load])
+
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg })
@@ -187,7 +248,10 @@ export default function PaymentsPage() {
       const amtKey   = colKeys.find(k => /^입금|입금\(|입금액|amount/i.test(k))
                     ?? colKeys.find(k => /금액|입금/i.test(k) && !/출금/i.test(k))
                     ?? colKeys[1]
-      const noteKey  = colKeys.find(k => /^내용$|내용\(|적요|note|memo/i.test(k)) ?? colKeys[2]
+      // "내용" 컬럼 우선 탐색 (입금자명 포함) → 없으면 "적요" (거래유형 코드) 순
+      const noteKey  = colKeys.find(k => /^내용$|내용\(/i.test(k))
+                    ?? colKeys.find(k => /적요|note|memo/i.test(k))
+                    ?? colKeys[2]
 
       const bankRows: BankRow[] = rows
         .map(r => ({
@@ -212,55 +276,158 @@ export default function PaymentsPage() {
   }
 
   /* ══════════════════════════════════
-     검토 화면 열기 (자동 매칭 제안)
+     검토 화면 열기 (자동 매칭 + AI 제안)
   ══════════════════════════════════ */
-  const openReview = (bankRows: BankRow[]) => {
+  const openReview = async (bankRows: BankRow[]) => {
+    /* ── 법인/개인 이름 정규화 ── */
+    const normalize = (s: string) =>
+      s.replace(/\s/g, '')
+       .replace(/^\(주\)|\(유\)|\(사\)|\(재\)|주식회사|유한회사|사단법인/g, '')
+       .toLowerCase()
+
+    /* ── 이름 매칭 점수 (0=불일치, 1=부분일치, 2=완전일치) ── */
+    const nameScore = (note: string, tenantName: string | null | undefined): number => {
+      if (!tenantName) return 0
+      const n = normalize(note)
+      const t = normalize(tenantName)
+      if (!t) return 0
+      if (n.includes(t)) return 2
+      // 앞 70% 글자 부분일치 (3자 이상일 때만)
+      if (t.length >= 3 && n.includes(t.slice(0, Math.ceil(t.length * 0.7)))) return 1
+      return 0
+    }
+
+    /* ── 입금일 기준 계약 중인 입주사인지 확인 ── */
+    const isTenantActiveOn = (tenant: { lease_start: string | null; lease_end: string | null }, isoDate: string): boolean => {
+      const d = new Date(isoDate)
+      if (tenant.lease_start && d < new Date(tenant.lease_start)) return false
+      if (tenant.lease_end   && d > new Date(tenant.lease_end))   return false
+      return true
+    }
+
     const matches: PendingMatch[] = bankRows.map((row, idx) => {
-      /* 중복 감지: 이미 완납된 건과 금액+이름이 일치 */
-      const alreadyPaid = invoices.find(inv =>
-        inv.status === 'paid' &&
-        inv.amount === row.amount &&
-        !!inv.room?.tenant_name &&
-        row.note.includes(inv.room.tenant_name)
-      )
+      const { isoDate } = parseBankDate(row.date)
+
+      /* ── 입금일 기준 계약 중인 입주사 목록 ── */
+      const activeTenants = allTenants.filter(t => isTenantActiveOn(t, isoDate))
+
+      /* ── 노트 → 최고 점수 tenant 찾기 ── */
+      const bestTenantMatch = activeTenants
+        .map(t => ({ tenant: t, score: nameScore(row.note, t.name) }))
+        .filter(x => x.score > 0)
+        .sort((a, b) => b.score - a.score)[0] ?? null
+
+      /* 중복 감지: 이미 완납된 건 */
+      const paidByNameAndAmount = invoices.find(inv => {
+        if (inv.status !== 'paid' || inv.amount !== row.amount) return false
+        // 입주사 테이블 기준 매칭
+        if (bestTenantMatch && inv.room_id === bestTenantMatch.tenant.room_id) return true
+        // 폴백: rooms.tenant_name 기준
+        return nameScore(row.note, inv.room?.tenant_name) > 0
+      })
+      const paidByAmountOnly = !paidByNameAndAmount
+        ? (() => {
+            const ms = invoices.filter(inv => inv.status === 'paid' && inv.amount === row.amount)
+            return ms.length === 1 ? ms[0] : undefined
+          })()
+        : undefined
+      const alreadyPaid = paidByNameAndAmount ?? paidByAmountOnly
       if (alreadyPaid) {
         return {
           rowIdx:             idx,
           bankRow:            row,
           suggestedInvoiceId: alreadyPaid.id,
           selectedInvoiceId:  alreadyPaid.id,
-          included:           false,   // 중복은 기본 제외
+          included:           false,
           isDuplicate:        true,
+          duplicateLabel:     [alreadyPaid.room?.name, alreadyPaid.room?.tenant_name].filter(Boolean).join(' '),
+          aiSuggestedId:      null,
+          aiReason:           null,
         }
       }
 
-      /* 자동 매칭 1순위: 미납 청구서 중 금액 + 이름 모두 일치 */
-      const byNameAndAmount = invoices.find(inv =>
-        inv.status !== 'paid' &&
-        inv.amount === row.amount &&
-        !!inv.room?.tenant_name &&
-        row.note.includes(inv.room.tenant_name)
-      )
-      /* 자동 매칭 2순위: 이름 매칭 없이 금액만 일치 (차선책) */
-      const byAmountOnly = !byNameAndAmount
-        ? invoices.find(inv => inv.status !== 'paid' && inv.amount === row.amount)
-        : null
+      /* 자동 매칭 1순위: 미납 청구서 중 금액 + 입주사 이름 일치 */
+      const suggested = invoices.find(inv => {
+        if (inv.status === 'paid' || inv.amount !== row.amount) return false
+        // 입주사 테이블 기준 (계약기간 필터 적용)
+        if (bestTenantMatch && inv.room_id === bestTenantMatch.tenant.room_id) return true
+        // 폴백: rooms.tenant_name 기준
+        return nameScore(row.note, inv.room?.tenant_name) > 0
+      }) ?? null
 
-      const suggested = byNameAndAmount ?? byAmountOnly
+      /* 자동 매칭 2순위: 청구서 없을 경우 — 계약 중인 입주사 이름으로 호실 찾아 신규 등록 */
+      const suggestedNewRoom = !suggested
+        ? (() => {
+            if (bestTenantMatch) {
+              return allRooms.find(r => r.id === bestTenantMatch.tenant.room_id) ?? null
+            }
+            return allRooms.find(r => nameScore(row.note, r.tenant_name) > 0) ?? null
+          })()
+        : null
+      const suggestedId = suggested?.id ?? (suggestedNewRoom ? `new:${suggestedNewRoom.id}` : null)
 
       return {
         rowIdx:             idx,
         bankRow:            row,
-        suggestedInvoiceId: suggested?.id ?? null,
-        selectedInvoiceId:  suggested?.id ?? null,
-        included:           !!suggested,   // 제안 있으면 기본 포함
+        suggestedInvoiceId: suggestedId,
+        selectedInvoiceId:  suggestedId,
+        included:           !!suggestedId,
         isDuplicate:        false,
+        duplicateLabel:     null,
+        aiSuggestedId:      null,
+        aiReason:           null,
       }
     })
 
     setPendingMatches(matches)
     setShowReview(true)
+
+    /* ─── 미매칭 건에 대해 AI 추론 요청 ─── */
+    const unmatched = matches.filter(m => !m.selectedInvoiceId && !m.isDuplicate)
+    if (unmatched.length === 0) return
+
+    setAiMatching(true)
+    try {
+      const unpaidInvoices = invoices
+        .filter(i => i.status !== 'paid')
+        .map(i => ({
+          id:        i.id,
+          roomName:  i.room?.name        ?? '',
+          tenantName: i.room?.tenant_name ?? '',
+          amount:    i.amount,
+        }))
+
+      const res = await fetch('/api/ai/match-payments', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          bankRows:  unmatched.map(m => ({ rowIdx: m.rowIdx, date: m.bankRow.date, amount: m.bankRow.amount, note: m.bankRow.note })),
+          invoices:  unpaidInvoices,
+        }),
+      })
+      const data = await res.json()
+      const results: { rowIdx: number; invoiceId: string | null; reason: string }[] = data.results ?? []
+
+      if (results.length > 0) {
+        setPendingMatches(prev => prev.map(pm => {
+          const aiResult = results.find(r => r.rowIdx === pm.rowIdx)
+          if (!aiResult || !aiResult.invoiceId) return pm
+          return {
+            ...pm,
+            selectedInvoiceId: aiResult.invoiceId,
+            included:          true,
+            aiSuggestedId:     aiResult.invoiceId,
+            aiReason:          aiResult.reason,
+          }
+        }))
+      }
+    } catch (e) {
+      console.error('AI 매칭 오류:', e)
+    }
+    setAiMatching(false)
   }
+
+
 
   /* ══════════════════════════════════
      수납 확정 실행
@@ -272,10 +439,72 @@ export default function PaymentsPage() {
     setExecuting(true)
     let matched = 0
     let skipped = 0
+    const createdMonths: string[] = []
 
     for (const pm of pendingMatches) {
       if (!pm.included || !pm.selectedInvoiceId) { skipped++; continue }
 
+      /* ─── 새 청구서 생성 후 수납 (과거 수납 내역 등록) ─── */
+      if (pm.selectedInvoiceId.startsWith('new:')) {
+        const roomId = pm.selectedInvoiceId.replace('new:', '')
+        const { year, month, isoDate } = parseBankDate(pm.bankRow.date)
+
+        // 같은 호실+연월 청구서가 이미 있으면 재사용, 없으면 생성
+        let invoiceId: string | null = null
+        const { data: existing } = await supabase
+          .from('invoices')
+          .select('id')
+          .eq('room_id', roomId)
+          .eq('year', year)
+          .eq('month', month)
+          .maybeSingle()
+
+        if (existing) {
+          invoiceId = existing.id
+          // 기존 청구서 금액/상태 업데이트
+          await supabase.from('invoices').update({
+            paid_amount: pm.bankRow.amount,
+            status: 'paid',
+            paid_at: isoDate,
+          }).eq('id', invoiceId)
+        } else {
+          const { data: newInv, error: insertErr } = await supabase
+            .from('invoices')
+            .insert({
+              owner_id:    user.id,
+              room_id:     roomId,
+              year,
+              month,
+              amount:      pm.bankRow.amount,
+              paid_amount: pm.bankRow.amount,
+              status:      'paid',
+              paid_at:     isoDate,
+              due_date:    new Date(year, month - 1, 10).toISOString().split('T')[0],
+            })
+            .select('id')
+            .single()
+          if (insertErr || !newInv) {
+            console.error('신규 청구서 생성 오류:', insertErr?.message ?? JSON.stringify(insertErr))
+            skipped++
+            continue
+          }
+          invoiceId = newInv.id
+          createdMonths.push(`${year}-${String(month).padStart(2,'0')}`)
+        }
+
+        await supabase.from('payments').insert({
+          owner_id:   user.id,
+          invoice_id: invoiceId,
+          room_id:    roomId,
+          amount:     pm.bankRow.amount,
+          paid_at:    isoDate,
+          note:       pm.bankRow.note,
+        })
+        matched++
+        continue
+      }
+
+      /* ─── 기존 청구서 수납 처리 ─── */
       const inv = invoices.find(i => i.id === pm.selectedInvoiceId)
       if (!inv || inv.status === 'paid') { skipped++; continue }
 
@@ -304,7 +533,10 @@ export default function PaymentsPage() {
     setExecuting(false)
     setShowReview(false)
     setPendingMatches([])
-    showToast('success', `${matched}건 수납 확정 완료${skipped > 0 ? ` (제외 ${skipped}건)` : ''}`)
+    const monthSummary = createdMonths.length > 0
+      ? ` · 신규등록 ${[...new Set(createdMonths)].sort().join(', ')}`
+      : ''
+    showToast('success', `${matched}건 수납 확정 완료${skipped > 0 ? ` (제외 ${skipped}건)` : ''}${monthSummary}`)
     load()
   }
 
@@ -473,39 +705,59 @@ export default function PaymentsPage() {
       showToast('error', '이미 모든 청구서가 생성되어 있습니다.'); setImporting(false); return
     }
 
+    // 해당 월 기준 계약 중인 입주사 조회 (임대료·연락처·tenant_id)
+    const billingDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
+    type TenantRow = { id: string; room_id: string; name: string; phone: string | null; monthly_rent: number }
+    const { data: tenantsData } = await supabase
+      .from('tenants')
+      .select('id, room_id, name, phone, monthly_rent')
+      .in('room_id', newRooms.map(r => r.id))
+      .or(`lease_end.is.null,lease_end.gte.${billingDate}`)
+    const tenantByRoom: Record<string, TenantRow> = {}
+    for (const t of (tenantsData || []) as TenantRow[]) tenantByRoom[t.room_id] = t
+
     const { data: insertedInvoices, error } = await supabase.from('invoices').insert(
-      newRooms.map(r => ({
-        owner_id:    user.id,
-        room_id:     r.id,
-        year,
-        month,
-        amount:      r.monthly_rent,
-        paid_amount: 0,
-        status:      'ready',
-        due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
-      }))
+      newRooms.map(r => {
+        const tenant = tenantByRoom[r.id]
+        return {
+          owner_id:    user.id,
+          room_id:     r.id,
+          tenant_id:   tenant?.id || null,
+          year,
+          month,
+          // tenants.monthly_rent 우선, 없으면 rooms.monthly_rent 폴백
+          amount:      tenant?.monthly_rent ?? r.monthly_rent,
+          paid_amount: 0,
+          status:      'ready',
+          due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
+        }
+      })
     ).select()
-    
+
     if (error) { showToast('error', error.message); setImporting(false); return }
 
     // 알림톡 발송
     if (insertedInvoices) {
       for (const inv of insertedInvoices) {
-        const room = newRooms.find(r => r.id === inv.room_id)
-        if (room && room.tenant_phone) {
+        const room   = newRooms.find(r => r.id === inv.room_id)
+        const tenant = tenantByRoom[inv.room_id]
+        const phone  = tenant?.phone || room?.tenant_phone
+        const name   = tenant?.name  || room?.tenant_name || '입주자님'
+        const amount = inv.amount ?? tenant?.monthly_rent ?? room?.monthly_rent ?? 0
+        if (room && phone) {
           try {
             await fetch('/api/alimtalk', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 templateKey: 'INVOICE_ISSUED',
-                phone:       room.tenant_phone,
+                phone,
                 roomName:    room.name,
-                tenantName:  room.tenant_name || '입주자님',
-                amount:      String(room.monthly_rent),
+                tenantName:  name,
+                amount:      String(amount),
                 dueDate:     inv.due_date,
                 paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
-                roomId:      room.id
+                roomId:      room.id,
               })
             })
           } catch (e) {
@@ -589,6 +841,38 @@ export default function PaymentsPage() {
   const duplicateCount = pendingMatches.filter(m => m.isDuplicate).length
   const unmatchedCount = pendingMatches.filter(m => !m.selectedInvoiceId && !m.isDuplicate).length
 
+  /* ─── 정렬된 검토 목록 ─── */
+  const sortedMatches = useMemo(() => {
+    const statusOrder = (pm: PendingMatch) => {
+      if (pm.isDuplicate) return 3
+      if (!pm.selectedInvoiceId) return 2
+      if (pm.aiSuggestedId && pm.selectedInvoiceId === pm.aiSuggestedId) return 1
+      return 0
+    }
+    const getRoomLabel = (pm: PendingMatch) => {
+      if (pm.selectedInvoiceId?.startsWith('new:')) {
+        const r = allRooms.find(r => `new:${r.id}` === pm.selectedInvoiceId)
+        return r ? `${r.name} ${r.tenant_name ?? ''}` : ''
+      }
+      const inv = invoices.find(i => i.id === pm.selectedInvoiceId)
+      return inv ? `${inv.room?.name ?? ''} ${inv.room?.tenant_name ?? ''}` : ''
+    }
+    return [...pendingMatches].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'date')   cmp = (a.bankRow.date || '').localeCompare(b.bankRow.date || '')
+      if (sortCol === 'amount') cmp = a.bankRow.amount - b.bankRow.amount
+      if (sortCol === 'note')   cmp = (a.bankRow.note || '').localeCompare(b.bankRow.note || '')
+      if (sortCol === 'room')   cmp = getRoomLabel(a).localeCompare(getRoomLabel(b))
+      if (sortCol === 'status') cmp = statusOrder(a) - statusOrder(b)
+      return sortAsc ? cmp : -cmp
+    })
+  }, [pendingMatches, sortCol, sortAsc, invoices, allRooms])
+
+  const toggleSort = (col: 'date' | 'amount' | 'note' | 'room' | 'status') => {
+    if (sortCol === col) setSortAsc(p => !p)
+    else { setSortCol(col); setSortAsc(true) }
+  }
+
   /* ══════════════════════════════════
      렌더
   ══════════════════════════════════ */
@@ -621,6 +905,13 @@ export default function PaymentsPage() {
                   <h2 className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
                     입금내역 검토
                   </h2>
+                  {aiMatching && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                         style={{ background: 'rgba(29,53,87,0.08)', color: 'var(--color-primary)' }}>
+                      <Loader2 size={11} className="animate-spin" />
+                      AI 매칭 분석 중...
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
                   총 {pendingMatches.length}건 &middot; 확정 {includedCount}건
@@ -647,16 +938,33 @@ export default function PaymentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ background: 'var(--color-muted-bg)', borderBottom: '1px solid var(--color-border)' }}>
-                    {['포함', '입금일', '입금액', '내용(비고)', '매칭 호실 / 입주사', '상태'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold"
-                          style={{ color: 'var(--color-muted)' }}>{h}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold" style={{ color: 'var(--color-muted)' }}>포함</th>
+                    {([
+                      ['입금일',           'date'],
+                      ['입금액',           'amount'],
+                      ['내용(비고)',        'note'],
+                      ['매칭 호실 / 입주사', 'room'],
+                      ['상태',             'status'],
+                    ] as [string, 'date' | 'amount' | 'note' | 'room' | 'status'][]).map(([label, col]) => (
+                      <th key={col}
+                          className="px-4 py-3 text-left text-xs font-semibold cursor-pointer select-none"
+                          style={{ color: sortCol === col ? 'var(--color-primary)' : 'var(--color-muted)' }}
+                          onClick={() => toggleSort(col)}>
+                        <span className="flex items-center gap-1">
+                          {label}
+                          <span className="text-[10px]">
+                            {sortCol === col ? (sortAsc ? '↑' : '↓') : '↕'}
+                          </span>
+                        </span>
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingMatches.map((pm, i) => {
+                  {sortedMatches.map((pm, i) => {
                     const selInv = invoices.find(inv => inv.id === pm.selectedInvoiceId)
-                    const isAutoMatch = pm.suggestedInvoiceId && pm.selectedInvoiceId === pm.suggestedInvoiceId
+                    const isAutoMatch = pm.suggestedInvoiceId && pm.selectedInvoiceId === pm.suggestedInvoiceId && !pm.aiSuggestedId
+                    const isAiMatch   = !!pm.aiSuggestedId && pm.selectedInvoiceId === pm.aiSuggestedId
                     return (
                       <tr key={pm.rowIdx}
                           style={{
@@ -670,10 +978,9 @@ export default function PaymentsPage() {
                           <input
                             type="checkbox"
                             checked={pm.included}
-                            disabled={pm.isDuplicate}
                             onChange={e =>
                               setPendingMatches(prev =>
-                                prev.map((m, idx) => idx === i ? { ...m, included: e.target.checked } : m)
+                                prev.map(m => m.rowIdx === pm.rowIdx ? { ...m, included: e.target.checked } : m)
                               )
                             }
                             className="w-4 h-4 cursor-pointer"
@@ -693,42 +1000,75 @@ export default function PaymentsPage() {
                         </td>
 
                         {/* 내용 */}
-                        <td className="px-4 py-3 max-w-[160px] truncate text-xs"
-                            style={{ color: 'var(--color-text)' }}
-                            title={pm.bankRow.note}>
-                          {pm.bankRow.note || '—'}
+                        <td className="px-4 py-3 max-w-[180px] text-xs" style={{ color: 'var(--color-text)' }}>
+                          <div className="truncate" title={pm.bankRow.note}>{pm.bankRow.note || '—'}</div>
+                          {pm.aiReason && (
+                            <div className="flex items-start gap-1 mt-0.5" style={{ color: '#7c3aed' }}>
+                              <Sparkles size={10} className="mt-0.5 shrink-0" />
+                              <span className="text-[10px] leading-tight">{pm.aiReason}</span>
+                            </div>
+                          )}
                         </td>
 
                         {/* 매칭 선택 드롭다운 */}
                         <td className="px-4 py-3">
                           <select
                             value={pm.selectedInvoiceId ?? ''}
-                            disabled={pm.isDuplicate}
                             onChange={e => {
                               const val = e.target.value || null
                               setPendingMatches(prev =>
-                                prev.map((m, idx) =>
-                                  idx === i ? { ...m, selectedInvoiceId: val, included: !!val } : m
+                                prev.map(m =>
+                                  m.rowIdx === pm.rowIdx ? {
+                                    ...m,
+                                    selectedInvoiceId: val,
+                                    included:          !!val,
+                                    isDuplicate:       false,  // 수동 변경 시 중복 해제
+                                    duplicateLabel:    null,
+                                  } : m
                                 )
                               )
                             }}
-                            className="w-full max-w-[220px] px-2 py-1.5 rounded-lg text-xs outline-none"
+                            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                             style={{
                               border:     '1px solid var(--color-border)',
                               background: 'var(--color-muted-bg)',
                               color:      'var(--color-foreground)',
+                              minWidth:   '200px',
                             }}>
                             <option value="">— 미매칭 (제외) —</option>
-                            {unpaidInvoiceOptions.map(inv => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.room?.name} {inv.room?.tenant_name} ({formatKRW(inv.amount)})
-                              </option>
-                            ))}
-                            {/* 중복인 경우 완납 건도 표시 */}
-                            {pm.isDuplicate && selInv && (
-                              <option key={selInv.id} value={selInv.id}>
-                                {selInv.room?.name} {selInv.room?.tenant_name} ({formatKRW(selInv.amount)})
-                              </option>
+                            {unpaidInvoiceOptions.length > 0 && (
+                              <optgroup label="── 이번 달 청구서 매칭 ──">
+                                {unpaidInvoiceOptions.map(inv => (
+                                  <option key={inv.id} value={inv.id}>
+                                    {inv.room?.name} {inv.room?.tenant_name} ({formatKRW(inv.amount)})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {allRooms.length > 0 && (
+                              <optgroup label="── 새 청구서 생성 후 수납 (과거 내역) ──">
+                                {allRooms.map(r => (
+                                  <option key={`new:${r.id}`} value={`new:${r.id}`}>
+                                    {r.name} {r.tenant_name ?? ''} (신규 등록)
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {/* 이미 완납 건 — selInv가 없어도 duplicateLabel로 항상 표시 */}
+                            {pm.duplicateLabel && pm.suggestedInvoiceId && (
+                              <optgroup label="── 이미 완납 (자동 감지) ──">
+                                <option value={pm.suggestedInvoiceId}>
+                                  {pm.duplicateLabel} ({formatKRW(pm.bankRow.amount)}) ✓ 완납
+                                </option>
+                              </optgroup>
+                            )}
+                            {/* selInv가 완납이고 duplicateLabel이 없는 경우 (수동 선택된 완납 건) */}
+                            {!pm.duplicateLabel && selInv && selInv.status === 'paid' && !unpaidInvoiceOptions.find(inv => inv.id === selInv.id) && (
+                              <optgroup label="── 이미 완납 ──">
+                                <option key={selInv.id} value={selInv.id}>
+                                  {selInv.room?.name} {selInv.room?.tenant_name} ({formatKRW(selInv.amount)})
+                                </option>
+                              </optgroup>
                             )}
                           </select>
                         </td>
@@ -740,6 +1080,17 @@ export default function PaymentsPage() {
                               <AlertTriangle size={12} />
                               이미 완납
                             </div>
+                          ) : pm.selectedInvoiceId?.startsWith('new:') ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                              신규 등록
+                            </span>
+                          ) : isAiMatch ? (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                 style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+                              <Sparkles size={10} />
+                              AI 제안
+                            </div>
                           ) : isAutoMatch ? (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium"
                                   style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
@@ -750,6 +1101,11 @@ export default function PaymentsPage() {
                                   style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
                               수동선택
                             </span>
+                          ) : aiMatching ? (
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-muted)' }}>
+                              <Loader2 size={11} className="animate-spin" />
+                              분석 중
+                            </div>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium"
                                   style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>

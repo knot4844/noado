@@ -184,7 +184,7 @@ export default function TenantPortalPage() {
         ws["!cols"] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "납입 영수증");
-        XLSX.writeFile(wb, `임대료_납입영수증_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(wb, `이용료_납입영수증_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     return (
@@ -213,7 +213,7 @@ export default function TenantPortalPage() {
                     <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl flex items-start gap-4 animate-in slide-in-from-bottom-2 duration-500">
                         <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={24} />
                         <div>
-                            <h3 className="font-bold text-rose-800 text-base mb-1">미납된 임대료가 있습니다</h3>
+                            <h3 className="font-bold text-rose-800 text-base mb-1">미납된 이용료가 있습니다</h3>
                             <p className="text-rose-600 text-sm mb-3">
                                 {room.unpaidMonths}개월분 (₩ {room.unpaidAmount.toLocaleString()})이 미납되었습니다.
                             </p>
@@ -232,7 +232,7 @@ export default function TenantPortalPage() {
                     <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
                         <h2 className="font-bold text-neutral-900 text-lg flex items-center gap-2">
                             <CalendarClock size={20} className="text-neutral-400" />
-                            나의 임대차 계약
+                            나의 이용 계약
                         </h2>
                         <Link href={`/contracts/${room.id}`} className="text-xs font-bold px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-md hover:bg-neutral-200 transition-colors flex items-center gap-1">
                             <FileSignature size={14} /> 계약서 보기
@@ -240,7 +240,7 @@ export default function TenantPortalPage() {
                     </div>
                     <div className="p-5 space-y-5">
                         <div>
-                            <span className="text-xs font-bold text-neutral-400 block mb-1">임대 기간</span>
+                            <span className="text-xs font-bold text-neutral-400 block mb-1">이용 기간</span>
                             <span className="text-neutral-900 font-medium">
                                 {room.leaseStart} ~ <span className="font-bold">{room.leaseEnd}</span>
                             </span>
@@ -251,7 +251,7 @@ export default function TenantPortalPage() {
                                 <span className="font-bold text-neutral-900 block text-lg">₩ {room.deposit.toLocaleString()}</span>
                             </div>
                             <div className="flex-1 pl-4">
-                                <span className="text-xs font-bold text-neutral-400 block mb-1">월임대료 ({room.dueDate})</span>
+                                <span className="text-xs font-bold text-neutral-400 block mb-1">월 이용료 ({room.dueDate})</span>
                                 <span className="font-bold text-blue-600 block text-lg">₩ {room.monthlyRent.toLocaleString()}</span>
                             </div>
                         </div>
@@ -296,7 +296,7 @@ export default function TenantPortalPage() {
                         ))}
                     </div>
                     <Link href={`/portal/${room.id}/pay`} className="flex items-center justify-between p-5 bg-neutral-50 hover:bg-neutral-100 transition-colors group">
-                        <span className="font-bold text-neutral-700 group-hover:text-neutral-900">당월 임대료 신용카드 결제하기</span>
+                        <span className="font-bold text-neutral-700 group-hover:text-neutral-900">당월 이용료 신용카드 결제하기</span>
                         <ChevronRight size={20} className="text-neutral-400 group-hover:text-neutral-700 transition-transform group-hover:translate-x-1" />
                     </Link>
                 </div>

@@ -96,7 +96,7 @@ export default function TenantPaymentPage() {
                     </div>
                     <h1 className="text-2xl font-extrabold text-neutral-900 mb-3 tracking-tight">결제가 완료되었습니다</h1>
                     <p className="text-neutral-500 mb-8 leading-relaxed">
-                        이번 달 임대료 납부가 정상적으로 처리되었습니다.<br />이용해 주셔서 감사합니다.
+                        이번 달 이용료 납부가 정상적으로 처리되었습니다.<br />이용해 주셔서 감사합니다.
                     </p>
                     <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 mb-8 text-left space-y-3">
                         <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
@@ -129,7 +129,7 @@ export default function TenantPaymentPage() {
                     </button>
                     <span className="font-extrabold text-lg text-neutral-900 tracking-tight flex items-center gap-2">
                         <CreditCard size={20} className="text-neutral-400" />
-                        임대료 카드 결제
+                        이용료 카드 결제
                     </span>
                 </div>
             </header>
@@ -143,7 +143,7 @@ export default function TenantPaymentPage() {
                         </div>
                         <div>
                             <span className="text-sm font-bold text-neutral-400">{room.name}</span>
-                            <h2 className="text-xl font-black text-neutral-900 tracking-tight">당월 임대료 결제</h2>
+                            <h2 className="text-xl font-black text-neutral-900 tracking-tight">당월 이용료 결제</h2>
                         </div>
                     </div>
                     <div className="bg-neutral-50 rounded-xl p-5 border border-neutral-100">
@@ -157,7 +157,7 @@ export default function TenantPaymentPage() {
                         </div>
                     </div>
                     <p className="text-xs text-neutral-400 mt-4 text-center">
-                        * 신용카드 결제 수수료는 임차인 부담으로 진행됩니다.
+                        * 신용카드 결제 수수료는 이용자 부담으로 진행됩니다.
                     </p>
                 </div>
 
@@ -180,7 +180,7 @@ export default function TenantPaymentPage() {
                 {isCheckoutOpen && (
                     <TossCheckout
                         amount={paymentAmount}
-                        orderName={`${room.name} 당월 임대료`}
+                        orderName={`${room.name} 당월 이용료`}
                         onClose={() => setIsCheckoutOpen(false)}
                     />
                 )}

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { Room, Business, Payment } from "@/lib/data";
+import { Room, Business, Payment, businesses as mockBusinesses, allRooms as mockAllRooms, payments as mockPayments } from "@/lib/data";
 import { useAuth } from "./AuthProvider";
 
 // Supabase DB 행 타입 정의
@@ -82,11 +82,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!useSupabase) {
             // 데모 모드 or 미로그인: mock 데이터 사용
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { businesses: mockB, allRooms: mockR, payments: mockP } = require('@/lib/data');
-            setAllBusinesses(mockB);
-            setRooms(mockR);
-            if (mockP) setPayments(mockP);
+             
+            setAllBusinesses(mockBusinesses);
+            setRooms(mockAllRooms);
+            if (mockPayments) setPayments(mockPayments);
             return;
         }
 

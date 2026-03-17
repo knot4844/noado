@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable react/no-unescaped-entities */
 
 export const dynamic = 'force-dynamic'
 
