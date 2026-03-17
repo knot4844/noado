@@ -20,10 +20,18 @@ export default function LandingPage() {
   const bgFrameRef   = useRef<number>(0)
   const bgStarsRef   = useRef<BgStar[]>([])
   const idRef        = useRef(0)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [scrollY, setScrollY]     = useState(0)
-  const [visible, setVisible]     = useState(false)
-  const [checking, setChecking]   = useState(true)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const statsRef      = useRef<HTMLElement>(null)
+  const featuresRef   = useRef<HTMLElement>(null)
+  const stepsRef      = useRef<HTMLElement>(null)
+  const pricingRef    = useRef<HTMLElement>(null)
+  const [scrollY, setScrollY]       = useState(0)
+  const [showStats, setShowStats]   = useState(false)
+  const [showFeatures, setShowFeatures] = useState(false)
+  const [showSteps, setShowSteps]   = useState(false)
+  const [showPricing, setShowPricing] = useState(false)
+  const [visible, setVisible]       = useState(false)
+  const [checking, setChecking]     = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   /* 로그인 체크 — 리다이렉트 하지 않고 상태만 기록 */
@@ -111,13 +119,33 @@ export default function LandingPage() {
     }
   }, [])
 
-  /* 스크롤 */
+  /* 스크롤 — nav 배경용 */
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const fn = () => setScrollY(el.scrollTop)
     el.addEventListener('scroll', fn)
     return () => el.removeEventListener('scroll', fn)
+  }, [])
+
+  /* 섹션 진입 감지 — IntersectionObserver */
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(e => {
+          if (!e.isIntersecting) return
+          if (e.target === statsRef.current)    setShowStats(true)
+          if (e.target === featuresRef.current) setShowFeatures(true)
+          if (e.target === stepsRef.current)    setShowSteps(true)
+          if (e.target === pricingRef.current)  setShowPricing(true)
+        })
+      },
+      { root, threshold: 0.3 }
+    )
+    ;[statsRef, featuresRef, stepsRef, pricingRef].forEach(r => { if (r.current) obs.observe(r.current) })
+    return () => obs.disconnect()
   }, [])
 
   if (checking) return null
@@ -228,33 +256,33 @@ export default function LandingPage() {
       </section>
 
       {/* STATS */}
-      <section style={{
+      <section ref={statsRef} style={{
         position: 'relative', zIndex: 1, padding: '40px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '20px' }}>
-          {STATS.map((s, i) => <StatCard key={i} {...s} i={i} show={scrollY > 350} />)}
+          {STATS.map((s, i) => <StatCard key={i} {...s} i={i} show={showStats} />)}
         </div>
       </section>
 
       {/* FEATURES */}
-      <section style={{
+      <section ref={featuresRef} style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
       }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
           <SectionTag>핵심 기능</SectionTag>
           <SectionTitle>공간 관리의 모든 것</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '20px', marginTop: '56px' }}>
-            {FEATURES.map((f, i) => <FeatureCard key={i} {...f} i={i} show={scrollY > 720} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '16px', marginTop: '40px' }}>
+            {FEATURES.map((f, i) => <FeatureCard key={i} {...f} i={i} show={showFeatures} />)}
           </div>
         </div>
       </section>
 
       {/* STEPS */}
-      <section style={{
+      <section ref={stepsRef} style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
@@ -269,7 +297,7 @@ export default function LandingPage() {
       </section>
 
       {/* PRICING */}
-      <section style={{
+      <section ref={pricingRef} style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
@@ -523,19 +551,19 @@ function FeatureCard({ icon, title, desc, color, i, show }: {
     <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
       background: h ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.025)',
       border: `1px solid ${h ? color + '55' : 'rgba(255,255,255,0.07)'}`,
-      borderRadius: '20px', padding: '32px 26px',
+      borderRadius: '16px', padding: '22px 20px',
       opacity: show ? 1 : 0,
       transform: show ? (h ? 'translateY(-6px)' : 'translateY(0)') : 'translateY(40px)',
       transition: `opacity 0.75s ease ${i * 0.08}s, transform ${h ? '0.2s ease' : `0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s`}`,
       boxShadow: h ? `0 22px 60px ${color}22` : 'none',
     }}>
       <div style={{
-        width: '48px', height: '48px', borderRadius: '14px', fontSize: '22px',
+        width: '40px', height: '40px', borderRadius: '12px', fontSize: '18px',
         background: color + '18', border: `1px solid ${color}30`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px',
       }}>{icon}</div>
-      <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: 700, marginBottom: '10px', letterSpacing: '-0.3px' }}>{title}</h3>
-      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '13.5px', lineHeight: 1.75 }}>{desc}</p>
+      <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.3px' }}>{title}</h3>
+      <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '13px', lineHeight: 1.65 }}>{desc}</p>
     </div>
   )
 }
