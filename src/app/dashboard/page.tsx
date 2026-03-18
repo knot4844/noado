@@ -9,7 +9,8 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, AlertCircle, Home,
-  CheckCircle2, Clock, Sparkles, RefreshCw, ArrowRight
+  CheckCircle2, Clock, Sparkles, RefreshCw, ArrowRight,
+  FileText, Upload, Users, Building2, Zap
 } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import Link from 'next/link'
@@ -24,14 +25,14 @@ interface KpiCardProps {
   trend?: { value: string; up: boolean }
   accent?: string
   onClick?: () => void
+  progress?: number   // 0~100, progress bar 표시용
 }
 
-function KpiCard({ icon, label, value, sub, trend, accent, onClick }: KpiCardProps) {
+function KpiCard({ icon, label, value, sub, trend, accent, onClick, progress }: KpiCardProps) {
   return (
     <div
       onClick={onClick}
       className={`card p-5 flex flex-col gap-3 transition-all duration-200 ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
-      style={{ '--hover-shadow': 'var(--shadow-md)' } as React.CSSProperties}
       onMouseEnter={e => onClick && ((e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)')}
       onMouseLeave={e => onClick && ((e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-soft)')}
     >
@@ -60,6 +61,19 @@ function KpiCard({ icon, label, value, sub, trend, accent, onClick }: KpiCardPro
         </p>
         {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{sub}</p>}
       </div>
+      {progress !== undefined && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-muted-bg)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.min(progress, 100)}%`,
+                background: progress >= 80 ? 'var(--color-success)' : progress >= 50 ? 'var(--color-warning)' : 'var(--color-danger)',
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -91,7 +105,7 @@ function RoomRow({ room }: { room: Room }) {
         </span>
       </td>
       <td className="py-3 px-4 text-right">
-        <Link href={`/units`}
+        <Link href="/units"
           className="text-xs font-medium hover:underline"
           style={{ color: 'var(--color-primary-light)' }}>
           상세 →
@@ -101,18 +115,57 @@ function RoomRow({ room }: { room: Room }) {
   )
 }
 
+// ── 최근 수납 피드 아이템 ────────────────────────────────
+interface RecentPayment {
+  id: string
+  amount: number
+  paid_at: string | null
+  memo: string | null
+  room_name?: string
+  tenant_name?: string
+}
+
+function PaymentFeedItem({ p }: { p: RecentPayment }) {
+  const d = p.paid_at ? new Date(p.paid_at) : null
+  const label = d
+    ? d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+    : '—'
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b last:border-0"
+         style={{ borderColor: 'var(--color-border)' }}>
+      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+           style={{ background: 'var(--color-success-bg)' }}>
+        <CheckCircle2 size={14} style={{ color: 'var(--color-success)' }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-primary)' }}>
+          {p.room_name || '—'} {p.tenant_name ? `· ${p.tenant_name}` : ''}
+        </p>
+        <p className="text-xs truncate" style={{ color: 'var(--color-muted)' }}>
+          {p.memo || '수납 완료'}
+        </p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-success)' }}>
+          +{formatKRW(p.amount)}
+        </p>
+        <p className="text-xs" style={{ color: 'var(--color-muted)' }}>{label}</p>
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 대시보드 ─────────────────────────────────────────
 export default function DashboardPage() {
-  // supabase 클라이언트는 useMemo로 한 번만 생성 (매 렌더 재생성 방지)
   const supabase = useMemo(() => createClient(), [])
 
-  const [rooms,    setRooms]    = useState<Room[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [briefing, setBriefing] = useState<string | null>(null)
-  const [chartData, setChartData] = useState<{ month: string; amount: number }[]>([])
+  const [rooms,          setRooms]          = useState<Room[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [briefing,       setBriefing]       = useState<string | null>(null)
+  const [chartData,      setChartData]      = useState<{ month: string; expected: number; paid: number }[]>([])
+  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
 
-  // today는 렌더와 무관하게 고정 (무한루프 방지)
-  const today = useMemo(() => new Date(), [])
+  const today     = useMemo(() => new Date(), [])
   const thisYear  = today.getFullYear()
   const thisMonth = today.getMonth() + 1
 
@@ -128,25 +181,70 @@ export default function DashboardPage() {
       .order('name')
     setRooms(roomList ?? [])
 
-    // 최근 6개월 수납 차트 데이터 (invoices 기준)
+    // 최근 6개월 수납 차트 (expected + paid)
     const sixMonthsAgo = new Date(thisYear, thisMonth - 7, 1)
-    const { data: payList } = await supabase
-      .from('invoices')
-      .select('year, month, paid_amount')
-      .eq('owner_id', user.id)
-      .eq('status', 'paid')
-      .gte('year', sixMonthsAgo.getFullYear())
-      .order('year').order('month')
-    if (payList) {
-      const grouped: Record<string, number> = {}
-      payList.forEach(p => {
-        const key = `${String(p.year).slice(2)}-${String(p.month).padStart(2,'0')}`
-        grouped[key] = (grouped[key] ?? 0) + (p.paid_amount || 0)
-      })
-      setChartData(Object.entries(grouped).map(([month, amount]) => ({ month, amount })))
+    const [{ data: invList }, { data: payList }] = await Promise.all([
+      supabase.from('invoices').select('year, month, amount')
+        .eq('owner_id', user.id)
+        .gte('year', sixMonthsAgo.getFullYear())
+        .order('year').order('month'),
+      supabase.from('invoices').select('year, month, paid_amount')
+        .eq('owner_id', user.id)
+        .eq('status', 'paid')
+        .gte('year', sixMonthsAgo.getFullYear())
+        .order('year').order('month'),
+    ])
+
+    // 최근 6개월 슬롯 생성
+    const slots: { year: number; month: number; key: string }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(thisYear, thisMonth - 1 - i, 1)
+      const y = d.getFullYear()
+      const m = d.getMonth() + 1
+      slots.push({ year: y, month: m, key: `${String(y).slice(2)}-${String(m).padStart(2, '0')}` })
     }
 
-    // 저장된 브리핑 확인 (오늘 날짜 기준)
+    const expectedByKey: Record<string, number> = {}
+    const paidByKey:     Record<string, number> = {}
+    ;(invList ?? []).forEach(p => {
+      const key = `${String(p.year).slice(2)}-${String(p.month).padStart(2, '0')}`
+      expectedByKey[key] = (expectedByKey[key] ?? 0) + (p.amount || 0)
+    })
+    ;(payList ?? []).forEach(p => {
+      const key = `${String(p.year).slice(2)}-${String(p.month).padStart(2, '0')}`
+      paidByKey[key] = (paidByKey[key] ?? 0) + (p.paid_amount || 0)
+    })
+    setChartData(slots.map(s => ({
+      month:    s.key,
+      expected: expectedByKey[s.key] ?? 0,
+      paid:     paidByKey[s.key]     ?? 0,
+    })))
+
+    // 최근 수납 5건 (payments 테이블)
+    const { data: pmts } = await supabase
+      .from('payments')
+      .select('id, amount, paid_at, memo, invoices(room_id, rooms(name, tenant_name))')
+      .eq('owner_id', user.id)
+      .order('paid_at', { ascending: false })
+      .limit(5)
+
+    if (pmts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setRecentPayments((pmts as any[]).map((p) => {
+        const inv   = Array.isArray(p.invoices) ? p.invoices[0] : p.invoices
+        const room  = Array.isArray(inv?.rooms)  ? inv.rooms[0]  : inv?.rooms
+        return {
+          id:          p.id          as string,
+          amount:      p.amount      as number,
+          paid_at:     p.paid_at     as string | null,
+          memo:        p.memo        as string | null,
+          room_name:   room?.name    as string | undefined,
+          tenant_name: room?.tenant_name as string | undefined,
+        }
+      }))
+    }
+
+    // 오늘 브리핑 로드
     const storedDate    = localStorage.getItem('briefing_date')
     const storedContent = localStorage.getItem('briefing_content')
     if (storedDate === today.toDateString() && storedContent) {
@@ -159,9 +257,9 @@ export default function DashboardPage() {
   useEffect(() => { setTimeout(() => fetchData(), 0) }, [fetchData])
 
   // ── KPI 계산 ──
-  const paid   = rooms.filter(r => r.status === 'PAID')
-  const unpaid = rooms.filter(r => r.status === 'UNPAID')
-  const vacant = rooms.filter(r => r.status === 'VACANT')
+  const paid     = rooms.filter(r => r.status === 'PAID')
+  const unpaid   = rooms.filter(r => r.status === 'UNPAID')
+  const vacant   = rooms.filter(r => r.status === 'VACANT')
   const occupied = rooms.filter(r => r.status !== 'VACANT')
 
   const totalBilled    = occupied.reduce((s, r) => s + r.monthly_rent, 0)
@@ -177,6 +275,14 @@ export default function DashboardPage() {
     const days = Math.ceil((new Date(r.lease_end).getTime() - today.getTime()) / 86400000)
     return days >= 0 && days <= 30
   })
+
+  // ── 퀵 액션 ──
+  const quickActions = [
+    { icon: <FileText size={16} />,  label: '청구서',   sub: '이번달 청구서',  href: '/invoices',  accent: '#a8dadc22', border: '#a8dadc' },
+    { icon: <Upload   size={16} />,  label: '수납처리', sub: '엑셀 업로드',    href: '/payments',  accent: '#c8b6ff22', border: '#c8b6ff' },
+    { icon: <Users    size={16} />,  label: '입주사',   sub: '납부 현황',      href: '/tenants',   accent: '#ffd18c22', border: '#ffd18c' },
+    { icon: <Building2 size={16} />, label: '호실관리', sub: '호실 현황',      href: '/units',     accent: '#b8e8b022', border: '#b8e8b0' },
+  ]
 
   if (loading) {
     return (
@@ -200,8 +306,7 @@ export default function DashboardPage() {
             대시보드
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-muted)' }}>
-            {today.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' })}
-            {''}
+            {today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
         </div>
         <button onClick={fetchData}
@@ -243,6 +348,31 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* ── 퀵 액션 ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {quickActions.map(a => (
+          <Link key={a.href} href={a.href}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
+            style={{
+              background: a.accent,
+              border: `1px solid ${a.border}40`,
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = 'none'}
+          >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                 style={{ background: a.border + '30', color: 'var(--color-primary)' }}>
+              {a.icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--color-primary)' }}>{a.label}</p>
+              <p className="text-xs truncate" style={{ color: 'var(--color-muted)' }}>{a.sub}</p>
+            </div>
+            <Zap size={13} className="ml-auto shrink-0" style={{ color: a.border }} />
+          </Link>
+        ))}
+      </div>
+
       {/* ── KPI 6개 (3×2 그리드) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
@@ -252,6 +382,7 @@ export default function DashboardPage() {
           sub={`청구 ${formatKRW(totalBilled)}`}
           accent="var(--color-success-bg)"
           trend={{ value: `${collectionRate}%`, up: collectionRate >= 80 }}
+          progress={collectionRate}
         />
         <KpiCard
           icon={<AlertCircle size={18} style={{ color: 'var(--color-danger)' }} />}
@@ -267,12 +398,13 @@ export default function DashboardPage() {
           value={`${occupancyRate}%`}
           sub={`${occupied.length}/${rooms.length} 세대`}
           accent="var(--color-info-bg)"
+          progress={occupancyRate}
         />
         <KpiCard
           icon={<CheckCircle2 size={18} style={{ color: 'var(--color-success)' }} />}
           label="수납 완료"
           value={`${paid.length}세대`}
-          sub={`전체 ${rooms.filter(r=>r.status!=='VACANT').length}세대 중`}
+          sub={`전체 ${occupied.length}세대 중`}
           accent="var(--color-success-bg)"
         />
         <KpiCard
@@ -287,28 +419,42 @@ export default function DashboardPage() {
           value={`${leaseExpiringSoon.length}건`}
           sub="30일 이내"
           accent="var(--color-warning-bg)"
+          onClick={leaseExpiringSoon.length > 0 ? () => window.location.href = '/tenants' : undefined}
         />
       </div>
 
-      {/* ── 하단: 수납 차트 + 호실 현황 테이블 ── */}
+      {/* ── 하단 3열 레이아웃 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
         {/* 월별 수납 차트 (40%) */}
         <div className="card p-5 lg:col-span-2">
-          <h3 className="text-sm font-semibold mb-4" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-            월별 수납 현황
-          </h3>
-          {chartData.length > 0 ? (
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              월별 수납 현황
+            </h3>
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--color-muted)' }}>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#e2e8f0' }} />
+                청구
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#a8dadc' }} />
+                수납
+              </span>
+            </div>
+          </div>
+          {chartData.some(d => d.expected > 0 || d.paid > 0) ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6d7d8b' }} axisLine={false} tickLine={false} />
                 <YAxis hide />
                 <Tooltip
-                  formatter={(v: unknown) => [formatKRW(Number(v)), '수납액']}
+                  formatter={(v: unknown, name?: string) => [formatKRW(Number(v)), name === 'expected' ? '청구액' : '수납액']}
                   contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
                 />
-                <Bar dataKey="amount" fill="#a8dadc" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="expected" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="paid"     fill="#a8dadc" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -319,8 +465,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* 호실 현황 테이블 (60%) */}
-        <div className="card lg:col-span-3" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* 호실 현황 테이블 (35%) */}
+        <div className="card lg:col-span-2" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="flex items-center justify-between px-5 py-4 border-b"
                style={{ borderColor: 'var(--color-border)' }}>
             <h3 className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
@@ -343,15 +489,15 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {rooms.slice(0, 8).map(room => <RoomRow key={room.id} room={room} />)}
+                {rooms.slice(0, 6).map(room => <RoomRow key={room.id} room={room} />)}
               </tbody>
             </table>
           </div>
-          {rooms.length > 8 && (
+          {rooms.length > 6 && (
             <div className="px-5 py-3 border-t text-center" style={{ borderColor: 'var(--color-border)' }}>
               <Link href="/units" className="text-xs font-medium hover:underline"
                     style={{ color: 'var(--color-primary-light)' }}>
-                {rooms.length - 8}개 호실 더 보기
+                {rooms.length - 6}개 호실 더 보기
               </Link>
             </div>
           )}
@@ -361,6 +507,30 @@ export default function DashboardPage() {
               <p className="text-sm font-medium" style={{ color: 'var(--color-muted)' }}>등록된 호실이 없습니다.</p>
               <Link href="/units" className="text-xs mt-1 hover:underline block"
                     style={{ color: 'var(--color-primary-light)' }}>호실 추가하기</Link>
+            </div>
+          )}
+        </div>
+
+        {/* 최근 수납 피드 (25%) */}
+        <div className="card p-5 lg:col-span-1">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              최근 수납
+            </h3>
+            <Link href="/payments"
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: 'var(--color-primary-light)' }}>
+              전체 <ArrowRight size={12} />
+            </Link>
+          </div>
+          {recentPayments.length > 0 ? (
+            <div>
+              {recentPayments.map(p => <PaymentFeedItem key={p.id} p={p} />)}
+            </div>
+          ) : (
+            <div className="py-10 text-center">
+              <CheckCircle2 size={28} className="mx-auto mb-2" style={{ color: 'var(--color-border)' }} />
+              <p className="text-xs" style={{ color: 'var(--color-muted)' }}>최근 수납 내역이 없습니다.</p>
             </div>
           )}
         </div>
