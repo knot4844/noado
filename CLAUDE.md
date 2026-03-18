@@ -1,11 +1,16 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-03-18 (오후) — [3단계][4단계][5단계] 완료. 전체 로드맵 완료!
+> **Last Updated:** 2026-03-18 (저녁) — 전체 로드맵 완료 + ESLint 0 errors + 랜딩페이지 개선 진행 중
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 15. ESLint 0 errors 달성 + git 정리 (2026-03-18)
+- `npm run lint` 결과 59 errors → **0 errors** (경고 31개만 남음)
+- `master` 브랜치 삭제 (GitHub 기본 브랜치 main으로 변경 후 master 제거)
+- StepRow 호버 리프트 효과 추가 (`translateY(-4px)` + glow + 탄성 커브)
 
 ### 14. [5단계] 계약기간별 임대료 자동 산정 (2026-03-18)
 - **`/api/cron/generate-invoices/route.ts`** (월례 크론) 수정
