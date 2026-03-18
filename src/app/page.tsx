@@ -140,7 +140,7 @@ export default function LandingPage() {
     <div ref={containerRef} style={{
       background: '#070d1a', height: '100vh', overflowY: 'scroll', overflowX: 'hidden',
       fontFamily: "'Space Grotesk',sans-serif",
-      scrollSnapType: 'y mandatory', scrollBehavior: 'smooth',
+      scrollSnapType: 'y proximity', scrollBehavior: 'smooth',
     }}>
       <canvas ref={bgCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
       <canvas ref={canvasRef}   style={{ position: 'fixed', inset: 0, zIndex: 10, pointerEvents: 'none' }} />
@@ -367,10 +367,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER — 스냅 없이 자연스럽게 */}
+      {/* FOOTER */}
       <footer style={{
         position: 'relative', zIndex: 1, padding: '36px 40px 32px',
         borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
+        scrollSnapAlign: 'end',
       }}>
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
