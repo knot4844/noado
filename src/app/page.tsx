@@ -21,10 +21,6 @@ export default function LandingPage() {
   const bgStarsRef   = useRef<BgStar[]>([])
   const idRef        = useRef(0)
   const containerRef  = useRef<HTMLDivElement>(null)
-  const statsRef      = useRef<HTMLElement>(null)
-  const featuresRef   = useRef<HTMLElement>(null)
-  const stepsRef      = useRef<HTMLElement>(null)
-  const pricingRef    = useRef<HTMLElement>(null)
   const [scrollY, setScrollY]       = useState(0)
   const [showStats, setShowStats]   = useState(false)
   const [showFeatures, setShowFeatures] = useState(false)
@@ -119,34 +115,22 @@ export default function LandingPage() {
     }
   }, [])
 
-  /* 스크롤 — nav 배경용 */
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const fn = () => setScrollY(el.scrollTop)
-    el.addEventListener('scroll', fn)
-    return () => el.removeEventListener('scroll', fn)
-  }, [])
-
-  /* 섹션 진입 감지 — IntersectionObserver (checking 끝난 후 실행) */
+  /* 스크롤 — checking 끝난 후 containerRef가 DOM에 존재할 때 등록 */
   useEffect(() => {
     if (checking) return
-    const root = containerRef.current
-    if (!root) return
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          if (!e.isIntersecting) return
-          if (e.target === statsRef.current)    setShowStats(true)
-          if (e.target === featuresRef.current) setShowFeatures(true)
-          if (e.target === stepsRef.current)    setShowSteps(true)
-          if (e.target === pricingRef.current)  setShowPricing(true)
-        })
-      },
-      { root, threshold: 0.2 }
-    )
-    ;[statsRef, featuresRef, stepsRef, pricingRef].forEach(r => { if (r.current) obs.observe(r.current) })
-    return () => obs.disconnect()
+    const el = containerRef.current
+    if (!el) return
+    const fn = () => {
+      const st = el.scrollTop
+      const vh = window.innerHeight || 800
+      setScrollY(st)
+      if (st > vh * 0.3) setShowStats(true)
+      if (st > vh * 1.3) setShowFeatures(true)
+      if (st > vh * 2.3) setShowSteps(true)
+      if (st > vh * 3.3) setShowPricing(true)
+    }
+    el.addEventListener('scroll', fn, { passive: true })
+    return () => el.removeEventListener('scroll', fn)
   }, [checking])
 
   if (checking) return null
@@ -257,7 +241,7 @@ export default function LandingPage() {
       </section>
 
       {/* STATS */}
-      <section ref={statsRef} style={{
+      <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
@@ -272,7 +256,7 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURES */}
-      <section ref={featuresRef} style={{
+      <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
@@ -287,7 +271,7 @@ export default function LandingPage() {
       </section>
 
       {/* STEPS */}
-      <section ref={stepsRef} style={{
+      <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
@@ -302,7 +286,7 @@ export default function LandingPage() {
       </section>
 
       {/* PRICING */}
-      <section ref={pricingRef} style={{
+      <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
         scrollSnapAlign: 'start', flexShrink: 0,
