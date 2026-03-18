@@ -140,7 +140,6 @@ export default function LandingPage() {
     <div ref={containerRef} style={{
       background: '#070d1a', height: '100vh', overflowY: 'scroll', overflowX: 'hidden',
       fontFamily: "'Space Grotesk',sans-serif",
-      scrollSnapType: 'y proximity', scrollBehavior: 'smooth',
     }}>
       <canvas ref={bgCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
       <canvas ref={canvasRef}   style={{ position: 'fixed', inset: 0, zIndex: 10, pointerEvents: 'none' }} />
@@ -172,7 +171,6 @@ export default function LandingPage() {
         position: 'relative', zIndex: 1, height: '100vh',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', textAlign: 'center', padding: '120px 24px 80px',
-        scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         {/* orb glow */}
         <div style={{
@@ -244,7 +242,6 @@ export default function LandingPage() {
       <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px',
         height: '100vh', display: 'flex', alignItems: 'center',
-        scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
           <SectionTag>숫자로 보는 노아도</SectionTag>
@@ -259,7 +256,6 @@ export default function LandingPage() {
       <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
-        scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
           <SectionTag>핵심 기능</SectionTag>
@@ -274,7 +270,6 @@ export default function LandingPage() {
       <section style={{
         position: 'relative', zIndex: 1, padding: '60px 24px 80px',
         height: '100vh', display: 'flex', alignItems: 'center',
-        scrollSnapAlign: 'start', flexShrink: 0,
       }}>
         <div style={{ maxWidth: '760px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
           <SectionTag>워크플로우</SectionTag>
@@ -285,94 +280,94 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PRICING */}
+      {/* PRICING + FOOTER — 한 화면에 */}
       <section style={{
-        position: 'relative', zIndex: 1, padding: '60px 24px 80px',
-        height: '100vh', display: 'flex', alignItems: 'center',
-        scrollSnapAlign: 'start', flexShrink: 0,
+        position: 'relative', zIndex: 1,
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ maxWidth: '1020px', width: '100%', margin: '0 auto' }}>
-          <SectionTag>요금제</SectionTag>
-          <SectionTitle>합리적인 가격, 투명한 구조</SectionTitle>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
-            gap: '20px', marginTop: '56px',
-          }}>
-            {[
-              {
-                name: '스타터', sub: 'Starter', price: '무료', priceSub: '평생 무료',
-                featured: false, badge: null,
-                features: ['사업장 1개 관리', '호실 최대 3개', '기본 대시보드 & 통계', '수동 수납 관리'],
-                cta: '무료로 시작', ctaHref: '/signup',
-              },
-              {
-                name: '비기너', sub: 'Beginner', price: '₩9,900', priceSub: '/ 월',
-                featured: true, badge: '인기',
-                features: ['사업장 1개 관리', '호실 최대 5개', 'AI 통장 입금 자동 매칭', '전자세금계산서 자동 발행', '카카오 자동 알림톡'],
-                cta: '시작하기', ctaHref: '/pricing',
-              },
-              {
-                name: '프로', sub: 'Pro', price: '₩19,900', priceSub: '/ 월',
-                featured: false, badge: null,
-                features: ['사업장 최대 3개 관리', '호실 최대 50개', '스마트 카드/가상계좌 수납', '전자세금계산서 자동 발행', '전자계약 & 서명'],
-                cta: '자세히 보기', ctaHref: '/pricing',
-              },
-            ].map((plan, pi) => (
-              <div key={pi} style={{
-                position: 'relative', borderRadius: '20px', padding: '28px',
-                background: plan.featured
-                  ? 'linear-gradient(145deg, rgba(29,53,87,0.7), rgba(69,123,157,0.3))'
-                  : 'rgba(255,255,255,0.04)',
-                border: plan.featured
-                  ? '1px solid rgba(168,218,220,0.35)'
-                  : '1px solid rgba(255,255,255,0.07)',
-                transition: 'transform 0.3s', cursor: 'default',
-              }}>
-                {plan.badge && (
-                  <div style={{
-                    position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
-                    background: 'linear-gradient(135deg,#a8dadc,#7bbfc1)', color: '#070d1a',
-                    fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '100px',
-                  }}>{plan.badge}</div>
-                )}
-                <div style={{ marginBottom: '6px' }}>
-                  <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>{plan.name}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px', marginLeft: '7px' }}>{plan.sub}</span>
+        {/* 요금제 */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '60px 24px 40px' }}>
+          <div style={{ maxWidth: '1020px', width: '100%', margin: '0 auto' }}>
+            <SectionTag>요금제</SectionTag>
+            <SectionTitle>합리적인 가격, 투명한 구조</SectionTitle>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))',
+              gap: '16px', marginTop: '40px',
+            }}>
+              {[
+                {
+                  name: '스타터', sub: 'Starter', price: '무료', priceSub: '평생 무료',
+                  featured: false, badge: null,
+                  features: ['사업장 1개 관리', '호실 최대 3개', '기본 대시보드 & 통계', '수동 수납 관리'],
+                  cta: '무료로 시작', ctaHref: '/signup',
+                },
+                {
+                  name: '비기너', sub: 'Beginner', price: '₩9,900', priceSub: '/ 월',
+                  featured: true, badge: '인기',
+                  features: ['사업장 1개 관리', '호실 최대 5개', 'AI 통장 입금 자동 매칭', '전자세금계산서 자동 발행', '카카오 자동 알림톡'],
+                  cta: '시작하기', ctaHref: '/pricing',
+                },
+                {
+                  name: '프로', sub: 'Pro', price: '₩19,900', priceSub: '/ 월',
+                  featured: false, badge: null,
+                  features: ['사업장 최대 3개 관리', '호실 최대 50개', '스마트 카드/가상계좌 수납', '전자세금계산서 자동 발행', '전자계약 & 서명'],
+                  cta: '자세히 보기', ctaHref: '/pricing',
+                },
+              ].map((plan, pi) => (
+                <div key={pi} style={{
+                  position: 'relative', borderRadius: '20px', padding: '24px',
+                  background: plan.featured
+                    ? 'linear-gradient(145deg, rgba(29,53,87,0.7), rgba(69,123,157,0.3))'
+                    : 'rgba(255,255,255,0.04)',
+                  border: plan.featured
+                    ? '1px solid rgba(168,218,220,0.35)'
+                    : '1px solid rgba(255,255,255,0.07)',
+                  transition: 'transform 0.3s', cursor: 'default',
+                }}>
+                  {plan.badge && (
+                    <div style={{
+                      position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
+                      background: 'linear-gradient(135deg,#a8dadc,#7bbfc1)', color: '#070d1a',
+                      fontSize: '11px', fontWeight: 700, padding: '3px 12px', borderRadius: '100px',
+                    }}>{plan.badge}</div>
+                  )}
+                  <div style={{ marginBottom: '4px' }}>
+                    <span style={{ color: '#fff', fontSize: '17px', fontWeight: 700 }}>{plan.name}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: '12px', marginLeft: '7px' }}>{plan.sub}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', margin: '12px 0 16px' }}>
+                    <span style={{ fontSize: plan.price === '무료' ? '26px' : '30px', fontWeight: 800, color: plan.featured ? '#a8dadc' : '#fff' }}>{plan.price}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>{plan.priceSub}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '18px' }}>
+                    {plan.features.map((f, fi) => (
+                      <div key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <span style={{ color: plan.featured ? '#a8dadc' : 'rgba(255,255,255,0.3)', fontSize: '13px', marginTop: '1px' }}>✓</span>
+                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => router.push(plan.ctaHref)} style={{
+                    width: '100%', padding: '10px', borderRadius: '10px',
+                    fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    background: plan.featured ? 'linear-gradient(135deg,#a8dadc,#7bbfc1)' : 'rgba(168,218,220,0.1)',
+                    color: plan.featured ? '#070d1a' : '#a8dadc',
+                    border: plan.featured ? 'none' : '1px solid rgba(168,218,220,0.25)',
+                  }}>{plan.cta} →</button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', margin: '16px 0 20px' }}>
-                  <span style={{ fontSize: plan.price === '무료' ? '28px' : '32px', fontWeight: 800, color: plan.featured ? '#a8dadc' : '#fff' }}>{plan.price}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>{plan.priceSub}</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '24px' }}>
-                  {plan.features.map((f, fi) => (
-                    <div key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <span style={{ color: plan.featured ? '#a8dadc' : 'rgba(255,255,255,0.3)', fontSize: '14px', marginTop: '1px' }}>✓</span>
-                      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>{f}</span>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => router.push(plan.ctaHref)} style={{
-                  width: '100%', padding: '11px', borderRadius: '10px',
-                  fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                  background: plan.featured ? 'linear-gradient(135deg,#a8dadc,#7bbfc1)' : 'rgba(168,218,220,0.1)',
-                  color: plan.featured ? '#070d1a' : '#a8dadc',
-                  border: plan.featured ? 'none' : '1px solid rgba(168,218,220,0.25)',
-                }}>{plan.cta} →</button>
-              </div>
-            ))}
+              ))}
+            </div>
+            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '12px', marginTop: '20px' }}>
+              언제든 취소 가능 · 숨겨진 비용 없음 · 결제 후 7일 이내 전액 환불
+            </p>
           </div>
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '12px', marginTop: '28px' }}>
-            언제든 취소 가능 · 숨겨진 비용 없음 · 결제 후 7일 이내 전액 환불
-          </p>
         </div>
-      </section>
 
-      {/* FOOTER */}
-      <footer style={{
-        position: 'relative', zIndex: 1, padding: '36px 40px 32px',
-        borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
-        scrollSnapAlign: 'end',
-      }}>
+        {/* FOOTER — 요금제 섹션 하단에 붙임 */}
+        <footer style={{
+          position: 'relative', zIndex: 1, padding: '28px 40px 24px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+        }}>
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '4px 40px', marginBottom: '20px',
@@ -404,7 +399,7 @@ export default function LandingPage() {
           <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
         </div>
       </footer>
-
+      </section>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&display=swap');
