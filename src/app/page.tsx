@@ -502,24 +502,38 @@ function SectionTitle({ children }: { children: string }) {
 }
 
 /* ─── 통계 카드 ─── */
+const STAT_COLORS = [
+  { from: '#a8dadc', to: '#5b91bd', glow: 'rgba(168,218,220,0.18)', bg: 'rgba(168,218,220,0.07)', border: 'rgba(168,218,220,0.25)' },
+  { from: '#c8b6ff', to: '#9b6dff', glow: 'rgba(200,182,255,0.18)', bg: 'rgba(200,182,255,0.07)', border: 'rgba(200,182,255,0.25)' },
+  { from: '#ffd18c', to: '#f59e3a', glow: 'rgba(255,209,140,0.18)', bg: 'rgba(255,209,140,0.07)', border: 'rgba(255,209,140,0.25)' },
+  { from: '#7eb8f7', to: '#3b7dd8', glow: 'rgba(126,184,247,0.18)', bg: 'rgba(126,184,247,0.07)', border: 'rgba(126,184,247,0.25)' },
+]
 function StatCard({ num, label, sub, i, show }: { num: string; label: string; sub: string; i: number; show: boolean }) {
   const [h, setH] = useState(false)
+  const c = STAT_COLORS[i % STAT_COLORS.length]
   return (
     <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
-      background: h ? 'rgba(168,218,220,0.07)' : 'rgba(255,255,255,0.03)',
-      border: `1px solid ${h ? 'rgba(168,218,220,0.35)' : 'rgba(168,218,220,0.1)'}`,
+      background: h ? c.bg : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${h ? c.border : c.border.replace('0.25', '0.15')}`,
       borderRadius: '20px', padding: h ? '36px 28px' : '32px 24px', textAlign: 'center',
+      position: 'relative', overflow: 'hidden',
       opacity: show ? 1 : 0,
       transform: show ? (h ? 'translateY(-8px) scale(1.03)' : 'translateY(0) scale(1)') : 'translateY(32px) scale(1)',
-      boxShadow: h ? '0 24px 60px rgba(168,218,220,0.12), 0 0 0 1px rgba(168,218,220,0.2)' : 'none',
+      boxShadow: h ? `0 24px 60px ${c.glow}, 0 0 0 1px ${c.border}` : `0 0 0 1px ${c.border.replace('0.25','0.08')}`,
       transition: show
         ? `background 0.25s ease, border 0.25s ease, box-shadow 0.25s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1), padding 0.3s ease`
         : `opacity 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s, transform 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s`,
       cursor: 'default',
     }}>
+      {/* 상단 컬러 바 */}
       <div style={{
-        fontSize: h ? '54px' : '46px', fontWeight: 800, letterSpacing: '-2px', marginBottom: '10px',
-        background: 'linear-gradient(135deg,#a8dadc,#457b9d)',
+        position: 'absolute', top: 0, left: '20%', right: '20%', height: '2px', borderRadius: '0 0 4px 4px',
+        background: `linear-gradient(90deg, ${c.from}, ${c.to})`,
+        boxShadow: `0 0 12px ${c.from}`,
+      }} />
+      <div style={{
+        fontSize: h ? '54px' : '48px', fontWeight: 800, letterSpacing: '-2px', marginBottom: '10px',
+        background: `linear-gradient(135deg, ${c.from}, ${c.to})`,
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
         transition: 'font-size 0.3s cubic-bezier(0.34,1.56,0.64,1)',
       }}>{num}</div>
@@ -527,7 +541,7 @@ function StatCard({ num, label, sub, i, show }: { num: string; label: string; su
         color: '#fff', fontWeight: 700, fontSize: h ? '16px' : '14px', marginBottom: '6px',
         transition: 'font-size 0.25s ease',
       }}>{label}</div>
-      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px' }}>{sub}</div>
+      <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>{sub}</div>
     </div>
   )
 }
@@ -539,9 +553,12 @@ function FeatureCard({ icon, title, desc, color, i, show }: {
   const [h, setH] = useState(false)
   return (
     <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{
-      background: h ? `linear-gradient(145deg, rgba(255,255,255,0.07), ${color}11)` : 'rgba(255,255,255,0.025)',
-      border: `1px solid ${h ? color + '60' : 'rgba(255,255,255,0.07)'}`,
+      background: h
+        ? `linear-gradient(145deg, ${color}18, ${color}08)`
+        : `linear-gradient(145deg, ${color}0e, rgba(255,255,255,0.02))`,
+      border: `1px solid ${h ? color + '55' : color + '28'}`,
       borderRadius: '16px', padding: h ? '26px 24px' : '22px 20px',
+      position: 'relative', overflow: 'hidden',
       opacity: show ? 1 : 0,
       transform: show
         ? (h ? 'translateY(-10px) scale(1.02)' : 'translateY(0) scale(1)')
@@ -549,23 +566,35 @@ function FeatureCard({ icon, title, desc, color, i, show }: {
       transition: show
         ? `background 0.25s ease, border 0.25s ease, padding 0.3s ease, box-shadow 0.25s ease, transform 0.35s cubic-bezier(0.34,1.56,0.64,1)`
         : `opacity 0.75s ease ${i * 0.08}s, transform 0.75s cubic-bezier(0.16,1,0.3,1) ${i * 0.08}s`,
-      boxShadow: h ? `0 28px 70px ${color}25, 0 0 0 1px ${color}20` : 'none',
+      boxShadow: h ? `0 20px 60px ${color}22, 0 0 0 1px ${color}30` : `0 0 0 1px ${color}15`,
       cursor: 'default',
     }}>
+      {/* 배경 glow blob */}
       <div style={{
-        width: h ? '48px' : '40px', height: h ? '48px' : '40px',
-        borderRadius: '14px', fontSize: h ? '22px' : '18px',
-        background: color + '22', border: `1px solid ${color}40`,
+        position: 'absolute', top: '-30px', right: '-30px',
+        width: '100px', height: '100px', borderRadius: '50%',
+        background: `radial-gradient(circle, ${color}22 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        width: '44px', height: '44px',
+        borderRadius: '14px', fontSize: '20px',
+        background: `linear-gradient(135deg, ${color}33, ${color}18)`,
+        border: `1px solid ${color}50`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px',
-        boxShadow: h ? `0 8px 24px ${color}30` : 'none',
+        boxShadow: h ? `0 8px 24px ${color}40` : `0 4px 12px ${color}20`,
         transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+        transform: h ? 'scale(1.1)' : 'scale(1)',
       }}>{icon}</div>
       <h3 style={{
-        color: h ? '#fff' : 'rgba(255,255,255,0.9)',
-        fontSize: h ? '16px' : '15px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.3px',
-        transition: 'font-size 0.25s ease, color 0.2s ease',
+        color: h ? '#fff' : 'rgba(255,255,255,0.92)',
+        fontSize: '15px', fontWeight: 700, marginBottom: '8px', letterSpacing: '-0.3px',
+        transition: 'color 0.2s ease',
       }}>{title}</h3>
-      <p style={{ color: h ? 'rgba(255,255,255,0.58)' : 'rgba(255,255,255,0.42)', fontSize: '13px', lineHeight: 1.65, transition: 'color 0.2s ease' }}>{desc}</p>
+      <p style={{
+        color: h ? 'rgba(255,255,255,0.62)' : 'rgba(255,255,255,0.48)',
+        fontSize: '13px', lineHeight: 1.65, transition: 'color 0.2s ease',
+      }}>{desc}</p>
     </div>
   )
 }
@@ -636,15 +665,15 @@ const STATS = [
 const FEATURES = [
   { icon: '🏦', color: '#a8dadc', title: '은행 엑셀 → 수납 자동매칭',
     desc: '매월 은행에서 받은 입금내역 엑셀을 올리면 입주사·호실과 자동으로 연결됩니다. (주)·주식회사 같은 법인명도 정규화해서 정확하게 매칭.' },
-  { icon: '📋', color: '#7bbfc1', title: '전자계약 & 온라인 서명',
+  { icon: '📋', color: '#c8b6ff', title: '전자계약 & 온라인 서명',
     desc: '계약서를 직접 출력·방문 없이 카카오톡 링크로 발송. 입주사가 스마트폰으로 서명하면 PDF로 자동 보관됩니다.' },
-  { icon: '💬', color: '#5b91bd', title: '카카오 알림톡 자동발송',
+  { icon: '💬', color: '#ffd18c', title: '카카오 알림톡 자동발송',
     desc: '청구서 생성 시 결제 링크 자동 발송, 납부기한 D-3 사전 안내, 미납 시 독촉, 완납 확인까지 전부 자동.' },
-  { icon: '🏢', color: '#a8dadc', title: '호실·입주사 통합 관리',
+  { icon: '🏢', color: '#7eb8f7', title: '호실·입주사 통합 관리',
     desc: '공실·입주·완납·미납 상태를 한눈에. 입주사별 계약기간, 월 임대료, 납부이력을 연도별로 조회 가능.' },
-  { icon: '💳', color: '#7bbfc1', title: '가상계좌 온라인 수납',
+  { icon: '💳', color: '#86efac', title: '가상계좌 온라인 수납',
     desc: '입주사에게 전용 결제 링크를 보내면 본인 명의 가상계좌로 입금 가능. 입금 즉시 수납 완료 처리.' },
-  { icon: '📊', color: '#5b91bd', title: '수납 보고서 & 세무자료',
+  { icon: '📊', color: '#f9a8d4', title: '수납 보고서 & 세무자료',
     desc: '월별 수납현황, 미납 현황, 부가세 자료를 엑셀로 내보내기. 세무사에게 바로 전달할 수 있는 포맷 제공.' },
 ]
 
