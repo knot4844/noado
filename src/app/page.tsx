@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import LaunchBanner from '@/components/layout/LaunchBanner'
 
 /* ─── 타입 ─── */
 interface Star {
@@ -29,6 +30,7 @@ export default function LandingPage() {
   const [visible, setVisible]       = useState(false)
   const [checking, setChecking]     = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [bannerVisible, setBannerVisible] = useState(true)
 
   /* 로그인 체크 — 리다이렉트 하지 않고 상태만 기록 */
   useEffect(() => {
@@ -144,9 +146,11 @@ export default function LandingPage() {
       <canvas ref={bgCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
       <canvas ref={canvasRef}   style={{ position: 'fixed', inset: 0, zIndex: 10, pointerEvents: 'none' }} />
 
+      <LaunchBanner onDismiss={() => setBannerVisible(false)} />
+
       {/* NAV */}
       <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, height: '64px',
+        position: 'fixed', top: bannerVisible ? '44px' : '0', left: 0, right: 0, zIndex: 50, height: '64px',
         padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: scrollY > 40 ? 'rgba(7,13,26,0.88)' : 'transparent',
         backdropFilter: scrollY > 40 ? 'blur(18px)' : 'none',
