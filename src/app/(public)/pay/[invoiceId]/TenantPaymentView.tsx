@@ -24,9 +24,10 @@ interface Props {
   invoice:  Invoice
   room?:    Room
   contract?: Contract | null
+  tenantName?: string
 }
 
-export default function TenantPaymentView({ invoice, room, contract }: Props) {
+export default function TenantPaymentView({ invoice, room, contract, tenantName }: Props) {
   const [bank, setBank]             = useState<string>('SHINHAN')
   const [loading, setLoading]       = useState(false)
   const [errorObj, setErrorObj]     = useState<string | null>(null)
@@ -183,7 +184,7 @@ export default function TenantPaymentView({ invoice, room, contract }: Props) {
             <span className="text-neutral-500 font-medium flex items-center gap-2">
                이용자명
             </span>
-            <span className="text-neutral-900 font-medium">{room?.tenant_name || '미등록'}</span>
+            <span className="text-neutral-900 font-medium">{tenantName || '미등록'}</span>
           </div>
         </div>
 
