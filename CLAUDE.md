@@ -1,11 +1,93 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-03-18 (저녁) — 전체 로드맵 완료 + ESLint 0 errors + 랜딩페이지 개선 진행 중
+> **Last Updated:** 2026-03-19 (새벽) — 실데이터 임포트 완료 (임차인현황 xlsx + 25년 거래내역 md → DB)
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 20. 실데이터 임포트 완료 (2026-03-19)
+- **완료:**
+  - `임차인현황_import.xlsx` 파싱 → 15개 호실(205호~238호) 구조 확인
+  - `25년 거래내역.md` 분석 → 2025년 1~12월 납부 내역 파싱 (호실별 날짜·금액)
+  - `scripts/import-real-data.mjs` 작성 및 실행
+  - DB 삽입 결과: rooms 15개, leases 15개, invoices ~170건, payments ~163건
+  - 월말 초과 날짜 버그(2025-02-31 등) 수정 후 재실행으로 누락 10건 보완
+- **결정:**
+  - 기존 테스트 데이터(호 없는 이름: "205", "213" 등)와 실데이터("205호" 형식)가 DB에 공존 중 → 추후 정리 필요
+  - 임포트 스크립트는 idempotent (중복 실행해도 기존 데이터 보존, 누락분만 추가)
+  - 납부 상태 기준: 2025-12월 납부 여부로 rooms.status 자동 세팅
+- **DB 현황 (총계):**
+  - rooms: 36개 (기존 21 + 신규 15호)
+  - leases: 42개 (기존 27 + 신규 15)
+  - invoices: 383건, payments: 398건, 총 수납액: 135,420,000원
+- **미납/주의 호실 (12월 기준):**
+  - 215호 주상완 (12월 미확인), 220호 최지원 (12월 미납), 230호 김진혁 (12월 미확인)
+  - 231호 팜푸드 (12월 미납), 236호 주식회사미래씨앤에스 (11·12월 미납)
+- **다음:** 기존 테스트 데이터(호 없는 rooms) 정리 권장, 대시보드 KPI leases 기준 교체([A단계])
+
+### 19. /team 에이전트 스킬 신설 (2026-03-19)
+- `.claude/skills/team/SKILL.md` 생성
+- `/team <작업내용>` 으로 호출
+- 작업 유형 자동 판단 → 전문가 10명 풀에서 3명 소집 (BE/FE/DB/SEC/UX/PM/QA/PERF/DATA/DEVOPS)
+- 🔍 비판적 검토자 1명 항상 배석, 문제 있으면 라운드 반복 후 최종 보고
+- noado 프로젝트 기술 스택 컨텍스트 내장 (Supabase, Next.js, PortOne, Solapi)
+- **주의:** 새 세션에서 인식됨 (현재 세션 reload 필요)
+
+### 18. /worklog 스킬 신설 (2026-03-19)
+- `.claude/skills/worklog/SKILL.md` 생성
+- 주요 작업 완료, 결정, 세션 마무리 시 자동 실행
+- 완료 작업·결정사항·유저 언급을 CLAUDE.md에 자동 기록
+- **주의:** 새 세션에서 인식됨 (현재 세션 reload 필요)
+
+### 17. payments 페이지 AI 매칭 UI 개선 (2026-03-19)
+- **완료:** Gemini AI 분석 중 드라마틱한 UI 추가
+  - 헤더 배지: 보라 그라디언트 펄스 "Gemini AI 분석 중"
+  - 모달 배너: 핑 애니메이션 아이콘 + 음파 막대 8개 + 스캔 진행바
+  - 행별 상태: "AI 추론 중" pill 배지
+  - 결과 배지: 그라디언트 솔리드 "AI 매칭" (glow 포함)
+  - AI 추론 이유: 보라 배경 박스 스타일
+- **결정:** AI API = Google Gemini 2.5 Flash (`GEMINI_API_KEY` — 로컬 + Vercel 전 환경 확인 완료)
+- **유저 언급:** "ai가 분석한다고 생색내줘", "내 임대 데이터가 외부로 안나가?" (→ Gemini API로 나간다고 설명)
+- **빌드:** 0 errors 확인
+
+### 16. 공유오피스 전환 — DB 재설계 마이그레이션 완료 (2026-03-19)
+
+**핵심 변경:** 임대사업자 → 공유오피스 모델로 전환. `leases` 테이블을 중심에 두고 rooms/tenants를 독립 관리.
+
+**실행된 마이그레이션:** `supabase/migrations/20260319_redesign_schema.sql`
+
+- **rooms 테이블 정리**
+  - 제거: `tenant_name`, `tenant_phone`, `tenant_email`, `monthly_rent`, `payment_day`, `deposit`, `lease_start`, `lease_end`, `virtual_account_number`
+  - 추가: `building` (건물/구역), `area` (면적 m²)
+- **tenants 테이블 정리**
+  - 제거: `room_id`, `monthly_rent`, `deposit`, `lease_start`, `lease_end`
+  - 추가: `business_no`, `representative`, `birth_date`, `biz_type`, `biz_item`, `id_card_file`
+  - 주민번호 수집 없음 (생년월일+사업자번호만), 신분증은 암호화 파일로 저장
+- **leases 테이블 신설** (핵심 연결 테이블)
+  - `contract_type`: OCCUPANCY(전용좌석) / BIZ_ONLY(공용좌석) / STORAGE(보관)
+  - `rate_type`: MONTHLY / DAILY
+  - `monthly_rent`: 사용료 + 관리비 포함 (all-in)
+  - `pledge_amount`: 예치금 (보증금이라는 단어 사용 안 함)
+  - `vat_type`: VAT_INVOICE / CASH_RECEIPT / NONE
+  - `status`: RESERVED / ACTIVE / TERMINATED
+  - RLS 정책 적용
+- **billing_items 테이블 신설** (추가 실비)
+  - `item_type`: PARKING / INTERNET / ELECTRICITY / CUSTOM
+  - `billing_cycle`: MONTHLY(고정) / ACTUAL(실비)
+- **deposits 테이블 신설** (예치금/선납/예약금)
+  - `type`: PLEDGE / PREPAY / RESERVE
+- **tax_invoices 테이블 신설** (세금계산서)
+  - `status`: DRAFT / ISSUED / CANCELLED
+  - `ntax_id`: 국세청 승인번호
+- **invoices 테이블 수정**: `lease_id`, `base_amount`, `extra_amount` 컬럼 추가
+- **payments 테이블 수정**: `lease_id` 컬럼 추가
+- **`src/types/index.ts` 전면 재작성**: Room, Tenant, Lease, BillingItem, Deposit, TaxInvoice, Invoice, Payment 인터페이스 업데이트
+
+**현재 DB 테이블 목록:** billing_items, businesses, contracts, deposits, invoices, leases, notification_logs, payments, rooms, tax_invoices, tenants
+
+---
 
 ### 15. ESLint 0 errors 달성 + git 정리 (2026-03-18)
 - `npm run lint` 결과 59 errors → **0 errors** (경고 31개만 남음)
@@ -217,148 +299,81 @@
 
 ## 🚀 다음 세션 시작 순서
 
-1. **Supabase에서 마이그레이션 SQL 실행** (한 번만)
-   - `supabase/migrations/20260317_add_tenants_table.sql` 파일 내용을 Supabase SQL Editor에 붙여넣고 실행
-   - 실행 결과 `tenants_count` = `rooms_with_tenant` 인지 확인
-2. **앱에서 `/tenants` 페이지 접속** → 카드들이 정상 표시되는지 확인
-3. **[2단계] 호실별 입주사 다중 관리 UI** 개발 시작 (아래 로드맵 참고)
+### 즉시 확인
+1. `npm run build` — 0 errors 확인
+2. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 삭제 권장
+   - 삭제 방법: Supabase 대시보드 또는 스크립트로 `WHERE name NOT LIKE '%호'` 조건으로 삭제
 
----
-
-## ✅ [1단계] 완료 내역 (2026-03-17)
-
-- `supabase/migrations/20260317_add_tenants_table.sql` 생성
-  - `tenants` 테이블 신설 (owner_id, room_id, name, phone, email, monthly_rent, deposit, lease_start, lease_end, memo)
-  - RLS 정책 적용 (`auth.uid() = owner_id`)
-  - `invoices.tenant_id` 컬럼 추가 (FK → tenants.id)
-  - 기존 `rooms` 데이터 → `tenants` 자동 마이그레이션 (tenant_name IS NOT NULL AND status != 'VACANT')
-- `src/types/index.ts` — `Tenant` 인터페이스 추가, `Invoice`에 `tenant_id` 추가
-- `src/app/tenants/page.tsx` — `tenants` 테이블 기반으로 전면 재작성
-  - `TenantItem` 타입: tenant + room 조인 + invoices 조인
-  - 카드: rooms.status(PAID/UNPAID)는 room에서, 나머지는 tenant에서
-  - 퇴실 처리: tenant.lease_end = 오늘, room.status = VACANT
-  - 신규 입주사 등록: tenants INSERT + rooms 동기화
-- `src/app/api/cron/generate-invoices/route.ts` — invoice 생성 시 `tenant_id` 자동 세팅
-
-**호환성 주의사항:**
-- `rooms` 테이블의 `tenant_name`, `tenant_phone`, `monthly_rent` 등은 **유지됨** (다른 페이지 backward-compat)
-- `payments/page.tsx` 자동 매칭은 여전히 `rooms.tenant_name`으로 작동 (정상)
-- `units/page.tsx` 호실 관리는 rooms 테이블 직접 접근으로 변경 없음
+### 이어서 개발할 것 (우선순위 순)
+3. **대시보드 KPI leases 기준으로 교체** — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
+   - 파일: `src/app/dashboard/page.tsx`
+   - 입주율 = ACTIVE lease 수 / 전체 rooms 수
+   - 이번 달 수납 = invoices (lease_id 있는 것) 기준
+4. **billing_items UI** — 실비 항목 관리 (주차/인터넷/전기/커스텀)
+   - 계약별 추가 실비 등록·수정·삭제
+   - `/units` 또는 `/tenants` 내 계약 상세 탭에 추가
+5. **deposits UI** — 예치금·선납·예약금 관리
+   - 계약 시 예치금 수령 기록, 퇴실 시 환불 처리
+6. **청구서 생성 로직 leases 완전 연동**
+   - `base_amount` = lease.monthly_rent
+   - `extra_amount` = billing_items 합계
+   - `amount` = base + extra (현재는 lease.monthly_rent만 사용)
+7. **tax_invoices UI** — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
 
 ---
 
 ## 📋 다음 개발 계획 (Next Feature Roadmap)
 
-> 아래 5가지 기능은 서로 연관되어 있으므로 **순서대로** 개발하는 것을 권장합니다.
-> 특히 1번(DB 구조 변경)이 2~5번 전체의 기반이 됩니다.
+> ✅ 이전 1~5단계 로드맵 (tenants/leases 전환) 전부 완료됨 (2026-03-17~19)
+> 아래는 leases 중심 구조 완료 이후 이어서 개발할 기능들
 
 ---
 
-### [1단계] DB 구조 변경 — `tenants` 테이블 신설 (가장 중요, 선행 필수)
-
-**현재 문제:**
-- `rooms` 테이블에 `tenant_name`, `tenant_phone`, `lease_start`, `lease_end`, `monthly_rent` 가 직접 박혀있어 호실당 입주사 1명만 관리 가능
-- 이전 입주사 이력 보관 불가, 임대 기간별 임대료 산정 불가
-
-**설계안 — `tenants` 테이블 신설:**
-```sql
-CREATE TABLE tenants (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id      uuid REFERENCES auth.users NOT NULL,
-  room_id       uuid REFERENCES rooms(id) ON DELETE CASCADE NOT NULL,
-  name          text NOT NULL,           -- 입주사명 (개인명 또는 상호명)
-  phone         text,
-  email         text,
-  monthly_rent  integer NOT NULL,        -- 이 계약 기간의 임대료
-  lease_start   date NOT NULL,           -- 입주일
-  lease_end     date,                    -- 퇴실일 (null = 현재 입주 중)
-  deposit       integer DEFAULT 0,
-  memo          text,
-  created_at    timestamptz DEFAULT now()
-);
-```
-
-**마이그레이션 전략:**
-1. `tenants` 테이블 생성
-2. 기존 `rooms.tenant_name`, `rooms.lease_start`, `rooms.lease_end`, `rooms.monthly_rent` 데이터를 `tenants`로 이전(마이그레이션 스크립트)
-3. `rooms` 테이블에서 위 컬럼들 제거 (또는 deprecated 처리)
-4. `invoices` 테이블에 `tenant_id` 컬럼 추가 (어떤 입주사의 청구서인지 명시)
-
-**영향받는 파일:**
-- `src/types/index.ts` — `Tenant` 인터페이스 추가, `Room` 인터페이스 수정
-- `src/app/api/rooms/route.ts` — rooms CRUD 수정
-- `src/app/units/page.tsx` — 호실 관리 UI에 입주사 탭 추가
-- `src/app/tenants/page.tsx` — tenants 테이블 기반으로 전면 재작성
-- `src/app/payments/page.tsx` — 매칭 시 tenant_id 연동
+### [A단계] 대시보드 KPI — leases 기준으로 교체
+- 입주율: ACTIVE lease 수 / 전체 rooms 수
+- 이번 달 수납: invoices.lease_id 기반
+- 만료 예정: leases.lease_end 기준 30일 내
+- 파일: `src/app/dashboard/page.tsx`
 
 ---
 
-### [2단계] 호실별 입주사 다중 관리 UI
-
-**목표:** 한 호실에 현재 입주사 + 이전 입주사 목록을 모두 표시/관리
-
-**구현 내용:**
-- `units/[id]` 또는 `units` 페이지 내 호실 상세에서 입주사 탭 추가
-- 입주사 목록: 현재 입주 중(`lease_end IS NULL`) 1명 + 이전 입주사(`lease_end IS NOT NULL`) 목록
-- 신규 입주사 등록 시 기존 입주사의 `lease_end` 자동 설정 (퇴실 처리)
-- 각 입주사 카드에 계약기간(입주일~퇴실일), 월 임대료 표시
+### [B단계] billing_items UI — 실비 항목 관리
+- 계약(lease)별 추가 실비 등록·수정·삭제
+- 항목 유형: PARKING / INTERNET / ELECTRICITY / CUSTOM
+- 월정액(MONTHLY) vs 실비(ACTUAL) 구분
+- 청구서 생성 시 `extra_amount`에 자동 합산
+- 위치: `/units` 또는 `/tenants` 계약 상세 탭
 
 ---
 
-### [3단계] 입주사별 연도별 납부내역 뷰
-
-**목표:** 입주사(tenant) 기준으로 1년치 납부 내역을 한눈에 볼 수 있는 페이지
-
-**구현 내용:**
-- `/tenants` 페이지 또는 `/tenants/[id]` 상세 페이지
-- 연도 선택 셀렉트 (2023 / 2024 / 2025 / 2026...)
-- 12개월(1월~12월) 납부 도트 + 금액 표시
-- 계약기간 외 월은 회색/비활성 처리 (해당 입주사가 계약 중이 아닌 달)
-- 미납/완납/초과납부 구분 색상
+### [C단계] deposits UI — 예치금 관리
+- 입주 시 예치금(PLEDGE) 수령 등록
+- 퇴실 시 환불 처리 (refunded_at 세팅)
+- 선납(PREPAY), 예약금(RESERVE) 구분 표시
+- 위치: 계약 상세 or 별도 `/deposits` 페이지
 
 ---
 
-### [4단계] 은행 입금내역 자동 분류 고도화
-
-**목표:** 213호처럼 입금자명이 등록된 입주사명과 일치하면 자동으로 해당 호실·입주사에 매칭
-
-**현재 상태:** `tenant_name`으로만 단순 `includes` 비교 → 일부 미분류 발생
-
-**개선 방향:**
-- `tenants` 테이블의 `name`과 은행 입금 내용(note) 비교
-- 유사 매칭: 공백 제거, (주)/(유)/(사) 법인 접두사 정규화 후 비교
-  ```typescript
-  // 예: "(주)케이엠무역" → "케이엠무역" 으로 정규화
-  const normalize = (s: string) =>
-    s.replace(/\s/g, '').replace(/^\(주\)|\(유\)|\(사\)|주식회사\s*/g, '')
-  ```
-- 입금일 기준으로 해당 날짜에 계약 중인(`lease_start <= 입금일 <= lease_end`) 입주사만 후보로 사용
-- 매칭 신뢰도 점수 계산 (금액 일치 + 이름 유사도) → 자동 선택 vs 수동 확인 분기
+### [D단계] 청구서 생성 완전 leases 연동
+- `base_amount` = lease.monthly_rent
+- `extra_amount` = 해당 lease의 billing_items 합계
+- `amount` = base + extra (현재는 lease.monthly_rent만 사용 중)
+- 파일: `/api/cron/generate-invoices/route.ts`, `payments/page.tsx`
 
 ---
 
-### [5단계] 계약 기간별 임대료 자동 산정
-
-**목표:** 입주사가 변경되거나 임대 조건이 바뀔 때, 각 계약 기간에 맞는 임대료로 청구서 생성
-
-**구현 내용:**
-- 청구서 생성 시(`generate-invoices`) 해당 월에 계약 중인 `tenant`의 `monthly_rent` 사용
-- 기존 `rooms.monthly_rent` 대신 `tenants.monthly_rent` 참조
-- 한 달 안에 입주사가 바뀐 경우: 일할 계산 옵션 (일단 단순 처리 → 추후 고도화)
-- 청구서(`invoices`)에 `tenant_id` 컬럼으로 어느 입주사의 청구서인지 기록
+### [E단계] tax_invoices UI — 세금계산서 관리
+- vat_type = VAT_INVOICE 계약에 한해 발행
+- DRAFT → ISSUED → CANCELLED 상태 관리
+- 국세청 승인번호(ntax_id) 입력
 
 ---
 
-## 🧱 개발 순서 요약
+## 🔧 클로드 스킬 현황
 
-```
-[1단계] DB 스키마 변경 (tenants 테이블)
-    ↓
-[2단계] 호실별 입주사 다중 관리 UI
-    ↓
-[3단계] 입주사별 연도별 납부내역 뷰
-    ↓
-[4단계] 은행 입금 자동 분류 고도화
-    ↓
-[5단계] 계약기간별 임대료 자동 산정
-```
+| 스킬 | 경로 | 용도 |
+|------|------|------|
+| `/worklog` | `.claude/skills/worklog/SKILL.md` | 작업 기록 자동화 — CLAUDE.md 업데이트 |
+| `/team` | `.claude/skills/team/SKILL.md` | 팀 에이전트 — 전문가 3명 + 비판적 검토자 |
+
+> 두 스킬 모두 **새 세션**에서 인식됨. 현재 세션은 reload 필요.
