@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const apiSecret    = process.env.PORTONE_API_SECRET
-    const channelKey   = process.env.PORTONE_CHANNEL_KEY
+    const channelKey   = process.env.PORTONE_CHANNEL_KEY || process.env.PORTONE_CHANNEL_KEY_VIRTUAL
 
     if (!apiSecret || !channelKey || channelKey === 'your_virtual_account_channel_key_here') {
       return NextResponse.json(
