@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Phone, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -24,8 +24,69 @@ export default function LoginPage() {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [message, setMessage]   = useState('')
+  const [resetMode, setResetMode] = useState(false)
+  const [resetMethod, setResetMethod] = useState<'phone' | 'email'>('phone')
+  const [resetPhone, setResetPhone] = useState('')
+  const [resetEmail, setResetEmail] = useState('')
+  const searchParams = useSearchParams()
+
+  // URL 쿼리 파라미터에서 에러 메시지 읽기 (Supabase 리다이렉트)
+  useEffect(() => {
+    const urlError = searchParams.get('error')
+    if (urlError) {
+      setError(urlError)
+      // 만료 에러면 자동으로 비밀번호 재설정 모드로 전환
+      if (urlError.includes('만료')) setResetMode(true)
+    }
+  }, [searchParams])
 
   const clearMessages = () => { setError(''); setMessage('') }
+
+  /* ── 비밀번호 재설정 (SMS / 이메일) ── */
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    clearMessages()
+
+    if (resetMethod === 'phone') {
+      // SMS로 재설정 링크 발송
+      if (!resetPhone.match(/^010\d{8}$/)) {
+        setError('010으로 시작하는 11자리 번호를 입력해주세요.')
+        return
+      }
+      setLoading(true)
+      try {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: resetPhone }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setError(data.error || 'SMS 발송에 실패했습니다.')
+        } else {
+          setMessage('등록된 번호라면 카카오톡 또는 SMS로 재설정 링크가 발송됩니다.')
+          setResetPhone('')
+        }
+      } catch {
+        setError('서버 오류가 발생했습니다.')
+      }
+      setLoading(false)
+    } else {
+      // 이메일로 재설정 링크 발송
+      if (!resetEmail) { setError('이메일 주소를 입력해주세요.'); return }
+      setLoading(true)
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/settings?reset=true')}&type=recovery`,
+      })
+      if (error) {
+        setError(error.message)
+      } else {
+        setMessage('비밀번호 재설정 링크를 이메일로 발송했습니다.')
+        setResetEmail('')
+      }
+      setLoading(false)
+    }
+  }
 
   /* ── 이메일 로그인 ── */
   async function handleEmailLogin(e: React.FormEvent) {
@@ -159,7 +220,7 @@ export default function LoginPage() {
           {message && <div className="mb-4 px-4 py-3 rounded-lg text-sm" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>{message}</div>}
 
           {/* ── 이메일 탭 ── */}
-          {tab === 'email' && (
+          {tab === 'email' && !resetMode && (
             <form onSubmit={handleEmailLogin} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>이메일</label>
@@ -175,7 +236,14 @@ export default function LoginPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>비밀번호</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>비밀번호</label>
+                  <button type="button" onClick={() => { setResetMode(true); setResetEmail(email); clearMessages() }}
+                    className="text-xs font-medium hover:underline transition-opacity hover:opacity-80"
+                    style={{ color: 'var(--color-accent-dark)' }}>
+                    비밀번호를 잊으셨나요?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-muted)' }} />
                   <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
@@ -196,6 +264,82 @@ export default function LoginPage() {
                 style={{ background: 'var(--color-primary)' }}>
                 {loading ? <Loader2 size={16} className="animate-spin" /> : null}
                 로그인
+              </button>
+            </form>
+          )}
+
+          {/* ── 비밀번호 재설정 ── */}
+          {tab === 'email' && resetMode && (
+            <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+              {/* 재설정 방법 선택 */}
+              <div className="flex gap-1 p-1 rounded-xl"
+                   style={{ background: 'var(--color-muted-bg)' }}>
+                {([
+                  { key: 'phone' as const, label: '휴대폰 (SMS)' },
+                  { key: 'email' as const, label: '이메일' },
+                ]).map(m => (
+                  <button key={m.key} type="button"
+                    onClick={() => { setResetMethod(m.key); clearMessages() }}
+                    className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      background: resetMethod === m.key ? 'var(--color-surface)' : 'transparent',
+                      color:      resetMethod === m.key ? 'var(--color-primary)' : 'var(--color-muted)',
+                      boxShadow:  resetMethod === m.key ? 'var(--shadow-soft)' : 'none',
+                    }}>
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-4 py-3 rounded-lg text-sm" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-foreground)' }}>
+                {resetMethod === 'phone'
+                  ? '가입 시 등록한 휴대폰 번호를 입력하면 SMS로 재설정 링크를 보내드립니다.'
+                  : '가입하신 이메일 주소를 입력하면 비밀번호 재설정 링크를 보내드립니다.'}
+              </div>
+
+              {/* 휴대폰 입력 */}
+              {resetMethod === 'phone' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>휴대폰 번호</label>
+                  <div className="relative">
+                    <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-muted)' }} />
+                    <input type="tel" value={resetPhone} onChange={e => setResetPhone(e.target.value.replace(/\D/g, ''))}
+                      placeholder="01012345678" maxLength={11}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-lg border text-sm outline-none transition-all"
+                      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+                      onFocus={e => e.target.style.borderColor = 'var(--color-accent-dark)'}
+                      onBlur={e  => e.target.style.borderColor = 'var(--color-border)'} />
+                  </div>
+                </div>
+              )}
+
+              {/* 이메일 입력 */}
+              {resetMethod === 'email' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>이메일</label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-muted)' }} />
+                    <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
+                      placeholder="가입한 이메일 주소" autoComplete="email"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-lg border text-sm outline-none transition-all"
+                      style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
+                      onFocus={e => e.target.style.borderColor = 'var(--color-accent-dark)'}
+                      onBlur={e  => e.target.style.borderColor = 'var(--color-border)'} />
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading}
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-60 mt-2"
+                style={{ background: 'var(--color-primary)' }}>
+                {loading ? <Loader2 size={16} className="animate-spin" /> : resetMethod === 'phone' ? <Phone size={16} /> : <Mail size={16} />}
+                {resetMethod === 'phone' ? 'SMS로 재설정 링크 발송' : '이메일로 재설정 링크 발송'}
+              </button>
+
+              <button type="button" onClick={() => { setResetMode(false); clearMessages() }}
+                className="w-full py-2 text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ color: 'var(--color-muted)' }}>
+                로그인으로 돌아가기
               </button>
             </form>
           )}

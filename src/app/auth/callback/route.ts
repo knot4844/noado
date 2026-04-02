@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
+  // 비밀번호 재설정(recovery) 여부 판별
+  const isRecovery = type === 'recovery'
+
   // 방법 1: PKCE 코드 플로우
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
@@ -29,6 +32,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(
         `${origin}/login?error=${encodeURIComponent(error.message)}`
       )
+    }
+    // PKCE에서도 recovery 감지 → 설정 페이지로 이동
+    if (isRecovery) {
+      return NextResponse.redirect(`${origin}/settings?reset=true`)
     }
   }
   // 방법 2: token_hash 플로우 (이메일 OTP / 새 Supabase 버전)
@@ -42,6 +49,10 @@ export async function GET(request: NextRequest) {
         `${origin}/login?error=${encodeURIComponent(error.message)}`
       )
     }
+    // 비밀번호 재설정 플로우 → 설정 페이지로 이동
+    if (isRecovery) {
+      return NextResponse.redirect(`${origin}/settings?reset=true`)
+    }
   }
 
   // 세션 확인 후 역할에 맞게 이동
@@ -49,8 +60,13 @@ export async function GET(request: NextRequest) {
 
   if (user) {
     const role = user.user_metadata?.role
+    // next 파라미터에 recovery 경로가 포함된 경우 (PKCE 폴백)
+    const decodedNext = decodeURIComponent(next)
+    if (decodedNext.includes('reset=true')) {
+      return NextResponse.redirect(`${origin}/settings?reset=true`)
+    }
     return NextResponse.redirect(
-      `${origin}${role === 'TENANT' ? '/portal' : next}`
+      `${origin}${role === 'TENANT' ? '/portal' : decodedNext}`
     )
   }
 

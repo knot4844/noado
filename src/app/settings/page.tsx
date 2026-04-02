@@ -3,11 +3,14 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Save, CheckCircle2, AlertCircle, User, Phone, Lock, Loader2 } from 'lucide-react'
+import { Save, CheckCircle2, AlertCircle, User, Phone, Lock, Loader2, ShieldAlert } from 'lucide-react'
 
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), [])
+  const searchParams = useSearchParams()
+  const isResetMode = searchParams.get('reset') === 'true'
 
   const [loading, setLoading]       = useState(true)
   const [saving,  setSaving]        = useState(false)
@@ -142,7 +145,19 @@ export default function SettingsPage() {
       </div>
 
       {/* 비밀번호 변경 카드 */}
-      <div className="card p-6 space-y-5">
+      <div className="card p-6 space-y-5" id="password-section">
+        {isResetMode && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-lg"
+               style={{ background: 'var(--color-warning-bg, #FEF3C7)', border: '1px solid var(--color-warning, #F59E0B)' }}>
+            <ShieldAlert size={18} className="shrink-0 mt-0.5" style={{ color: 'var(--color-warning, #F59E0B)' }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-foreground)' }}>비밀번호 재설정</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                이메일 인증이 완료되었습니다. 아래에서 새 비밀번호를 설정해주세요.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2 mb-1">
           <Lock size={16} style={{ color: 'var(--color-primary)' }} />
           <h2 className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>비밀번호 변경</h2>
