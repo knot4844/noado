@@ -51,12 +51,39 @@ export async function POST(req: NextRequest) {
     /* ─── 청구서 조회 ─── */
     const { data: invoice, error: invErr } = await supabase
       .from('invoices')
-      .select('*, rooms(name, tenant_name, tenant_phone)')
+      .select('*, rooms(name)')
       .eq('id', invoiceId)
       .single()
 
     if (invErr || !invoice) {
+      console.error('[VA] 청구서 조회 오류:', invErr)
       return NextResponse.json({ error: '청구서를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    // tenant 정보 조회 (leases → tenants)
+    let tenantName = '세입자'
+    let tenantPhone = ''
+    if (invoice.lease_id) {
+      const { data: lease } = await supabase
+        .from('leases')
+        .select('tenants(name, phone)')
+        .eq('id', invoice.lease_id)
+        .single()
+      if (lease) {
+        const t = lease.tenants as unknown as { name: string; phone: string } | null
+        tenantName = t?.name || '세입자'
+        tenantPhone = t?.phone || ''
+      }
+    } else if (invoice.tenant_id) {
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('name, phone')
+        .eq('id', invoice.tenant_id)
+        .single()
+      if (tenant) {
+        tenantName = tenant.name || '세입자'
+        tenantPhone = tenant.phone || ''
+      }
     }
 
     if (invoice.status === 'paid') {
@@ -86,7 +113,7 @@ export async function POST(req: NextRequest) {
       return d > new Date() ? d.toISOString() : fallbackExpiry
     })()
 
-    const room = invoice.rooms as { name: string; tenant_name: string | null; tenant_phone: string | null } | null
+    const room = invoice.rooms as { name: string } | null
 
     /* ─── PortOne V2 가상계좌 발급 (instant API) ─── */
     const portoneRes = await fetch(
@@ -103,9 +130,9 @@ export async function POST(req: NextRequest) {
           amount:    { total: invoice.amount },
           currency:  'KRW',
           customer:  {
-            name:        { full: room?.tenant_name || '세입자' },
+            name:        { full: tenantName },
             email:       'noreply@noado.kr',
-            phoneNumber: room?.tenant_phone || '',
+            phoneNumber: tenantPhone,
           },
           method: {
             virtualAccount: {
