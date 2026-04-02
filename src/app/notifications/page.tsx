@@ -138,7 +138,7 @@ export default function NotificationsPage() {
   const TEMPLATE_KEYS = Object.keys(TEMPLATES) as TemplateKey[]
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-3 sm:p-6 max-w-[1200px]">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white"
@@ -338,7 +338,7 @@ export default function NotificationsPage() {
                         ? tpl.preview(
                             sample.tenant_name ?? '입주사',
                             sample.name,
-                            sample.monthly_rent.toLocaleString()
+                            (sample.monthly_rent ?? 0).toLocaleString()
                           )
                         : tpl.preview('입주사', '101호', '500,000')}
                     </div>

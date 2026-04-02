@@ -280,6 +280,21 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PRODUCT TOUR */}
+      <section style={{
+        position: 'relative', zIndex: 1, padding: '80px 24px',
+        minHeight: '100vh', display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto' }}>
+          <SectionTag>제품 둘러보기</SectionTag>
+          <SectionTitle>실제 화면으로 만나보세요</SectionTitle>
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginTop: '12px', marginBottom: '48px' }}>
+            실데이터 기반 — 20개 호실, 16개 입주사, 월 5,092,000원 수납 처리
+          </p>
+          <ProductTour />
+        </div>
+      </section>
+
       {/* PRICING + FOOTER — 한 화면에 */}
       <section style={{
         position: 'relative', zIndex: 1,
@@ -363,42 +378,58 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* FOOTER — 요금제 섹션 하단에 붙임 */}
+        {/* FOOTER */}
         <footer style={{
-          position: 'relative', zIndex: 1, padding: '28px 40px 24px',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          position: 'relative', zIndex: 1,
+          padding: '36px 48px 32px',
+          borderTop: '1px solid rgba(255,255,255,0.07)',
         }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '4px 40px', marginBottom: '20px',
-          color: 'rgba(255,255,255,0.42)', fontSize: '12px', lineHeight: '1.9',
-        }}>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>상호</span>대우오피스</div>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>사업자등록번호</span>127-44-85045</div>
-          <div><span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>대표전화</span>031-970-0600</div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>주소</span>
-            경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
+          {/* 상단: 로고 + 링크 */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            flexWrap: 'wrap', gap: '20px', marginBottom: '28px',
+          }}>
+            <LogoMark />
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', paddingTop: '2px' }}>
+              <a href="/terms"   style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', textDecoration: 'none', letterSpacing: '0.01em' }}>이용약관</a>
+              <a href="/privacy" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', textDecoration: 'none', letterSpacing: '0.01em' }}>개인정보처리방침</a>
+              <a href="/refund"  style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', textDecoration: 'none', letterSpacing: '0.01em' }}>환불정책</a>
+            </div>
           </div>
-          <div>
-            <span style={{ color: 'rgba(255,255,255,0.22)', marginRight: '6px' }}>이메일</span>
-            <a href="mailto:knot4844@gmail.com" style={{ color: 'rgba(255,255,255,0.42)' }}>knot4844@gmail.com</a>
+
+          {/* 사업자 정보 */}
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: '6px 0',
+            color: 'rgba(255,255,255,0.35)', fontSize: '12px', lineHeight: '1.8',
+            marginBottom: '24px',
+          }}>
+            {[
+              ['상호', '대우오피스'],
+              ['사업자등록번호', '127-44-85045'],
+              ['대표전화', '031-970-0600'],
+              ['이메일', 'knot4844@gmail.com'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ marginRight: '32px', whiteSpace: 'nowrap' }}>
+                <span style={{ color: 'rgba(255,255,255,0.2)', marginRight: '6px' }}>{label}</span>
+                {label === '이메일'
+                  ? <a href={`mailto:${value}`} style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>{value}</a>
+                  : value}
+              </div>
+            ))}
+            <div style={{ width: '100%' }}>
+              <span style={{ color: 'rgba(255,255,255,0.2)', marginRight: '6px' }}>주소</span>
+              경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호
+            </div>
           </div>
-        </div>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          flexWrap: 'wrap', gap: '10px',
-          borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px',
-        }}>
-          <LogoMark />
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <a href="/terms"   style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>이용약관</a>
-            <a href="/privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>개인정보처리방침</a>
-            <a href="/refund"  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', textDecoration: 'none' }}>환불정책</a>
+
+          {/* 하단: 카피라이트 */}
+          <div style={{
+            borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px',
+            color: 'rgba(255,255,255,0.18)', fontSize: '11px', letterSpacing: '0.02em',
+          }}>
+            © 2026 noado. All rights reserved.
           </div>
-          <span style={{ color: 'rgba(255,255,255,0.22)', fontSize: '12px' }}>© 2025 noado. All rights reserved.</span>
-        </div>
-      </footer>
+        </footer>
       </section>
 
       <style>{`
@@ -676,6 +707,590 @@ const FEATURES = [
   { icon: '📊', color: '#f9a8d4', title: '수납 보고서 & 세무자료',
     desc: '월별 수납현황, 미납 현황, 부가세 자료를 엑셀로 내보내기. 세무사에게 바로 전달할 수 있는 포맷 제공.' },
 ]
+
+/* ─── 프로덕트 투어 ─── */
+const TOUR_SLIDES = [
+  {
+    id: 'dashboard', label: '대시보드', icon: '📊',
+    color: '#a8dadc',
+    title: 'AI 브리핑 & KPI 한눈에',
+    desc: '오늘의 수납 현황, 미납 알림, 입주율을 실시간으로 확인합니다.',
+    mockup: {
+      type: 'kpi' as const,
+      stats: [
+        { label: '이번 달 수납', value: '5,092,000원', badge: '94%', color: '#34d399' },
+        { label: '미납 총액', value: '330,000원', badge: '1세대', color: '#f87171' },
+        { label: '입주율', value: '80%', badge: '16/20', color: '#60a5fa' },
+        { label: '수납 완료', value: '15세대', badge: '', color: '#a8dadc' },
+      ],
+      feed: [
+        { room: '238호', tenant: '강육희', amount: '+280,000원' },
+        { room: '237호', tenant: '더부띠끄', amount: '+605,000원' },
+        { room: '236호', tenant: '미래씨앤에스', amount: '+330,000원' },
+      ],
+    },
+  },
+  {
+    id: 'units', label: '호실 관리', icon: '🏢',
+    color: '#7eb8f7',
+    title: '20개 호실 실시간 현황',
+    desc: '공실/입주/납부 상태를 한눈에 파악하고 즉시 관리합니다.',
+    mockup: {
+      type: 'rooms' as const,
+      summary: { total: 20, paid: 15, overdue: 1, vacant: 4 },
+      rooms: [
+        { name: '212호', tenant: '한규동', status: '미납' },
+        { name: '213호', tenant: '기업경영연구소', status: '완납' },
+        { name: '214호', tenant: '(주)더파트너즈', status: '완납' },
+        { name: '215호', tenant: '주상완', status: '완납' },
+        { name: '218호', tenant: '인용식', status: '완납' },
+        { name: '221호', tenant: '—', status: '공실' },
+      ],
+    },
+  },
+  {
+    id: 'payments', label: '수납 매칭', icon: '🏦',
+    color: '#c8b6ff',
+    title: 'AI가 자동으로 매칭합니다',
+    desc: '은행 엑셀 업로드 → Gemini AI 분석 → 15/16건 자동 매칭 성공.',
+    mockup: {
+      type: 'matching' as const,
+      total: '5,422,000원',
+      matched: '5,092,000원',
+      rate: '94%',
+      items: [
+        { note: '강육희 3월임대료', room: '238호', amount: '280,000', status: 'AI 매칭' },
+        { note: '주식회사더부띠끄 3월', room: '237호', amount: '605,000', status: 'AI 매칭' },
+        { note: '주식회사미래씨앤에스', room: '236호', amount: '330,000', status: 'AI 매칭' },
+        { note: '박상민-임대료03', room: '235호', amount: '275,000', status: 'AI 매칭' },
+      ],
+    },
+  },
+  {
+    id: 'tenants', label: '입주사 관리', icon: '👥',
+    color: '#ffd18c',
+    title: '12개월 납부 이력 한눈에',
+    desc: '16개 입주사의 계약 현황, 월세, 납부 도트를 실시간 조회합니다.',
+    mockup: {
+      type: 'tenants' as const,
+      count: 16,
+      tenants: [
+        { name: '기업경영연구소', room: '213호', rent: '308,000원', dots: 12 },
+        { name: '(주)더파트너즈', room: '214호', rent: '330,000원', dots: 12 },
+        { name: '주상완', room: '215호', rent: '253,000원', dots: 11 },
+        { name: '인용식', room: '218호', rent: '275,000원', dots: 12 },
+      ],
+    },
+  },
+  {
+    id: 'notifications', label: '알림톡', icon: '💬',
+    color: '#86efac',
+    title: '카카오톡 16건 발송 성공',
+    desc: '청구서 생성 시 결제 링크 자동 발송. 성공률 100%.',
+    mockup: {
+      type: 'notifications' as const,
+      total: 16, success: 16, fail: 0,
+      recent: [
+        { to: '강육희', template: 'INVOICE_ISSUED', status: '성공' },
+        { to: '주식회사더부띠끄', template: 'INVOICE_ISSUED', status: '성공' },
+        { to: '주식회사미래씨앤에스', template: 'INVOICE_ISSUED', status: '성공' },
+        { to: '박상민', template: 'INVOICE_ISSUED', status: '성공' },
+      ],
+    },
+  },
+  {
+    id: 'contracts', label: '전자계약', icon: '📋',
+    color: '#f9a8d4',
+    title: '계약서 작성 & 전자서명',
+    desc: '카카오톡으로 계약서 발송, 스마트폰에서 서명 후 PDF 보관.',
+    mockup: {
+      type: 'contracts' as const,
+      statuses: [
+        { label: '초안', count: 0, icon: '✏️' },
+        { label: '발송됨', count: 0, icon: '📤' },
+        { label: '서명완료', count: 0, icon: '✅' },
+        { label: '만료됨', count: 0, icon: '⏰' },
+      ],
+    },
+  },
+]
+
+function ProductTour() {
+  const [active, setActive] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const slide = TOUR_SLIDES[active]
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  useEffect(() => {
+    if (isPaused) return
+    const timer = setInterval(() => {
+      setActive(prev => (prev + 1) % TOUR_SLIDES.length)
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [isPaused])
+
+  /* ── 모바일 레이아웃 ── */
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+        {/* 가로 스크롤 탭 바 */}
+        <div style={{
+          display: 'flex', gap: '8px', overflowX: 'auto', width: '100%',
+          paddingBottom: '4px', msOverflowStyle: 'none',
+        } as React.CSSProperties}>
+          {TOUR_SLIDES.map((s, i) => (
+            <button key={s.id} onClick={() => { setActive(i); setIsPaused(true) }} style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
+              background: i === active ? `linear-gradient(135deg,${s.color}33,${s.color}15)` : 'rgba(255,255,255,0.05)',
+              border: i === active ? `1px solid ${s.color}88` : '1px solid rgba(255,255,255,0.1)',
+              fontFamily: 'inherit', transition: 'all 0.25s ease',
+            }}>
+              <span style={{ fontSize: '15px' }}>{s.icon}</span>
+              <span style={{
+                color: i === active ? '#fff' : 'rgba(255,255,255,0.5)',
+                fontSize: '12px', fontWeight: i === active ? 700 : 500, whiteSpace: 'nowrap',
+              }}>{s.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 설명 */}
+        <div style={{ textAlign: 'center', padding: '0 4px' }}>
+          <h3 style={{ color: '#fff', fontSize: '17px', fontWeight: 700, marginBottom: '6px' }}>
+            <span style={{ color: slide.color, marginRight: '6px' }}>{slide.icon}</span>
+            {slide.title}
+          </h3>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', lineHeight: 1.5 }}>{slide.desc}</p>
+        </div>
+
+        {/* 폰 목업 */}
+        <div style={{
+          position: 'relative', margin: '0 auto',
+          width: '270px', height: '460px',
+          borderRadius: '30px', padding: '10px',
+          background: 'linear-gradient(145deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: `0 20px 60px rgba(0,0,0,0.5),0 0 40px ${slide.color}15`,
+          transition: 'box-shadow 0.5s ease',
+        }}>
+          <div style={{
+            position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
+            width: '90px', height: '18px', borderRadius: '9px',
+            background: 'rgba(0,0,0,0.6)', zIndex: 10,
+          }} />
+          <div style={{
+            width: '100%', height: '100%', borderRadius: '20px', overflow: 'hidden',
+            background: 'linear-gradient(180deg,#f8faf9 0%,#f0f4f2 100%)',
+          }}>
+            <TourScreen slide={slide} />
+          </div>
+        </div>
+
+        {/* 네비게이션 도트 */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+          {TOUR_SLIDES.map((s, i) => (
+            <button key={i} onClick={() => { setActive(i); setIsPaused(true) }} style={{
+              width: i === active ? '24px' : '7px', height: '7px',
+              borderRadius: '4px', border: 'none', cursor: 'pointer',
+              background: i === active ? s.color : 'rgba(255,255,255,0.2)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  /* ── 데스크톱 레이아웃 ── */
+  return (
+    <div
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      style={{ display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}
+    >
+      {/* 왼쪽: 기능 탭 목록 */}
+      <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {TOUR_SLIDES.map((s, i) => (
+          <button key={s.id} onClick={() => setActive(i)} style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            padding: '14px 18px', borderRadius: '14px', border: 'none', cursor: 'pointer',
+            background: i === active
+              ? `linear-gradient(135deg, ${s.color}22, ${s.color}0a)`
+              : 'transparent',
+            borderLeft: i === active ? `3px solid ${s.color}` : '3px solid transparent',
+            transition: 'all 0.3s ease',
+            fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: '20px' }}>{s.icon}</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{
+                color: i === active ? '#fff' : 'rgba(255,255,255,0.5)',
+                fontSize: '14px', fontWeight: i === active ? 700 : 500,
+                transition: 'all 0.3s ease',
+              }}>{s.label}</div>
+              {i === active && (
+                <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginTop: '2px' }}>
+                  {s.desc.slice(0, 30)}...
+                </div>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* 오른쪽: 폰 목업 + 설명 */}
+      <div style={{ flex: '1 1 400px', maxWidth: '700px' }}>
+        {/* 상단 설명 */}
+        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+          <h3 style={{
+            color: '#fff', fontSize: '22px', fontWeight: 700, marginBottom: '8px',
+            transition: 'all 0.3s ease',
+          }}>
+            <span style={{ color: slide.color, marginRight: '8px' }}>{slide.icon}</span>
+            {slide.title}
+          </h3>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '14px' }}>{slide.desc}</p>
+        </div>
+
+        {/* 폰 프레임 */}
+        <div style={{
+          position: 'relative', margin: '0 auto',
+          width: '340px', height: '580px',
+          borderRadius: '36px', padding: '12px',
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: `0 30px 80px rgba(0,0,0,0.5), 0 0 60px ${slide.color}15`,
+          transition: 'box-shadow 0.5s ease',
+        }}>
+          {/* 노치 */}
+          <div style={{
+            position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
+            width: '120px', height: '24px', borderRadius: '12px',
+            background: 'rgba(0,0,0,0.6)', zIndex: 10,
+          }} />
+
+          {/* 화면 내용 */}
+          <div style={{
+            width: '100%', height: '100%', borderRadius: '24px', overflow: 'hidden',
+            background: 'linear-gradient(180deg, #f8faf9 0%, #f0f4f2 100%)',
+          }}>
+            <TourScreen slide={slide} />
+          </div>
+        </div>
+
+        {/* 네비게이션 도트 */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '24px' }}>
+          {TOUR_SLIDES.map((s, i) => (
+            <button key={i} onClick={() => setActive(i)} style={{
+              width: i === active ? '28px' : '8px', height: '8px',
+              borderRadius: '4px', border: 'none', cursor: 'pointer',
+              background: i === active ? s.color : 'rgba(255,255,255,0.2)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function TourScreen({ slide }: { slide: any }) {
+  const m = slide.mockup
+
+  /* 공통 헤더 */
+  const Header = ({ title }: { title: string }) => (
+    <div style={{
+      padding: '40px 16px 12px', background: `linear-gradient(135deg, ${slide.color}18, ${slide.color}08)`,
+      borderBottom: '1px solid rgba(0,0,0,0.06)',
+    }}>
+      <div style={{ fontSize: '16px', fontWeight: 800, color: '#1a2332', letterSpacing: '-0.5px' }}>{title}</div>
+    </div>
+  )
+
+  if (m.type === 'kpi') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="대시보드" />
+        {/* AI 브리핑 */}
+        <div style={{ margin: '12px', padding: '12px 14px', borderRadius: '12px', background: '#f0f7ff', border: '1px solid #d0e7ff' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#457b9d', marginBottom: '6px' }}>✨ AI 일일 브리핑</div>
+          <div style={{ fontSize: '11px', color: '#456', lineHeight: 1.5 }}>
+            현재 미납 <span style={{ color: '#ef4444', fontWeight: 700 }}>1세대 (330,000원)</span> 주의가 필요합니다.
+          </div>
+        </div>
+        {/* KPI 그리드 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '0 12px' }}>
+          {m.stats.map((s: any, i: number) => (
+            <div key={i} style={{
+              padding: '12px', borderRadius: '12px', background: '#fff',
+              border: '1px solid rgba(0,0,0,0.06)',
+            }}>
+              {s.badge && (
+                <span style={{
+                  fontSize: '9px', fontWeight: 700, color: s.color, background: s.color + '18',
+                  padding: '2px 6px', borderRadius: '4px',
+                }}>{s.badge}</span>
+              )}
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#1a2332', marginTop: '4px' }}>{s.value}</div>
+              <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {/* 최근 수납 */}
+        <div style={{ padding: '12px', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#1a2332', marginBottom: '8px' }}>최근 수납</div>
+          {m.feed.map((f: any, i: number) => (
+            <div key={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '8px 10px', marginBottom: '4px', borderRadius: '8px', background: '#fff',
+              border: '1px solid rgba(0,0,0,0.04)',
+            }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#1a2332' }}>{f.room} · {f.tenant}</div>
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#10b981' }}>{f.amount}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.type === 'rooms') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="호실 현황" />
+        {/* 요약 탭 */}
+        <div style={{ display: 'flex', gap: '4px', padding: '10px 12px' }}>
+          {[
+            { l: `전체 ${m.summary.total}`, active: true },
+            { l: `납부완료 ${m.summary.paid}`, active: false },
+            { l: `미납 ${m.summary.overdue}`, active: false },
+            { l: `공실 ${m.summary.vacant}`, active: false },
+          ].map((t, i) => (
+            <div key={i} style={{
+              padding: '6px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 600,
+              background: t.active ? '#1a2332' : '#f0f2f4', color: t.active ? '#fff' : '#888',
+            }}>{t.l}</div>
+          ))}
+        </div>
+        {/* 호실 목록 */}
+        <div style={{ padding: '0 12px' }}>
+          {m.rooms.map((r: any, i: number) => (
+            <div key={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 10px', borderBottom: '1px solid rgba(0,0,0,0.05)',
+            }}>
+              <div>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#1a2332' }}>{r.name}</span>
+                <span style={{ fontSize: '11px', color: '#888', marginLeft: '10px' }}>{r.tenant}</span>
+              </div>
+              <span style={{
+                fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '6px',
+                background: r.status === '완납' ? '#d1fae5' : r.status === '미납' ? '#fee2e2' : '#f0f2f4',
+                color: r.status === '완납' ? '#059669' : r.status === '미납' ? '#dc2626' : '#888',
+              }}>{r.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.type === 'matching') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="수납 매칭" />
+        {/* 요약 카드 */}
+        <div style={{ display: 'flex', gap: '6px', padding: '10px 12px' }}>
+          {[
+            { l: '총 청구', v: m.total, c: '#1a2332' },
+            { l: '수납 완료', v: m.matched, c: '#10b981' },
+            { l: '매칭률', v: m.rate, c: '#8b5cf6' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              flex: 1, padding: '10px 8px', borderRadius: '10px',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.06)', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: s.c }}>{s.v}</div>
+              <div style={{ fontSize: '9px', color: '#888', marginTop: '2px' }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+        {/* Gemini AI 배너 */}
+        <div style={{
+          margin: '4px 12px 8px', padding: '8px 12px', borderRadius: '10px',
+          background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)',
+          border: '1px solid #c4b5fd',
+          display: 'flex', alignItems: 'center', gap: '8px',
+        }}>
+          <div style={{
+            width: '24px', height: '24px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '12px', color: '#fff',
+          }}>✦</div>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#6d28d9' }}>Gemini AI 매칭 완료</div>
+            <div style={{ fontSize: '9px', color: '#7c3aed' }}>15/16건 자동 매칭 성공</div>
+          </div>
+        </div>
+        {/* 매칭 결과 */}
+        <div style={{ padding: '0 12px' }}>
+          {m.items.map((item: any, i: number) => (
+            <div key={i} style={{
+              padding: '10px', marginBottom: '4px', borderRadius: '10px',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', color: '#456', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.note}</div>
+                <span style={{
+                  fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
+                  background: 'linear-gradient(135deg, #ede9fe, #e0e7ff)', color: '#7c3aed',
+                }}>{item.status}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#888' }}>→ {item.room}</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#1a2332' }}>{item.amount}원</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.type === 'tenants') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="입주사 관리" />
+        <div style={{ padding: '10px 12px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, background: '#1a2332', color: '#fff' }}>전체 {m.count}</div>
+            <div style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, background: '#f0f2f4', color: '#888' }}>완납 15</div>
+            <div style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, background: '#f0f2f4', color: '#888' }}>미납 1</div>
+          </div>
+          {m.tenants.map((t: any, i: number) => (
+            <div key={i} style={{
+              padding: '14px 12px', marginBottom: '8px', borderRadius: '14px',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.06)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div>
+                  <span style={{ fontSize: '10px', color: '#888' }}>{t.room}</span>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a2332' }}>{t.name}</div>
+                </div>
+                <span style={{
+                  fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                  background: '#d1fae5', color: '#059669',
+                }}>완납</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#888' }}>월세 {t.rent}</span>
+                <div style={{ display: 'flex', gap: '3px' }}>
+                  {Array.from({ length: Math.min(t.dots, 12) }).map((_, di) => (
+                    <div key={di} style={{
+                      width: '6px', height: '6px', borderRadius: '50%',
+                      background: di < t.dots ? '#10b981' : '#e5e7eb',
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.type === 'notifications') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="알림톡" />
+        {/* 요약 */}
+        <div style={{ display: 'flex', gap: '6px', padding: '10px 12px' }}>
+          {[
+            { l: '총 발송', v: m.total, c: '#1a2332' },
+            { l: '성공', v: m.success, c: '#10b981' },
+            { l: '실패', v: m.fail, c: '#ef4444' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              flex: 1, padding: '14px 8px', borderRadius: '12px',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.06)', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: s.c }}>{s.v}</div>
+              <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+        {/* 발송 이력 */}
+        <div style={{ padding: '4px 12px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#1a2332', marginBottom: '8px' }}>발송 이력</div>
+          {m.recent.map((r: any, i: number) => (
+            <div key={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '10px', marginBottom: '4px', borderRadius: '10px',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.04)',
+            }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#1a2332' }}>{r.to}</div>
+                <div style={{ fontSize: '9px', color: '#888', marginTop: '2px' }}>{r.template}</div>
+              </div>
+              <span style={{
+                fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                background: '#d1fae5', color: '#059669',
+              }}>✓ {r.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (m.type === 'contracts') {
+    return (
+      <div style={{ height: '100%', overflowY: 'auto' }}>
+        <Header title="전자계약" />
+        {/* 상태 카드 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px' }}>
+          {m.statuses.map((s: any, i: number) => (
+            <div key={i} style={{
+              padding: '16px 12px', borderRadius: '12px', textAlign: 'center',
+              background: '#fff', border: '1px solid rgba(0,0,0,0.06)',
+            }}>
+              <span style={{ fontSize: '18px' }}>{s.icon}</span>
+              <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>{s.label}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: '#1a2332', marginTop: '2px' }}>{s.count}</div>
+            </div>
+          ))}
+        </div>
+        {/* CTA */}
+        <div style={{ padding: '12px', textAlign: 'center' }}>
+          <div style={{
+            padding: '14px', borderRadius: '12px',
+            background: 'linear-gradient(135deg, #1a2332, #2d3748)',
+            color: '#fff', fontSize: '13px', fontWeight: 700,
+          }}>+ 계약서 작성</div>
+          <p style={{ fontSize: '10px', color: '#aaa', marginTop: '10px', lineHeight: 1.6 }}>
+            카카오톡으로 계약서 발송<br />스마트폰에서 전자서명
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const STEPS = [
   { step: '01', title: '호실 & 입주사 등록 (5분)',

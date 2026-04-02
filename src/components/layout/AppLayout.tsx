@@ -26,7 +26,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex-1 md:ml-60 flex flex-col min-h-screen overflow-x-hidden" style={{ background: 'var(--color-background)' }}>
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-1 p-6">
+        <main className="flex-1">
           {children}
         </main>
       </div>

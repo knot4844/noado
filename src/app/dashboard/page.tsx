@@ -14,7 +14,13 @@ import {
 } from 'lucide-react'
 import { formatKRW } from '@/lib/utils'
 import Link from 'next/link'
-import type { Room } from '@/types'
+// Room은 이름+상태만 사용 (leases 기준 KPI로 전환)
+interface RoomBasic { id: string; name: string; status: string }
+interface LeaseBasic {
+  id: string; room_id: string; monthly_rent: number
+  lease_end: string | null; status: string
+  tenants: { name: string } | null
+}
 
 // ── KPI 카드 ───────────────────────────────────────────────
 interface KpiCardProps {
@@ -32,7 +38,7 @@ function KpiCard({ icon, label, value, sub, trend, accent, onClick, progress }: 
   return (
     <div
       onClick={onClick}
-      className={`card p-5 flex flex-col gap-3 transition-all duration-200 ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+      className={`card p-3 sm:p-5 flex flex-col gap-2 sm:gap-3 transition-all duration-200 ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
       onMouseEnter={e => onClick && ((e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)')}
       onMouseLeave={e => onClick && ((e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-soft)')}
     >
@@ -56,7 +62,7 @@ function KpiCard({ icon, label, value, sub, trend, accent, onClick, progress }: 
         <p className="text-xs font-medium uppercase tracking-wide mb-1" style={{ color: 'var(--color-muted)' }}>
           {label}
         </p>
-        <p className="text-2xl font-bold tabular" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+        <p className="text-lg sm:text-2xl font-bold tabular break-all" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
           {value}
         </p>
         {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{sub}</p>}
@@ -78,33 +84,36 @@ function KpiCard({ icon, label, value, sub, trend, accent, onClick, progress }: 
   )
 }
 
-// ── 호실 상태 행 ──────────────────────────────────────────
-function RoomRow({ room }: { room: Room }) {
+// ── 호실 상태 행 (leases 기반) ────────────────────────────
+function RoomRow({ room, lease }: { room: RoomBasic; lease?: LeaseBasic }) {
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
     PAID:   { label: '납부완료', color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
     UNPAID: { label: '미납',    color: 'var(--color-danger)',  bg: 'var(--color-danger-bg)'  },
     VACANT: { label: '공실',    color: 'var(--color-muted)',   bg: 'var(--color-muted-bg)'   },
   }
-  const s = statusMap[room.status] ?? statusMap['VACANT']
+  const displayStatus = lease ? room.status : 'VACANT'
+  const s = statusMap[displayStatus] ?? statusMap['VACANT']
 
   return (
     <tr className="border-b transition-colors hover:bg-slate-50"
         style={{ borderColor: 'var(--color-border)' }}>
-      <td className="py-3 px-4 font-medium" style={{ color: 'var(--color-primary)' }}>{room.name}</td>
-      <td className="py-3 px-4" style={{ color: 'var(--color-foreground)' }}>{room.tenant_name || '—'}</td>
-      <td className="py-3 px-4 tabular text-right font-medium" style={{ color: 'var(--color-foreground)' }}>
-        {room.monthly_rent > 0 ? formatKRW(room.monthly_rent) : '—'}
+      <td className="py-2.5 px-3 font-medium text-sm" style={{ color: 'var(--color-primary)' }}>{room.name}</td>
+      <td className="py-2.5 px-3 text-sm truncate max-w-[80px]" style={{ color: 'var(--color-foreground)' }}>
+        {lease?.tenants?.name || '—'}
       </td>
-      <td className="py-3 px-4">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+      <td className="py-2.5 px-3 tabular text-right text-sm font-medium hidden sm:table-cell" style={{ color: 'var(--color-foreground)' }}>
+        {lease ? formatKRW(lease.monthly_rent) : '—'}
+      </td>
+      <td className="py-2.5 px-3">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
               style={{ background: s.bg, color: s.color }}>
-          {room.status === 'PAID'   && <CheckCircle2 size={11} />}
-          {room.status === 'UNPAID' && <AlertCircle  size={11} />}
-          {room.status === 'VACANT' && <Home         size={11} />}
+          {displayStatus === 'PAID'   && <CheckCircle2 size={10} />}
+          {displayStatus === 'UNPAID' && <AlertCircle  size={10} />}
+          {displayStatus === 'VACANT' && <Home         size={10} />}
           {s.label}
         </span>
       </td>
-      <td className="py-3 px-4 text-right">
+      <td className="py-2.5 px-3 text-right hidden sm:table-cell">
         <Link href="/units"
           className="text-xs font-medium hover:underline"
           style={{ color: 'var(--color-primary-light)' }}>
@@ -159,7 +168,8 @@ function PaymentFeedItem({ p }: { p: RecentPayment }) {
 export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), [])
 
-  const [rooms,          setRooms]          = useState<Room[]>([])
+  const [rooms,          setRooms]          = useState<RoomBasic[]>([])
+  const [leases,         setLeases]         = useState<LeaseBasic[]>([])
   const [loading,        setLoading]        = useState(true)
   const [briefing,       setBriefing]       = useState<string | null>(null)
   const [chartData,      setChartData]      = useState<{ month: string; expected: number; paid: number }[]>([])
@@ -174,12 +184,21 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    // 호실 전체
+    // 호실 (이름·상태만)
     const { data: roomList } = await supabase
-      .from('rooms').select('*')
+      .from('rooms').select('id, name, status')
       .eq('owner_id', user.id)
       .order('name')
     setRooms(roomList ?? [])
+
+    // 활성 계약 (leases 기준 KPI)
+    const { data: leaseList } = await supabase
+      .from('leases')
+      .select('id, room_id, monthly_rent, lease_end, status, tenants(name)')
+      .eq('owner_id', user.id)
+      .eq('status', 'ACTIVE')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setLeases((leaseList ?? []) as any as LeaseBasic[])
 
     // 최근 6개월 수납 차트 (expected + paid)
     const sixMonthsAgo = new Date(thisYear, thisMonth - 7, 1)
@@ -220,10 +239,10 @@ export default function DashboardPage() {
       paid:     paidByKey[s.key]     ?? 0,
     })))
 
-    // 최근 수납 5건 (payments 테이블)
+    // 최근 수납 5건 — rooms(name)만 join, tenant는 note에서 파싱
     const { data: pmts } = await supabase
       .from('payments')
-      .select('id, amount, paid_at, memo, invoices(room_id, rooms(name, tenant_name))')
+      .select('id, amount, paid_at, note, invoices(rooms(name))')
       .eq('owner_id', user.id)
       .order('paid_at', { ascending: false })
       .limit(5)
@@ -231,15 +250,17 @@ export default function DashboardPage() {
     if (pmts) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setRecentPayments((pmts as any[]).map((p) => {
-        const inv   = Array.isArray(p.invoices) ? p.invoices[0] : p.invoices
-        const room  = Array.isArray(inv?.rooms)  ? inv.rooms[0]  : inv?.rooms
+        const inv  = Array.isArray(p.invoices) ? p.invoices[0] : p.invoices
+        const room = Array.isArray(inv?.rooms)  ? inv.rooms[0]  : inv?.rooms
+        // note 형식: "입주사명 YYYY년 M월 월세"
+        const tenantName = (p.note as string | null)?.split(' ')[0] ?? undefined
         return {
-          id:          p.id          as string,
-          amount:      p.amount      as number,
-          paid_at:     p.paid_at     as string | null,
-          memo:        p.memo        as string | null,
-          room_name:   room?.name    as string | undefined,
-          tenant_name: room?.tenant_name as string | undefined,
+          id:          p.id      as string,
+          amount:      p.amount  as number,
+          paid_at:     p.paid_at as string | null,
+          memo:        p.note    as string | null,
+          room_name:   room?.name as string | undefined,
+          tenant_name: tenantName,
         }
       }))
     }
@@ -256,23 +277,33 @@ export default function DashboardPage() {
 
   useEffect(() => { setTimeout(() => fetchData(), 0) }, [fetchData])
 
-  // ── KPI 계산 ──
-  const paid     = rooms.filter(r => r.status === 'PAID')
-  const unpaid   = rooms.filter(r => r.status === 'UNPAID')
-  const vacant   = rooms.filter(r => r.status === 'VACANT')
-  const occupied = rooms.filter(r => r.status !== 'VACANT')
+  // ── KPI 계산 (leases 기준) ──
+  // leases에 연결된 room_id Set
+  const occupiedRoomIds = new Set(leases.map(l => l.room_id))
 
-  const totalBilled    = occupied.reduce((s, r) => s + r.monthly_rent, 0)
-  const totalCollected = paid.reduce((s, r) => s + r.monthly_rent, 0)
-  const totalUnpaid    = unpaid.reduce((s, r) => s + r.monthly_rent, 0)
-  const collectionRate = occupied.length > 0
-    ? Math.round((paid.length / occupied.length) * 100) : 0
+  const paidRooms   = rooms.filter(r => occupiedRoomIds.has(r.id) && r.status === 'PAID')
+  const unpaidRooms = rooms.filter(r => occupiedRoomIds.has(r.id) && r.status === 'UNPAID')
+  const vacantRooms = rooms.filter(r => !occupiedRoomIds.has(r.id))
+  const occupiedRooms = rooms.filter(r => occupiedRoomIds.has(r.id))
+
+  // 월세 합계는 leases.monthly_rent 기준
+  const totalBilled    = leases.reduce((s, l) => s + (l.monthly_rent ?? 0), 0)
+  const totalCollected = leases
+    .filter(l => paidRooms.some(r => r.id === l.room_id))
+    .reduce((s, l) => s + (l.monthly_rent ?? 0), 0)
+  const totalUnpaid = leases
+    .filter(l => unpaidRooms.some(r => r.id === l.room_id))
+    .reduce((s, l) => s + (l.monthly_rent ?? 0), 0)
+
+  const collectionRate = occupiedRooms.length > 0
+    ? Math.round((paidRooms.length / occupiedRooms.length) * 100) : 0
   const occupancyRate  = rooms.length > 0
-    ? Math.round((occupied.length / rooms.length) * 100) : 0
+    ? Math.round((occupiedRooms.length / rooms.length) * 100) : 0
 
-  const leaseExpiringSoon = rooms.filter(r => {
-    if (!r.lease_end) return false
-    const days = Math.ceil((new Date(r.lease_end).getTime() - today.getTime()) / 86400000)
+  // 30일 내 계약 만료 (leases 기준)
+  const leaseExpiringSoon = leases.filter(l => {
+    if (!l.lease_end) return false
+    const days = Math.ceil((new Date(l.lease_end).getTime() - today.getTime()) / 86400000)
     return days >= 0 && days <= 30
   })
 
@@ -297,7 +328,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 p-3 sm:p-6">
 
       {/* ── 페이지 헤더 ── */}
       <div className="flex items-center justify-between">
@@ -317,7 +348,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── AI 브리핑 카드 ── */}
-      <div className="rounded-xl p-5 flex items-start gap-4"
+      <div className="rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4"
            style={{ background: 'linear-gradient(135deg, #a8dadc22 0%, #1d355710 100%)', border: '1px solid var(--color-accent)' }}>
         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
              style={{ background: 'var(--color-primary)' }}>
@@ -331,15 +362,15 @@ export default function DashboardPage() {
           ) : (
             <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
               매일 오전 8시에 카카오톡 알림톡으로 브리핑이 발송됩니다.
-              {unpaid.length > 0 && (
+              {unpaidRooms.length > 0 && (
                 <span style={{ color: 'var(--color-danger)' }}>
-                  {' '}현재 미납 {unpaid.length}세대 ({formatKRW(totalUnpaid)}) 주의가 필요합니다.
+                  {' '}현재 미납 {unpaidRooms.length}세대 ({formatKRW(totalUnpaid)}) 주의가 필요합니다.
                 </span>
               )}
             </p>
           )}
         </div>
-        {unpaid.length > 0 && (
+        {unpaidRooms.length > 0 && (
           <Link href="/units?filter=UNPAID"
             className="shrink-0 flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
             style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>
@@ -352,7 +383,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {quickActions.map(a => (
           <Link key={a.href} href={a.href}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
+            className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
             style={{
               background: a.accent,
               border: `1px solid ${a.border}40`,
@@ -388,29 +419,29 @@ export default function DashboardPage() {
           icon={<AlertCircle size={18} style={{ color: 'var(--color-danger)' }} />}
           label="미납 총액"
           value={formatKRW(totalUnpaid)}
-          sub={`${unpaid.length}세대 미납`}
+          sub={`${unpaidRooms.length}세대 미납`}
           accent="var(--color-danger-bg)"
-          onClick={unpaid.length > 0 ? () => window.location.href = '/units?filter=UNPAID' : undefined}
+          onClick={unpaidRooms.length > 0 ? () => window.location.href = '/units?filter=UNPAID' : undefined}
         />
         <KpiCard
           icon={<Home size={18} style={{ color: 'var(--color-info)' }} />}
           label="입주율"
           value={`${occupancyRate}%`}
-          sub={`${occupied.length}/${rooms.length} 세대`}
+          sub={`활성계약 ${leases.length}건 / 전체 ${rooms.length}호`}
           accent="var(--color-info-bg)"
           progress={occupancyRate}
         />
         <KpiCard
           icon={<CheckCircle2 size={18} style={{ color: 'var(--color-success)' }} />}
           label="수납 완료"
-          value={`${paid.length}세대`}
-          sub={`전체 ${occupied.length}세대 중`}
+          value={`${paidRooms.length}세대`}
+          sub={`입주 ${occupiedRooms.length}세대 중`}
           accent="var(--color-success-bg)"
         />
         <KpiCard
           icon={<Home size={18} style={{ color: 'var(--color-muted)' }} />}
           label="공실"
-          value={`${vacant.length}세대`}
+          value={`${vacantRooms.length}세대`}
           accent="var(--color-muted-bg)"
         />
         <KpiCard
@@ -482,14 +513,26 @@ export default function DashboardPage() {
             <table className="w-full">
               <thead>
                 <tr style={{ background: 'var(--color-muted-bg)' }}>
-                  {['호실', '입주사', '월세', '상태', ''].map(h => (
-                    <th key={h} className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: 'var(--color-muted)' }}>{h}</th>
+                  {[
+                    { label: '호실',  cls: '' },
+                    { label: '입주사', cls: '' },
+                    { label: '월세',  cls: 'hidden sm:table-cell' },
+                    { label: '상태',  cls: '' },
+                    { label: '',      cls: 'hidden sm:table-cell' },
+                  ].map(h => (
+                    <th key={h.label} className={`py-2.5 px-3 text-left text-xs font-semibold uppercase tracking-wide ${h.cls}`}
+                        style={{ color: 'var(--color-muted)' }}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rooms.slice(0, 6).map(room => <RoomRow key={room.id} room={room} />)}
+                {rooms.slice(0, 6).map(room => (
+                  <RoomRow
+                    key={room.id}
+                    room={room}
+                    lease={leases.find(l => l.room_id === room.id)}
+                  />
+                ))}
               </tbody>
             </table>
           </div>

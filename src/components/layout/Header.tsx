@@ -114,7 +114,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
                     {/* 알림 드롭다운 */}
                     {showNotifications && (
-                        <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-neutral-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="absolute right-0 top-12 w-[min(320px,calc(100vw-2rem))] bg-white rounded-2xl shadow-xl border border-neutral-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                             <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
                                 <h3 className="font-bold text-neutral-900 text-sm">알림</h3>
                                 {hasNotifications && (

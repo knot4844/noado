@@ -11,12 +11,13 @@ import {
   Send,
 } from 'lucide-react'
 import { formatKRW, formatDate, formatPhone } from '@/lib/utils'
-import type { Room, Invoice, Payment, Tenant } from '@/types'
+import type { Room, Invoice, Payment, Tenant, Lease, ContractType, VatType } from '@/types'
 
 /* ─── 내부 통합 타입 ─────────────────────────────────────── */
-interface TenantItem extends Tenant {
-  room_name:     string
-  room_status:   'PAID' | 'UNPAID' | 'VACANT'
+interface LeaseItem {
+  lease:         Lease
+  tenant:        Tenant
+  room:          Room
   invoices:      Invoice[]
   latestInvoice: Invoice | null
 }
@@ -27,20 +28,27 @@ interface InvoiceWithPayments extends Invoice {
 
 type FilterKey = 'all' | 'paid' | 'unpaid'
 
+/* ─── 계약 유형 라벨 ─────────────────────────────────────── */
+const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
+  OCCUPANCY: '전용좌석',
+  BIZ_ONLY:  '공용좌석',
+  STORAGE:   '보관',
+}
+
 /* ─── 메인 컴포넌트 ──────────────────────────────────────── */
 export default function TenantsPage() {
   const supabase = useMemo(() => createClient(), [])
 
-  const [items, setItems]         = useState<TenantItem[]>([])
-  const [allRooms, setAllRooms]   = useState<Room[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [filter, setFilter]       = useState<FilterKey>('all')
-  const [search, setSearch]       = useState('')
-  const [selected, setSelected]   = useState<TenantItem | null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [historyItem, setHistoryItem] = useState<TenantItem | null>(null)
-  const [toast, setToast]         = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
-  const [viewMode, setViewMode]       = useState<'list' | 'timeline'>('list')
+  const [items, setItems]               = useState<LeaseItem[]>([])
+  const [allRooms, setAllRooms]         = useState<Room[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [filter, setFilter]             = useState<FilterKey>('all')
+  const [search, setSearch]             = useState('')
+  const [historyItem, setHistoryItem]   = useState<LeaseItem | null>(null)
+  const [editItem, setEditItem]         = useState<LeaseItem | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [toast, setToast]               = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [viewMode, setViewMode]         = useState<'list' | 'timeline'>('list')
   const [requestingId, setRequestingId] = useState<string | null>(null)
 
   /* ─── 데이터 로드 ──────────────────────────────────────── */
@@ -51,75 +59,58 @@ export default function TenantsPage() {
 
     const year  = new Date().getFullYear()
     const month = new Date().getMonth() + 1
-    const today = new Date().toISOString().split('T')[0]
 
-    // 1. 모든 호실 (status·name 참조용)
+    // 1. 모든 호실 (신규 등록 시 사용)
     const { data: roomsData } = await supabase
       .from('rooms')
       .select('*')
       .eq('owner_id', user.id)
       .order('name')
+    setAllRooms((roomsData ?? []) as Room[])
 
-    if (!roomsData) { setLoading(false); return }
-    setAllRooms(roomsData as Room[])
-
-    const roomIds = roomsData.map((r: Room) => r.id)
-
-    // 2. 현재 활성 입주사 (lease_end IS NULL 또는 아직 유효)
-    const { data: tenantsData, error: tenErr } = await supabase
-      .from('tenants')
-      .select('*')
+    // 2. 활성 리스 (room, tenant 조인)
+    const { data: leasesData, error: leaseErr } = await supabase
+      .from('leases')
+      .select('*, room:rooms(*), tenant:tenants(*)')
       .eq('owner_id', user.id)
-      .or(`lease_end.is.null,lease_end.gte.${today}`)
+      .eq('status', 'ACTIVE')
       .order('created_at')
 
-    if (tenErr) console.error('[tenants] load error:', tenErr)
+    if (leaseErr) console.error('[tenants] leases error:', leaseErr)
 
-    // 3. 최근 인보이스
+    const roomIds = (leasesData ?? []).map((l: Lease) => l.room_id)
+
+    // 3. 해당 호실 인보이스
     const { data: invData, error: invErr } = await supabase
       .from('invoices')
-      .select('id, room_id, status, amount, paid_amount, year, month, due_date')
-      .in('room_id', roomIds)
+      .select('id, room_id, lease_id, tenant_id, status, amount, base_amount, extra_amount, paid_amount, year, month, due_date')
+      .in('room_id', roomIds.length > 0 ? roomIds : ['00000000-0000-0000-0000-000000000000'])
       .order('year',  { ascending: false })
       .order('month', { ascending: false })
 
     if (invErr) console.error('[tenants] invoices error:', invErr)
-    console.log('[tenants] invData:', invData?.length ?? 0, 'records, roomIds:', roomIds.length)
 
     // 4. 조인
-    const roomMap: Record<string, Room> = {}
-    for (const r of roomsData) roomMap[r.id] = r as Room
-
     const invoicesByRoom: Record<string, Invoice[]> = {}
-    for (const inv of (invData || [])) {
+    for (const inv of (invData ?? [])) {
       if (!invoicesByRoom[inv.room_id]) invoicesByRoom[inv.room_id] = []
       invoicesByRoom[inv.room_id].push(inv as Invoice)
     }
 
-    // 방 1개당 가장 최근 활성 입주사 1명만 (중복 방어)
-    const latestByRoom: Record<string, Tenant> = {}
-    for (const t of (tenantsData || []) as Tenant[]) {
-      const prev = latestByRoom[t.room_id]
-      if (!prev || new Date(t.created_at) > new Date(prev.created_at)) {
-        latestByRoom[t.room_id] = t
-      }
-    }
-
-    const result: TenantItem[] = Object.values(latestByRoom)
-      .filter(t => roomMap[t.room_id])
-      .map(t => {
-        const room    = roomMap[t.room_id]
-        const invs    = invoicesByRoom[t.room_id] || []
-        const current = invs.find(i => i.year === year && i.month === month)
+    const result: LeaseItem[] = (leasesData ?? [])
+      .filter((l: Lease & { room?: Room; tenant?: Tenant }) => l.room && l.tenant)
+      .map((l: Lease & { room?: Room; tenant?: Tenant }) => {
+        const invs    = invoicesByRoom[l.room_id] ?? []
+        const current = invs.find(i => i.year === year && i.month === month) ?? null
         return {
-          ...t,
-          room_name:     room.name,
-          room_status:   room.status,
+          lease:         l,
+          tenant:        l.tenant as Tenant,
+          room:          l.room as Room,
           invoices:      invs,
-          latestInvoice: current ?? null,
+          latestInvoice: current,
         }
       })
-      .sort((a, b) => a.room_name.localeCompare(b.room_name, 'ko'))
+      .sort((a: LeaseItem, b: LeaseItem) => a.room.name.localeCompare(b.room.name, 'ko'))
 
     setItems(result)
     setLoading(false)
@@ -133,14 +124,14 @@ export default function TenantsPage() {
   }
 
   /* ─── 납부 요청 핸들러 ──────────────────────────────────── */
-  const handlePaymentRequest = async (item: TenantItem) => {
+  const handlePaymentRequest = async (item: LeaseItem) => {
     if (requestingId) return
-    setRequestingId(item.id)
+    setRequestingId(item.lease.id)
     try {
       const res = await fetch('/api/contracts/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: item.id }),
+        body: JSON.stringify({ tenantId: item.tenant.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '납부 요청 실패')
@@ -156,29 +147,29 @@ export default function TenantsPage() {
   /* ─── 필터 ─────────────────────────────────────────────── */
   const counts = {
     all:    items.length,
-    paid:   items.filter(i => i.room_status === 'PAID').length,
-    unpaid: items.filter(i => i.room_status === 'UNPAID').length,
+    paid:   items.filter(i => i.room.status === 'PAID').length,
+    unpaid: items.filter(i => i.room.status === 'UNPAID').length,
   }
 
   const filtered = items.filter(item => {
     const matchFilter =
       filter === 'all'    ? true :
-      filter === 'paid'   ? item.room_status === 'PAID' :
-                            item.room_status === 'UNPAID'
+      filter === 'paid'   ? item.room.status === 'PAID' :
+                            item.room.status === 'UNPAID'
     const q = search.toLowerCase()
     const matchSearch = !q ||
-      item.name.toLowerCase().includes(q) ||
-      item.room_name.toLowerCase().includes(q) ||
-      (item.phone?.includes(q) ?? false)
+      item.tenant.name.toLowerCase().includes(q) ||
+      item.room.name.toLowerCase().includes(q) ||
+      (item.tenant.phone?.includes(q) ?? false)
     return matchFilter && matchSearch
   })
 
-  // 새 입주사 추가 시 선택 가능한 호실 (활성 입주사 없는 호실)
-  const occupiedRoomIds = new Set(items.map(i => i.room_id))
+  // 신규 리스 추가 시 활성 리스가 없는 호실
+  const occupiedRoomIds = new Set(items.map(i => i.room.id))
   const availableRooms  = allRooms.filter(r => !occupiedRoomIds.has(r.id))
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-3 sm:p-6 max-w-[1200px]">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white"
@@ -225,7 +216,7 @@ export default function TenantsPage() {
             </button>
           </div>
           <button
-            onClick={() => { setSelected(null); setShowModal(true) }}
+            onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
             style={{ background: 'var(--color-primary)' }}>
             <Plus size={16} /> 입주사 추가
@@ -286,20 +277,20 @@ export default function TenantsPage() {
           <User size={32} className="mb-2 opacity-30" />
           <p className="text-sm">
             {items.length === 0
-              ? '등록된 입주사가 없습니다. 먼저 마이그레이션 SQL을 실행하거나 입주사를 추가해주세요.'
+              ? '등록된 입주사가 없습니다. 입주사를 추가해주세요.'
               : '검색 결과가 없습니다.'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(item => (
-            <TenantCard
-              key={item.id}
+            <LeaseCard
+              key={item.lease.id}
               item={item}
               onHistory={() => setHistoryItem(item)}
-              onEdit={() => { setSelected(item); setShowModal(true) }}
+              onEdit={() => setEditItem(item)}
               onRequestPayment={() => handlePaymentRequest(item)}
-              isRequesting={requestingId === item.id}
+              isRequesting={requestingId === item.lease.id}
             />
           ))}
         </div>
@@ -310,18 +301,27 @@ export default function TenantsPage() {
         <PaymentHistoryModal
           item={historyItem}
           onClose={() => setHistoryItem(null)}
-          onEdit={() => { setSelected(historyItem); setHistoryItem(null); setShowModal(true) }}
+          onEdit={() => { setEditItem(historyItem); setHistoryItem(null) }}
         />
       )}
 
-      {/* 추가/편집 모달 */}
-      {showModal && (
-        <TenantModal
-          item={selected}
-          availableRooms={selected ? [] : availableRooms}
-          onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); load(); showToast('success', '저장되었습니다.') }}
-          onEvicted={() => { setShowModal(false); load(); showToast('success', '퇴실 처리되었습니다.') }}
+      {/* 수정 모달 */}
+      {editItem && (
+        <EditLeaseModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); load(); showToast('success', '저장되었습니다.') }}
+          onEvicted={() => { setEditItem(null); load(); showToast('success', '퇴실 처리되었습니다.') }}
+          onError={(msg) => showToast('error', msg)}
+        />
+      )}
+
+      {/* 추가 모달 */}
+      {showAddModal && (
+        <AddLeaseModal
+          availableRooms={availableRooms}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); load(); showToast('success', '입주사가 등록되었습니다.') }}
           onError={(msg) => showToast('error', msg)}
         />
       )}
@@ -329,22 +329,23 @@ export default function TenantsPage() {
   )
 }
 
-/* ─── 입주사 카드 ────────────────────────────────────────── */
+/* ─── 리스 카드 ──────────────────────────────────────────── */
 const _NOW_MS = Date.now()
-function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: {
-  item: TenantItem
-  onHistory: () => void
-  onEdit: () => void
+function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: {
+  item:             LeaseItem
+  onHistory:        () => void
+  onEdit:           () => void
   onRequestPayment: () => void
-  isRequesting: boolean
+  isRequesting:     boolean
 }) {
-  const isPaid      = item.room_status === 'PAID'
+  const { lease, tenant, room, invoices } = item
+  const isPaid      = room.status === 'PAID'
   const statusColor = isPaid ? 'var(--color-success)' : 'var(--color-danger)'
   const statusBg    = isPaid ? 'var(--color-success-bg)' : 'var(--color-danger-bg)'
   const statusLabel = isPaid ? '완납' : '미납'
 
-  const daysLeft = item.lease_end
-    ? Math.ceil((new Date(item.lease_end).getTime() - _NOW_MS) / 86400000)
+  const daysLeft = lease.lease_end
+    ? Math.ceil((new Date(lease.lease_end).getTime() - _NOW_MS) / 86400000)
     : null
 
   // 최근 12개월 납부 현황
@@ -352,8 +353,10 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
     const now = new Date()
     return Array.from({ length: 12 }, (_, i) => {
       const d   = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1)
-      const inv = item.invoices.find(v => v.year === d.getFullYear() && v.month === d.getMonth() + 1)
-      return { label: `${d.getMonth() + 1}월`, status: inv?.status ?? null }
+      const inv = invoices.find(v => v.year === d.getFullYear() && v.month === d.getMonth() + 1)
+      // 계약기간 외 확인
+      const inContract = isInContractPeriod(d.getFullYear(), d.getMonth() + 1, lease.lease_start, lease.lease_end)
+      return { label: `${d.getMonth() + 1}월`, status: inv?.status ?? null, inContract }
     })
   })()
 
@@ -365,24 +368,28 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(29,53,87,0.02)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-        {/* 호실 + D-Day + 상태 배지 */}
+        {/* 호실 + 계약유형 + 상태 배지 */}
         <div className="flex items-start justify-between mb-3">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>
-              <Home size={12} /> {item.room_name}
+            <div className="flex items-center gap-1.5 text-xs font-medium mb-1" style={{ color: 'var(--color-primary)' }}>
+              <Home size={12} /> {room.name}
             </div>
             <p className="font-bold text-base" style={{ color: 'var(--color-text)', fontFamily: 'var(--font-display)' }}>
-              {item.name}
+              {tenant.name}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          <div className="flex items-center gap-1.5 shrink-0 ml-2 flex-wrap justify-end">
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: 'rgba(29,53,87,0.08)', color: 'var(--color-muted)' }}>
+              {CONTRACT_TYPE_LABELS[lease.contract_type]}
+            </span>
             {daysLeft !== null && (
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
                     style={{
-                      background: daysLeft <= 0  ? 'var(--color-danger-bg)'    :
-                                  daysLeft <= 30 ? 'var(--color-danger-bg)'    :
+                      background: daysLeft <= 0  ? 'var(--color-danger-bg)'  :
+                                  daysLeft <= 30 ? 'var(--color-danger-bg)'  :
                                                    'rgba(245,158,11,0.12)',
-                      color:      daysLeft <= 30 ? 'var(--color-danger)'       :
+                      color:      daysLeft <= 30 ? 'var(--color-danger)'     :
                                                    'rgb(180,120,0)',
                     }}>
                 {daysLeft <= 0 ? '만료됨' : `D-${daysLeft}`}
@@ -395,18 +402,18 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
           </div>
         </div>
 
-        {/* 월세 / 보증금 */}
+        {/* 월세 / 예치금 */}
         <div className="flex gap-4 mb-3">
           <div>
             <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>월세</p>
             <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
-              {formatKRW(item.monthly_rent)}
+              {formatKRW(lease.monthly_rent)}
             </p>
           </div>
           <div>
-            <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>보증금</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>예치금</p>
             <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
-              {formatKRW(item.deposit)}
+              {formatKRW(lease.pledge_amount)}
             </p>
           </div>
         </div>
@@ -414,20 +421,18 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
         {/* 연락처 */}
         <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--color-muted)' }}>
           <Phone size={11} />
-          {item.phone ? formatPhone(item.phone) : '연락처 없음'}
+          {tenant.phone ? formatPhone(tenant.phone) : '연락처 없음'}
         </div>
 
-        {/* 계약일 */}
+        {/* 계약기간 */}
         <div className="flex items-center justify-between text-xs mb-3" style={{ color: 'var(--color-muted)' }}>
           <div className="flex items-center gap-1">
             <Calendar size={11} />
-            {item.lease_start ? formatDate(item.lease_start) : '계약일 없음'}
+            {formatDate(lease.lease_start)}
           </div>
-          {item.lease_end && (
-            <div className="flex items-center gap-1" style={{ color: 'var(--color-muted)' }}>
-              ~{formatDate(item.lease_end)}
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            ~ {lease.lease_end ? formatDate(lease.lease_end) : '진행 중'}
+          </div>
         </div>
 
         {/* 최근 12개월 납부 도트 */}
@@ -436,13 +441,20 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
           <div className="flex items-center gap-0.5 flex-1 min-w-0">
             {recentMonths.map((m, i) => (
               <div key={i}
-                   title={`${m.label} · ${m.status === 'paid' ? '완납' : m.status === 'ready' || m.status === 'overdue' ? '미납' : '청구없음'}`}
+                   title={`${m.label} · ${
+                     !m.inContract        ? '계약기간 외' :
+                     m.status === 'paid'  ? '완납' :
+                     m.status === 'ready' || m.status === 'overdue' ? '미납' : '청구없음'
+                   }`}
                    className="w-3.5 h-3.5 rounded-full shrink-0"
                    style={{
-                     background: m.status === 'paid'    ? 'var(--color-success)' :
-                                 m.status === 'overdue'  ? 'var(--color-danger)'  :
-                                 m.status === 'ready'    ? 'rgba(245,158,11,0.7)' :
+                     background: !m.inContract        ? 'transparent'            :
+                                 m.status === 'paid'  ? 'var(--color-success)'   :
+                                 m.status === 'overdue' ? 'var(--color-danger)'  :
+                                 m.status === 'ready' ? 'rgba(245,158,11,0.7)'  :
                                  'var(--color-muted-bg)',
+                     border: !m.inContract ? '1px dashed var(--color-border)' : 'none',
+                     opacity: !m.inContract ? 0.4 : 1,
                    }} />
             ))}
           </div>
@@ -459,11 +471,11 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
         </button>
         <button
           onClick={e => { e.stopPropagation(); onRequestPayment() }}
-          disabled={isRequesting || item.room_status === 'PAID'}
-          title={item.room_status === 'PAID' ? '이미 완납 상태입니다' : '납부 요청 알림톡 발송'}
+          disabled={isRequesting || room.status === 'PAID'}
+          title={room.status === 'PAID' ? '이미 완납 상태입니다' : '납부 요청 알림톡 발송'}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-40"
           style={{
-            color: item.room_status === 'PAID' ? 'var(--color-muted)' : 'var(--color-success)',
+            color: room.status === 'PAID' ? 'var(--color-muted)' : 'var(--color-success)',
             borderRight: '1px solid var(--color-border)',
           }}>
           {isRequesting
@@ -480,10 +492,8 @@ function TenantCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }:
   )
 }
 
-/* ─── 납부 이력 모달 ─────────────────────────────────────── */
-/* 계약기간 내 월인지 확인 */
+/* ─── 계약기간 내 월인지 확인 ────────────────────────────── */
 function isInContractPeriod(year: number, month: number, leaseStart: string | null, leaseEnd: string | null): boolean {
-  // 해당 월의 첫날 / 마지막날
   const monthStart = new Date(year, month - 1, 1)
   const monthEnd   = new Date(year, month, 0)
   if (leaseStart) {
@@ -497,10 +507,11 @@ function isInContractPeriod(year: number, month: number, leaseStart: string | nu
   return true
 }
 
+/* ─── 납부 이력 모달 ─────────────────────────────────────── */
 function PaymentHistoryModal({ item, onClose, onEdit }: {
-  item: TenantItem
+  item:    LeaseItem
   onClose: () => void
-  onEdit: () => void
+  onEdit:  () => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [invoices,     setInvoices]     = useState<InvoiceWithPayments[]>([])
@@ -513,7 +524,7 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
       const { data: invData } = await supabase
         .from('invoices')
         .select('*')
-        .eq('room_id', item.room_id)
+        .eq('room_id', item.room.id)
         .order('year',  { ascending: false })
         .order('month', { ascending: false })
 
@@ -532,13 +543,12 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
       }))
       setInvoices(merged)
 
-      // 가장 최근 데이터가 있는 연도로 초기화
       const years = [...new Set(merged.map((i: Invoice) => i.year))].sort((a: number, b: number) => b - a)
       if (years.length > 0) setSelectedYear(years[0] as number)
 
       setLoading(false)
     })()
-  }, [item.room_id, supabase])
+  }, [item.room.id, supabase])
 
   const byYear = invoices.reduce<Record<number, InvoiceWithPayments[]>>((acc, inv) => {
     if (!acc[inv.year]) acc[inv.year] = []
@@ -546,7 +556,6 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
     return acc
   }, {})
 
-  // 선택 연도 전체 통계
   const yearInvoices  = byYear[selectedYear] ?? []
   const totalInvoiced = yearInvoices.reduce((s, i) => s + (i.amount ?? 0), 0)
   const totalPaid     = yearInvoices.reduce((s, i) => s + (i.paid_amount ?? 0), 0)
@@ -554,12 +563,13 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
   const paidCount     = yearInvoices.filter(i => i.status === 'paid').length
   const unpaidCount   = yearInvoices.filter(i => i.status !== 'paid' && i.amount > 0).length
 
-  // 연도 목록 (청구 있는 연도 + 현재연도 포함)
   const allYears = useMemo(() => {
     const ys = new Set(invoices.map(i => i.year))
     ys.add(new Date().getFullYear())
     return [...ys].sort((a, b) => b - a)
   }, [invoices])
+
+  const { lease, tenant, room } = item
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -579,9 +589,9 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
               </h2>
             </div>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
-              {item.room_name} · {item.name} · {formatKRW(item.monthly_rent)}/월
-              {item.lease_start && <span> · 입주 {formatDate(item.lease_start)}</span>}
-              {item.lease_end   && <span> ~ {formatDate(item.lease_end)}</span>}
+              {room.name} · {tenant.name} · {formatKRW(lease.monthly_rent)}/월
+              <span> · 입주 {formatDate(lease.lease_start)}</span>
+              {lease.lease_end && <span> ~ {formatDate(lease.lease_end)}</span>}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -648,20 +658,20 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
               <div>
                 <div className="flex gap-1.5 flex-wrap mb-2">
                   {Array.from({ length: 12 }, (_, mIdx) => {
-                    const month = mIdx + 1
-                    const inv   = yearInvoices.find(i => i.month === month)
-                    const inContract = isInContractPeriod(selectedYear, month, item.lease_start, item.lease_end)
-                    const bg = !inContract        ? 'transparent'
-                             : !inv               ? 'var(--color-muted-bg)'
+                    const mon = mIdx + 1
+                    const inv = yearInvoices.find(i => i.month === mon)
+                    const inContract = isInContractPeriod(selectedYear, mon, lease.lease_start, lease.lease_end)
+                    const bg = !inContract           ? 'transparent'
+                             : !inv                  ? 'var(--color-muted-bg)'
                              : inv.status === 'paid'    ? 'var(--color-success)'
                              : inv.status === 'overdue' ? 'var(--color-danger)'
                              :                           'rgba(245,158,11,0.7)'
                     const textColor = !inContract  ? 'var(--color-border)'
                                     : !inv         ? 'var(--color-muted)'
                                     :                '#fff'
-                    const title = !inContract ? `${month}월 — 계약기간 외`
-                                : !inv        ? `${month}월 — 청구 없음`
-                                : `${month}월 — ${inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : '미납'} ${formatKRW(inv.amount)}`
+                    const title = !inContract ? `${mon}월 — 계약기간 외`
+                                : !inv        ? `${mon}월 — 청구 없음`
+                                : `${mon}월 — ${inv.status === 'paid' ? '완납' : inv.status === 'overdue' ? '연체' : '미납'} ${formatKRW(inv.amount)}`
                     return (
                       <div key={mIdx}
                            title={title}
@@ -672,7 +682,7 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
                              border: !inContract ? '1px dashed var(--color-border)' : 'none',
                              opacity: !inContract ? 0.5 : 1,
                            }}>
-                        {month}
+                        {mon}
                       </div>
                     )
                   })}
@@ -770,109 +780,262 @@ function PaymentHistoryModal({ item, onClose, onEdit }: {
   )
 }
 
-/* ─── 입주사 추가 / 수정 모달 ─────────────────────────────── */
-function TenantModal({
-  item, availableRooms, onClose, onSaved, onEvicted, onError,
+/* ─── 입주사 추가 모달 ────────────────────────────────────── */
+function AddLeaseModal({
+  availableRooms, onClose, onSaved, onError,
 }: {
-  item:           TenantItem | null
   availableRooms: Room[]
   onClose:        () => void
   onSaved:        () => void
-  onEvicted:      () => void
   onError:        (msg: string) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const isEdit   = !!item
 
   const [form, setForm] = useState({
-    room_id:      item?.room_id      ?? '',
-    name:         item?.name         ?? '',
-    phone:        item?.phone        ?? '',
-    email:        item?.email        ?? '',
-    monthly_rent: String(item?.monthly_rent ?? ''),
-    deposit:      String(item?.deposit      ?? ''),
-    lease_start:  item?.lease_start  ?? '',
-    lease_end:    item?.lease_end    ?? '',
-    memo:         item?.memo         ?? '',
+    room_id:       '',
+    name:          '',
+    phone:         '',
+    email:         '',
+    monthly_rent:  '',
+    pledge_amount: '',
+    lease_start:   '',
+    lease_end:     '',
+    contract_type: 'OCCUPANCY' as ContractType,
+    vat_type:      'NONE' as VatType,
+    payment_day:   '25',
+    memo:          '',
   })
-  const [saving,        setSaving]        = useState(false)
-  const [confirmEvict,  setConfirmEvict]  = useState(false)
-  const [evicting,      setEvicting]      = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const setField = (k: string) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(prev => ({ ...prev, [k]: e.target.value }))
 
-  /* ─ 저장 ─ */
   const handleSave = async () => {
-    if (!form.name.trim()) return onError('입주사 이름을 입력해주세요.')
-    if (!isEdit && !form.room_id) return onError('호실을 선택해주세요.')
-    setSaving(true)
+    if (!form.name.trim())    return onError('입주사 이름을 입력해주세요.')
+    if (!form.room_id)        return onError('호실을 선택해주세요.')
+    if (!form.lease_start)    return onError('계약 시작일을 입력해주세요.')
+    if (!form.monthly_rent)   return onError('월세를 입력해주세요.')
 
+    setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
 
-    const tenantPayload = {
-      name:         form.name.trim(),
-      phone:        form.phone        || null,
-      email:        form.email        || null,
-      monthly_rent: Number(form.monthly_rent) || 0,
-      deposit:      Number(form.deposit)      || 0,
-      lease_start:  form.lease_start  || null,
-      lease_end:    form.lease_end    || null,
-      memo:         form.memo         || null,
-    }
+    // 1. 기존 입주사 검색 또는 신규 생성
+    let tenantId: string | null = null
+    const { data: existingTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('owner_id', user.id)
+      .ilike('name', form.name.trim())
+      .maybeSingle()
 
-    // rooms 동기화용 페이로드
-    const roomSync = {
-      tenant_name:  tenantPayload.name,
-      tenant_phone: tenantPayload.phone,
-      tenant_email: tenantPayload.email,
-      monthly_rent: tenantPayload.monthly_rent,
-      deposit:      tenantPayload.deposit,
-      lease_start:  tenantPayload.lease_start,
-      lease_end:    tenantPayload.lease_end,
-    }
-
-    if (isEdit) {
-      const { error } = await supabase.from('tenants').update(tenantPayload).eq('id', item!.id)
-      if (error) { onError(error.message); setSaving(false); return }
-      // 현재 활성 입주사인 경우 rooms도 동기화
-      await supabase.from('rooms').update(roomSync).eq('id', item!.room_id)
+    if (existingTenant) {
+      tenantId = existingTenant.id
+      // 연락처/이메일 업데이트
+      await supabase.from('tenants').update({
+        phone: form.phone || null,
+        email: form.email || null,
+      }).eq('id', tenantId)
     } else {
-      const { error } = await supabase.from('tenants').insert({
-        ...tenantPayload,
-        owner_id: user.id,
-        room_id:  form.room_id,
-      })
-      if (error) { onError(error.message); setSaving(false); return }
-      // 호실 입주사 정보 + 상태 UNPAID 반영
-      await supabase.from('rooms').update({ ...roomSync, status: 'UNPAID' }).eq('id', form.room_id)
+      const { data: newTenant, error: tenErr } = await supabase
+        .from('tenants')
+        .insert({
+          owner_id: user.id,
+          name:     form.name.trim(),
+          phone:    form.phone  || null,
+          email:    form.email  || null,
+        })
+        .select('id')
+        .single()
+      if (tenErr || !newTenant) {
+        setSaving(false)
+        return onError(tenErr?.message ?? '입주사 생성 실패')
+      }
+      tenantId = newTenant.id
     }
+
+    // 2. 리스 생성
+    const { error: leaseErr } = await supabase.from('leases').insert({
+      owner_id:      user.id,
+      room_id:       form.room_id,
+      tenant_id:     tenantId,
+      contract_type: form.contract_type,
+      rate_type:     'MONTHLY',
+      monthly_rent:  Number(form.monthly_rent)  || 0,
+      pledge_amount: Number(form.pledge_amount) || 0,
+      lease_start:   form.lease_start,
+      lease_end:     form.lease_end || null,
+      payment_day:   Number(form.payment_day) || 25,
+      vat_type:      form.vat_type,
+      status:        'ACTIVE',
+      memo:          form.memo || null,
+    })
+    if (leaseErr) { setSaving(false); return onError(leaseErr.message) }
+
+    // 3. 호실 상태 UNPAID
+    await supabase.from('rooms').update({ status: 'UNPAID' }).eq('id', form.room_id)
 
     setSaving(false)
     onSaved()
   }
 
-  /* ─ 퇴실 처리 ─ */
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.4)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden"
+           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
+
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+            신규 입주사 등록
+          </h2>
+          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* 호실 */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>호실 선택 *</label>
+            <select value={form.room_id} onChange={setField('room_id')}
+              className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+              <option value="">호실을 선택하세요</option>
+              {availableRooms.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+            {availableRooms.length === 0 && (
+              <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
+                모든 호실에 활성 계약이 있습니다. 기존 입주사를 퇴실 처리해주세요.
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="입주사 이름 *" value={form.name}  onChange={setField('name')}  placeholder="홍길동" />
+            <Field label="연락처"        value={form.phone} onChange={setField('phone')} placeholder="01012345678" type="tel" />
+          </div>
+          <Field label="이메일" value={form.email} onChange={setField('email')} placeholder="email@example.com" type="email" />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="월세 (원) *"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
+            <Field label="예치금 (원)"  value={form.pledge_amount} onChange={setField('pledge_amount')} type="number" placeholder="1000000" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="계약 시작일 *" value={form.lease_start} onChange={setField('lease_start')} type="date" />
+            <Field label="계약 종료일"   value={form.lease_end}   onChange={setField('lease_end')}   type="date" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {/* 계약 유형 */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>계약 유형</label>
+              <select value={form.contract_type} onChange={setField('contract_type')}
+                className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+                <option value="OCCUPANCY">전용좌석</option>
+                <option value="BIZ_ONLY">공용좌석</option>
+                <option value="STORAGE">보관</option>
+              </select>
+            </div>
+            {/* 세금 유형 */}
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>세금 유형</label>
+              <select value={form.vat_type} onChange={setField('vat_type')}
+                className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+                <option value="NONE">없음</option>
+                <option value="VAT_INVOICE">세금계산서</option>
+                <option value="CASH_RECEIPT">현금영수증</option>
+              </select>
+            </div>
+            {/* 납부일 */}
+            <Field label="납부일" value={form.payment_day} onChange={setField('payment_day')} type="number" placeholder="25" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>메모</label>
+            <textarea value={form.memo} onChange={setField('memo')} rows={2} placeholder="특이사항 메모..."
+              className="w-full px-3 py-2 rounded-lg border text-sm outline-none resize-none"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }} />
+          </div>
+        </div>
+
+        <div className="flex gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+            취소
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ background: 'var(--color-primary)' }}>
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            등록
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── 리스 수정 모달 ─────────────────────────────────────── */
+function EditLeaseModal({
+  item, onClose, onSaved, onEvicted, onError,
+}: {
+  item:      LeaseItem
+  onClose:   () => void
+  onSaved:   () => void
+  onEvicted: () => void
+  onError:   (msg: string) => void
+}) {
+  const supabase = useMemo(() => createClient(), [])
+  const { lease, tenant, room } = item
+
+  const [form, setForm] = useState({
+    monthly_rent:  String(lease.monthly_rent),
+    pledge_amount: String(lease.pledge_amount),
+    lease_start:   lease.lease_start,
+    lease_end:     lease.lease_end ?? '',
+    contract_type: lease.contract_type,
+    vat_type:      lease.vat_type,
+    payment_day:   String(lease.payment_day),
+    memo:          lease.memo ?? '',
+  })
+  const [saving,       setSaving]       = useState(false)
+  const [confirmEvict, setConfirmEvict] = useState(false)
+  const [evicting,     setEvicting]     = useState(false)
+
+  const setField = (k: string) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    const { error } = await supabase.from('leases').update({
+      monthly_rent:  Number(form.monthly_rent)  || 0,
+      pledge_amount: Number(form.pledge_amount) || 0,
+      lease_start:   form.lease_start || null,
+      lease_end:     form.lease_end   || null,
+      contract_type: form.contract_type,
+      vat_type:      form.vat_type,
+      payment_day:   Number(form.payment_day) || 25,
+      memo:          form.memo || null,
+    }).eq('id', lease.id)
+    setSaving(false)
+    if (error) return onError(error.message)
+    onSaved()
+  }
+
   const handleEvict = async () => {
-    if (!item) return
     setEvicting(true)
     const today = new Date().toISOString().split('T')[0]
-
-    await supabase.from('tenants').update({ lease_end: today }).eq('id', item.id)
-
-    const { error } = await supabase.from('rooms').update({
-      tenant_name:  null,
-      tenant_phone: null,
-      tenant_email: null,
-      lease_start:  null,
-      lease_end:    null,
-      status:       'VACANT',
-    }).eq('id', item.room_id)
-
+    const { error: leaseErr } = await supabase.from('leases').update({
+      status:    'TERMINATED',
+      lease_end: today,
+    }).eq('id', lease.id)
+    if (leaseErr) { setEvicting(false); return onError(leaseErr.message) }
+    await supabase.from('rooms').update({ status: 'VACANT' }).eq('id', room.id)
     setEvicting(false)
-    if (error) return onError(error.message)
     onEvicted()
   }
 
@@ -883,56 +1046,61 @@ function TenantModal({
       <div className="w-full max-w-lg rounded-2xl overflow-hidden"
            style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
 
-        {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-            {isEdit ? '입주사 정보 수정' : '신규 입주사 등록'}
-          </h2>
+          <div>
+            <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              계약 정보 수정
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+              {room.name} · {tenant.name}
+            </p>
+          </div>
           <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
         </div>
 
-        {/* 폼 */}
-        <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+        {/* 입주사/호실 고정 표시 */}
+        <div className="px-6 pt-4">
+          <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
+               style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
+            <Home size={14} />
+            <span className="font-medium" style={{ color: 'var(--color-text)' }}>{room.name}</span>
+            <User size={14} className="ml-2" />
+            <span className="font-medium" style={{ color: 'var(--color-text)' }}>{tenant.name}</span>
+            <span className="text-xs ml-auto">(변경 불가)</span>
+          </div>
+        </div>
 
-          {/* 호실 */}
-          {isEdit ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
-                 style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
-              <Home size={14} />
-              <span className="font-medium" style={{ color: 'var(--color-text)' }}>{item!.room_name}</span>
-              <span className="text-xs ml-1">(호실 변경 불가)</span>
-            </div>
-          ) : (
+        <div className="px-6 py-4 space-y-4 max-h-[52vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="월세 (원)"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
+            <Field label="예치금 (원)" value={form.pledge_amount} onChange={setField('pledge_amount')} type="number" placeholder="1000000" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="계약 시작일" value={form.lease_start} onChange={setField('lease_start')} type="date" />
+            <Field label="계약 종료일" value={form.lease_end}   onChange={setField('lease_end')}   type="date" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>호실 선택 *</label>
-              <select value={form.room_id} onChange={setField('room_id')}
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>계약 유형</label>
+              <select value={form.contract_type} onChange={setField('contract_type')}
                 className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
                 style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
-                <option value="">호실을 선택하세요</option>
-                {availableRooms.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
+                <option value="OCCUPANCY">전용좌석</option>
+                <option value="BIZ_ONLY">공용좌석</option>
+                <option value="STORAGE">보관</option>
               </select>
-              {availableRooms.length === 0 && (
-                <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
-                  모든 호실에 입주사가 있습니다. 호실 관리에서 공실을 추가하거나 기존 입주사를 퇴실 처리해주세요.
-                </p>
-              )}
             </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="입주사 이름 *" value={form.name}  onChange={setField('name')}  placeholder="홍길동" />
-            <Field label="연락처"        value={form.phone} onChange={setField('phone')} placeholder="01012345678" type="tel" />
-          </div>
-          <Field label="이메일" value={form.email} onChange={setField('email')} placeholder="email@example.com" type="email" />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="월세 (원)"   value={form.monthly_rent} onChange={setField('monthly_rent')} type="number" placeholder="330000" />
-            <Field label="보증금 (원)" value={form.deposit}      onChange={setField('deposit')}      type="number" placeholder="1000000" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="입주일"      value={form.lease_start} onChange={setField('lease_start')} type="date" />
-            <Field label="퇴실 예정일" value={form.lease_end}   onChange={setField('lease_end')}   type="date" />
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>세금 유형</label>
+              <select value={form.vat_type} onChange={setField('vat_type')}
+                className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+                <option value="NONE">없음</option>
+                <option value="VAT_INVOICE">세금계산서</option>
+                <option value="CASH_RECEIPT">현금영수증</option>
+              </select>
+            </div>
+            <Field label="납부일" value={form.payment_day} onChange={setField('payment_day')} type="number" placeholder="25" />
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>메모</label>
@@ -943,13 +1111,13 @@ function TenantModal({
         </div>
 
         {/* 퇴실 확인 영역 */}
-        {confirmEvict && isEdit && (
+        {confirmEvict && (
           <div className="px-6 pb-2">
             <div className="px-4 py-3 rounded-xl"
                  style={{ background: 'var(--color-danger-bg)', border: '1px solid var(--color-danger)' }}>
               <p className="font-semibold text-sm mb-1" style={{ color: 'var(--color-danger)' }}>퇴실 처리하시겠습니까?</p>
               <p className="text-xs mb-3" style={{ color: 'var(--color-text)', opacity: 0.7 }}>
-                오늘을 퇴실일로 기록하고 호실을 공실로 전환합니다. 납부 이력은 보존됩니다.
+                오늘을 퇴실일로 기록하고 계약을 종료합니다. 호실이 공실로 전환됩니다. 납부 이력은 보존됩니다.
               </p>
               <div className="flex gap-2">
                 <button onClick={() => setConfirmEvict(false)}
@@ -968,16 +1136,13 @@ function TenantModal({
           </div>
         )}
 
-        {/* 푸터 */}
         <div className="flex gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          {isEdit && (
-            <button onClick={() => setConfirmEvict(true)} disabled={confirmEvict}
-              className="p-2.5 rounded-lg border flex items-center justify-center disabled:opacity-40"
-              style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
-              title="퇴실 처리">
-              <LogOut size={16} />
-            </button>
-          )}
+          <button onClick={() => setConfirmEvict(true)} disabled={confirmEvict}
+            className="p-2.5 rounded-lg border flex items-center justify-center disabled:opacity-40"
+            style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
+            title="퇴실 처리">
+            <LogOut size={16} />
+          </button>
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
@@ -987,7 +1152,7 @@ function TenantModal({
             className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ background: 'var(--color-primary)' }}>
             {saving && <Loader2 size={14} className="animate-spin" />}
-            {isEdit ? '저장' : '등록'}
+            저장
           </button>
         </div>
       </div>
@@ -996,7 +1161,7 @@ function TenantModal({
 }
 
 /* ─── 계약 타임라인 ──────────────────────────────────────── */
-function ContractTimeline({ items }: { items: TenantItem[] }) {
+function ContractTimeline({ items }: { items: LeaseItem[] }) {
   type Unit = 'day' | 'month' | 'year'
   const [unit, setUnit]     = useState<Unit>('month')
   const [anchor, setAnchor] = useState(() => new Date())
@@ -1058,7 +1223,7 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
     return idx + 1 === today.getDate() && anchor.getMonth() === today.getMonth() && anchor.getFullYear() === today.getFullYear()
   }
 
-  const sorted = [...items].sort((a, b) => a.room_name.localeCompare(b.room_name, 'ko'))
+  const sorted = [...items].sort((a, b) => a.room.name.localeCompare(b.room.name, 'ko'))
 
   const fmt = (d: Date) =>
     `${d.getFullYear().toString().slice(2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`
@@ -1067,7 +1232,6 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
     <div>
       {/* 컨트롤 바 */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {/* 단위 토글 */}
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-muted-bg)' }}>
           {(['year','month','day'] as Unit[]).map(u => (
             <button key={u} onClick={() => setUnit(u)}
@@ -1082,7 +1246,6 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
           ))}
         </div>
 
-        {/* 네비게이션 */}
         <div className="flex items-center gap-1.5">
           <button onClick={() => navigate(-1)}
             className="w-8 h-8 flex items-center justify-center rounded-lg border"
@@ -1105,7 +1268,6 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
           오늘
         </button>
 
-        {/* 범례 */}
         <div className="flex items-center gap-3 ml-auto text-xs" style={{ color: 'var(--color-muted)' }}>
           {[
             { color: 'var(--color-success)', label: '계약 중' },
@@ -1156,8 +1318,8 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
                 표시할 계약 정보가 없습니다.
               </div>
             ) : sorted.map((item, rowIdx) => {
-              const leaseStart = item.lease_start ? new Date(item.lease_start) : null
-              const leaseEnd   = item.lease_end   ? new Date(item.lease_end)   : null
+              const leaseStart = item.lease.lease_start ? new Date(item.lease.lease_start) : null
+              const leaseEnd   = item.lease.lease_end   ? new Date(item.lease.lease_end)   : null
 
               const startMs  = leaseStart ? leaseStart.getTime() : viewStart.getTime()
               const endMs    = leaseEnd   ? leaseEnd.getTime()   : viewEnd.getTime()
@@ -1179,7 +1341,7 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
               const barVisible = widthPct > 0 && rightPct > 0 && leftPct < 100
 
               return (
-                <div key={item.id} className="flex border-b"
+                <div key={item.lease.id} className="flex border-b"
                      style={{
                        borderColor: 'var(--color-border)',
                        minHeight: 50,
@@ -1189,16 +1351,15 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
                   <div className="shrink-0 border-r px-4 py-2 flex flex-col justify-center"
                        style={{ width: LABEL_W, borderColor: 'var(--color-border)' }}>
                     <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
-                      {item.room_name}
+                      {item.room.name}
                     </p>
                     <p className="text-xs truncate" style={{ color: 'var(--color-muted)' }}>
-                      {item.name}
+                      {item.tenant.name}
                     </p>
                   </div>
 
                   {/* 바 영역 */}
                   <div className="relative" style={{ width: totalW, height: 50 }}>
-                    {/* 컬럼 배경 / 구분선 */}
                     {columns.map(col => (
                       <div key={col.key} className="absolute top-0 bottom-0"
                            style={{
@@ -1208,13 +1369,11 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
                            }} />
                     ))}
 
-                    {/* 오늘 선 */}
                     {todayPct >= 0 && todayPct <= 100 && (
                       <div className="absolute top-0 bottom-0 z-10 pointer-events-none"
                            style={{ left: `${todayPct}%`, width: 2, background: 'rgba(239,68,68,0.45)' }} />
                     )}
 
-                    {/* 계약 바 */}
                     {barVisible && (
                       <div className="absolute rounded-md flex items-center px-2 overflow-hidden z-[5]"
                            style={{
@@ -1237,7 +1396,6 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
                       </div>
                     )}
 
-                    {/* D-day 배지 */}
                     {daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && rightPct >= 0 && rightPct <= 102 && (
                       <div className="absolute z-20 pointer-events-none"
                            style={{ left: `${Math.min(rightPct, 97)}%`, top: 5, transform: 'translateX(-50%)' }}>
@@ -1262,9 +1420,9 @@ function ContractTimeline({ items }: { items: TenantItem[] }) {
 function Field({
   label, value, onChange, placeholder, type = 'text',
 }: {
-  label:       string
-  value:       string
-  onChange:    (e: React.ChangeEvent<HTMLInputElement>) => void
+  label:        string
+  value:        string
+  onChange:     (e: React.ChangeEvent<HTMLInputElement>) => void
   placeholder?: string
   type?:        string
 }) {

@@ -10,7 +10,17 @@ import {
   GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
-import type { Invoice, Room, Tenant } from '@/types'
+import type { Invoice, Room } from '@/types'
+
+/* ─── leases + tenants 조인 결과 타입 ─── */
+interface ActiveLease {
+  id:           string
+  room_id:      string
+  monthly_rent: number
+  lease_start:  string
+  lease_end:    string | null
+  tenant: { id: string; name: string } | null
+}
 
 /* ─── 은행 목록 ─── */
 const VA_BANKS: Record<string, string> = {
@@ -25,7 +35,7 @@ const VA_BANKS: Record<string, string> = {
 
 /* ─── 타입 ─── */
 interface InvoiceWithRoom extends Invoice {
-  room?: Pick<Room, 'name' | 'tenant_name' | 'tenant_phone'>
+  room?: Pick<Room, 'name'>
 }
 
 type FilterStatus = 'ALL' | 'paid' | 'upcoming' | 'ready' | 'overdue'
@@ -95,6 +105,7 @@ interface PendingMatch {
   duplicateLabel:     string | null  // 완납 매칭 호실 표시용 (호실명 + 입주사명)
   aiSuggestedId:      string | null  // AI 제안
   aiReason:           string | null  // AI 추론 이유
+  matchedTenantName:  string | null  // 매칭된 입주사명 (표시용)
 }
 
 /* ─── 가상계좌 모달 ─── */
@@ -112,8 +123,8 @@ export default function PaymentsPage() {
   const fileRef  = useRef<HTMLInputElement>(null)
 
   const [invoices, setInvoices] = useState<InvoiceWithRoom[]>([])
-  const [allRooms,    setAllRooms]    = useState<{ id: string; name: string; tenant_name: string | null }[]>([])
-  const [allTenants,  setAllTenants]  = useState<Pick<Tenant, 'id' | 'room_id' | 'name' | 'monthly_rent' | 'lease_start' | 'lease_end'>[]>([])
+  const [allRooms,    setAllRooms]    = useState<{ id: string; name: string }[]>([])
+  const [allLeases,   setAllLeases]   = useState<ActiveLease[]>([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState<FilterStatus>('ALL')
   const [search, setSearch]     = useState('')
@@ -154,31 +165,39 @@ export default function PaymentsPage() {
 
     const { data } = await supabase
       .from('invoices')
-      .select('*, rooms(name, tenant_name, tenant_phone)')
+      .select('*, rooms(name)')
       .eq('owner_id', user.id)
       .eq('year', year)
       .eq('month', month)
       .order('created_at', { ascending: false })
 
-    setInvoices((data || []).map((inv: InvoiceWithRoom & { rooms?: Room }) => ({
+    setInvoices((data || []).map((inv: InvoiceWithRoom & { rooms?: Pick<Room,'name'> }) => ({
       ...inv,
-      room: inv.rooms,
+      room: inv.rooms as Pick<Room,'name'> | undefined,
     })))
 
     const { data: roomsData, error: roomsErr } = await supabase
       .from('rooms')
-      .select('id, name, tenant_name')
+      .select('id, name')
       .eq('owner_id', user.id)
       .order('name')
     if (roomsErr) console.error('[load] allRooms 쿼리 에러:', JSON.stringify(roomsErr))
     setAllRooms(roomsData ?? [])
 
-    // 입주사 테이블 로드 (계약기간 포함)
-    const { data: tenantsData } = await supabase
-      .from('tenants')
-      .select('id, room_id, name, monthly_rent, lease_start, lease_end')
+    // 활성 계약 로드 (leases + tenants 조인) — 자동 매칭에 사용
+    const { data: leasesData } = await supabase
+      .from('leases')
+      .select('id, room_id, monthly_rent, lease_start, lease_end, tenant:tenants(id, name)')
       .eq('owner_id', user.id)
-    setAllTenants(tenantsData ?? [])
+      .eq('status', 'ACTIVE')
+    setAllLeases((leasesData ?? []).map((l: {id:string;room_id:string;monthly_rent:number;lease_start:string;lease_end:string|null;tenant:{id:string;name:string}[]|{id:string;name:string}|null}) => ({
+      id:           l.id,
+      room_id:      l.room_id,
+      monthly_rent: l.monthly_rent,
+      lease_start:  l.lease_start,
+      lease_end:    l.lease_end,
+      tenant:       Array.isArray(l.tenant) ? (l.tenant[0] ?? null) : l.tenant,
+    })))
 
     setLoading(false)
   }, [supabase, yearMonth])
@@ -190,6 +209,10 @@ export default function PaymentsPage() {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 4000)
   }
+
+  /* ─── leases에서 호실 입주사 정보 꺼내기 ─── */
+  const getTenantByRoom = (roomId: string) =>
+    allLeases.find(l => l.room_id === roomId)?.tenant ?? null
 
   /* ─── 필터 통계 ─── */
   const stats = {
@@ -212,10 +235,10 @@ export default function PaymentsPage() {
     else if (filter === 'upcoming') matchStatus = isUpcoming(inv)
     else if (filter === 'ready')    matchStatus = inv.status === 'ready' && !isUpcoming(inv)
     const q = search.toLowerCase()
+    const tenantName = allLeases.find(l => l.room_id === inv.room_id)?.tenant?.name ?? ''
     const matchSearch = !q ||
       inv.room?.name?.toLowerCase().includes(q) ||
-      inv.room?.tenant_name?.toLowerCase().includes(q) ||
-      inv.room?.tenant_phone?.includes(q)
+      tenantName.toLowerCase().includes(q)
     return matchStatus && matchSearch
   })
 
@@ -298,7 +321,7 @@ export default function PaymentsPage() {
     }
 
     /* ── 입금일 기준 계약 중인 입주사인지 확인 ── */
-    const isTenantActiveOn = (tenant: { lease_start: string | null; lease_end: string | null }, isoDate: string): boolean => {
+    const isTenantActiveOn = (tenant: { lease_start?: string | null; lease_end?: string | null }, isoDate: string): boolean => {
       const d = new Date(isoDate)
       if (tenant.lease_start && d < new Date(tenant.lease_start)) return false
       if (tenant.lease_end   && d > new Date(tenant.lease_end))   return false
@@ -308,22 +331,22 @@ export default function PaymentsPage() {
     const matches: PendingMatch[] = bankRows.map((row, idx) => {
       const { isoDate } = parseBankDate(row.date)
 
-      /* ── 입금일 기준 계약 중인 입주사 목록 ── */
-      const activeTenants = allTenants.filter(t => isTenantActiveOn(t, isoDate))
+      /* ── 입금일 기준 계약 중인 lease 목록 ── */
+      const activeLeases = allLeases.filter(l => isTenantActiveOn(l, isoDate))
 
-      /* ── 노트 → 최고 점수 tenant 찾기 ── */
-      const bestTenantMatch = activeTenants
-        .map(t => ({ tenant: t, score: nameScore(row.note, t.name) }))
+      /* ── 노트 → 최고 점수 lease 찾기 ── */
+      const bestLeaseMatch = activeLeases
+        .map(l => ({ lease: l, score: nameScore(row.note, l.tenant?.name ?? null) }))
         .filter(x => x.score > 0)
         .sort((a, b) => b.score - a.score)[0] ?? null
+
+      const bestTenantName = bestLeaseMatch?.lease.tenant?.name ?? null
 
       /* 중복 감지: 이미 완납된 건 */
       const paidByNameAndAmount = invoices.find(inv => {
         if (inv.status !== 'paid' || inv.amount !== row.amount) return false
-        // 입주사 테이블 기준 매칭
-        if (bestTenantMatch && inv.room_id === bestTenantMatch.tenant.room_id) return true
-        // 폴백: rooms.tenant_name 기준
-        return nameScore(row.note, inv.room?.tenant_name) > 0
+        if (bestLeaseMatch && inv.room_id === bestLeaseMatch.lease.room_id) return true
+        return false
       })
       const paidByAmountOnly = !paidByNameAndAmount
         ? (() => {
@@ -333,6 +356,7 @@ export default function PaymentsPage() {
         : undefined
       const alreadyPaid = paidByNameAndAmount ?? paidByAmountOnly
       if (alreadyPaid) {
+        const dupRoom = allRooms.find(r => r.id === alreadyPaid.room_id)
         return {
           rowIdx:             idx,
           bankRow:            row,
@@ -340,29 +364,23 @@ export default function PaymentsPage() {
           selectedInvoiceId:  alreadyPaid.id,
           included:           false,
           isDuplicate:        true,
-          duplicateLabel:     [alreadyPaid.room?.name, alreadyPaid.room?.tenant_name].filter(Boolean).join(' '),
+          duplicateLabel:     dupRoom?.name ?? alreadyPaid.room?.name ?? null,
           aiSuggestedId:      null,
           aiReason:           null,
+          matchedTenantName:  bestTenantName,
         }
       }
 
-      /* 자동 매칭 1순위: 미납 청구서 중 금액 + 입주사 이름 일치 */
+      /* 자동 매칭 1순위: 미납 청구서 중 금액 + lease 이름 일치 */
       const suggested = invoices.find(inv => {
         if (inv.status === 'paid' || inv.amount !== row.amount) return false
-        // 입주사 테이블 기준 (계약기간 필터 적용)
-        if (bestTenantMatch && inv.room_id === bestTenantMatch.tenant.room_id) return true
-        // 폴백: rooms.tenant_name 기준
-        return nameScore(row.note, inv.room?.tenant_name) > 0
+        if (bestLeaseMatch && inv.room_id === bestLeaseMatch.lease.room_id) return true
+        return false
       }) ?? null
 
-      /* 자동 매칭 2순위: 청구서 없을 경우 — 계약 중인 입주사 이름으로 호실 찾아 신규 등록 */
-      const suggestedNewRoom = !suggested
-        ? (() => {
-            if (bestTenantMatch) {
-              return allRooms.find(r => r.id === bestTenantMatch.tenant.room_id) ?? null
-            }
-            return allRooms.find(r => nameScore(row.note, r.tenant_name) > 0) ?? null
-          })()
+      /* 자동 매칭 2순위: 청구서 없을 경우 — lease로 호실 찾아 신규 등록 */
+      const suggestedNewRoom = !suggested && bestLeaseMatch
+        ? allRooms.find(r => r.id === bestLeaseMatch.lease.room_id) ?? null
         : null
       const suggestedId = suggested?.id ?? (suggestedNewRoom ? `new:${suggestedNewRoom.id}` : null)
 
@@ -376,6 +394,7 @@ export default function PaymentsPage() {
         duplicateLabel:     null,
         aiSuggestedId:      null,
         aiReason:           null,
+        matchedTenantName:  bestTenantName,
       }
     })
 
@@ -388,13 +407,15 @@ export default function PaymentsPage() {
 
     setAiMatching(true)
     try {
+      // 미납 청구서 + 해당 호실의 현재 입주사명 포함
+      const leaseByRoom = Object.fromEntries(allLeases.map(l => [l.room_id, l]))
       const unpaidInvoices = invoices
         .filter(i => i.status !== 'paid')
         .map(i => ({
-          id:        i.id,
-          roomName:  i.room?.name        ?? '',
-          tenantName: i.room?.tenant_name ?? '',
-          amount:    i.amount,
+          id:         i.id,
+          roomName:   i.room?.name ?? '',
+          tenantName: leaseByRoom[i.room_id]?.tenant?.name ?? '',
+          amount:     i.amount,
         }))
 
       const res = await fetch('/api/ai/match-payments', {
@@ -659,16 +680,17 @@ export default function PaymentsPage() {
 
   /* ─── 청구서 카톡 발송 (수동) ─── */
   const sendInvoiceKakao = async (inv: InvoiceWithRoom) => {
-    if (!inv.room?.tenant_phone) return showToast('error', '연락처가 없습니다.')
+    const t = getTenantByRoom(inv.room_id)
+    if (!t?.name) return showToast('error', '연락처가 없습니다.')
     try {
       const res = await fetch('/api/alimtalk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateKey: 'INVOICE_ISSUED',
-          phone:       inv.room.tenant_phone,
-          roomName:    inv.room.name,
-          tenantName:  inv.room.tenant_name || '입주자님',
+          phone:       '',  // tenants 테이블에 phone 필드 있음 (별도 조회 필요)
+          roomName:    inv.room?.name ?? '',
+          tenantName:  t.name,
           amount:      String(inv.amount),
           dueDate:     inv.due_date || '',
           paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
@@ -691,7 +713,7 @@ export default function PaymentsPage() {
     const [year, month] = yearMonth.split('-').map(Number)
 
     const { data: rooms } = await supabase
-      .from('rooms').select('id, monthly_rent, owner_id, payment_day, tenant_name, tenant_phone, name')
+      .from('rooms').select('id, name, owner_id')
       .eq('owner_id', user.id).neq('status', 'VACANT')
 
     if (!rooms || rooms.length === 0) {
@@ -705,31 +727,37 @@ export default function PaymentsPage() {
       showToast('error', '이미 모든 청구서가 생성되어 있습니다.'); setImporting(false); return
     }
 
-    // 해당 월 기준 계약 중인 입주사 조회 (임대료·연락처·tenant_id)
+    // 해당 월 기준 계약 중인 leases 조회 (임대료·연락처·tenant_id)
     const billingDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
-    type TenantRow = { id: string; room_id: string; name: string; phone: string | null; monthly_rent: number }
-    const { data: tenantsData } = await supabase
-      .from('tenants')
-      .select('id, room_id, name, phone, monthly_rent')
+    const { data: leasesForBilling } = await supabase
+      .from('leases')
+      .select('id, room_id, monthly_rent, payment_day, tenant_id, tenant:tenants(id, name, phone)')
       .in('room_id', newRooms.map(r => r.id))
+      .eq('status', 'ACTIVE')
       .or(`lease_end.is.null,lease_end.gte.${billingDate}`)
-    const tenantByRoom: Record<string, TenantRow> = {}
-    for (const t of (tenantsData || []) as TenantRow[]) tenantByRoom[t.room_id] = t
+    type LeaseRow = { id: string; room_id: string; monthly_rent: number; payment_day: number; tenant_id: string; tenant: { id: string; name: string; phone: string | null } | null }
+    const leaseByRoom: Record<string, LeaseRow> = {}
+    for (const raw of (leasesForBilling || [])) {
+      const l = raw as { id:string;room_id:string;monthly_rent:number;payment_day:number;tenant_id:string;tenant:{id:string;name:string;phone:string|null}[]|{id:string;name:string;phone:string|null}|null }
+      leaseByRoom[l.room_id] = { ...l, tenant: Array.isArray(l.tenant) ? (l.tenant[0] ?? null) : l.tenant }
+    }
 
     const { data: insertedInvoices, error } = await supabase.from('invoices').insert(
       newRooms.map(r => {
-        const tenant = tenantByRoom[r.id]
+        const lease = leaseByRoom[r.id]
         return {
-          owner_id:    user.id,
-          room_id:     r.id,
-          tenant_id:   tenant?.id || null,
+          owner_id:     user.id,
+          room_id:      r.id,
+          lease_id:     lease?.id || null,
+          tenant_id:    lease?.tenant_id || null,
           year,
           month,
-          // tenants.monthly_rent 우선, 없으면 rooms.monthly_rent 폴백
-          amount:      tenant?.monthly_rent ?? r.monthly_rent,
-          paid_amount: 0,
-          status:      'ready',
-          due_date:    new Date(year, month - 1, r.payment_day || 10).toISOString().split('T')[0],
+          amount:       lease?.monthly_rent ?? 0,
+          base_amount:  lease?.monthly_rent ?? 0,
+          extra_amount: 0,
+          paid_amount:  0,
+          status:       'ready',
+          due_date:     new Date(year, month - 1, lease?.payment_day || 10).toISOString().split('T')[0],
         }
       })
     ).select()
@@ -739,11 +767,10 @@ export default function PaymentsPage() {
     // 알림톡 발송
     if (insertedInvoices) {
       for (const inv of insertedInvoices) {
-        const room   = newRooms.find(r => r.id === inv.room_id)
-        const tenant = tenantByRoom[inv.room_id]
-        const phone  = tenant?.phone || room?.tenant_phone
-        const name   = tenant?.name  || room?.tenant_name || '입주자님'
-        const amount = inv.amount ?? tenant?.monthly_rent ?? room?.monthly_rent ?? 0
+        const room  = newRooms.find(r => r.id === inv.room_id)
+        const lease = leaseByRoom[inv.room_id]
+        const phone = lease?.tenant?.phone
+        const name  = lease?.tenant?.name || '입주자님'
         if (room && phone) {
           try {
             await fetch('/api/alimtalk', {
@@ -754,7 +781,7 @@ export default function PaymentsPage() {
                 phone,
                 roomName:    room.name,
                 tenantName:  name,
-                amount:      String(amount),
+                amount:      String(inv.amount ?? 0),
                 dueDate:     inv.due_date,
                 paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
                 roomId:      room.id,
@@ -804,9 +831,9 @@ export default function PaymentsPage() {
   const downloadCSV = async () => {
     const { utils, writeFile } = await import('xlsx')
     const rows = filtered.map(inv => ({
-      호실:         inv.room?.name        ?? '',
-      입주사:       inv.room?.tenant_name  ?? '',
-      연락처:       inv.room?.tenant_phone ?? '',
+      호실:         inv.room?.name ?? '',
+      입주사:       getTenantByRoom(inv.room_id)?.name ?? '',
+      연락처:       '',
       청구금액:     inv.amount,
       수납금액:     inv.paid_amount,
       미납:         inv.amount - inv.paid_amount,
@@ -852,10 +879,14 @@ export default function PaymentsPage() {
     const getRoomLabel = (pm: PendingMatch) => {
       if (pm.selectedInvoiceId?.startsWith('new:')) {
         const r = allRooms.find(r => `new:${r.id}` === pm.selectedInvoiceId)
-        return r ? `${r.name} ${r.tenant_name ?? ''}` : ''
+        if (!r) return ''
+        const t = allLeases.find(l => l.room_id === r.id)?.tenant
+        return `${r.name} ${t?.name ?? ''}`
       }
       const inv = invoices.find(i => i.id === pm.selectedInvoiceId)
-      return inv ? `${inv.room?.name ?? ''} ${inv.room?.tenant_name ?? ''}` : ''
+      if (!inv) return ''
+      const t = getTenantByRoom(inv.room_id)
+      return `${inv.room?.name ?? ''} ${t?.name ?? ''}`
     }
     return [...pendingMatches].sort((a, b) => {
       let cmp = 0
@@ -877,7 +908,28 @@ export default function PaymentsPage() {
      렌더
   ══════════════════════════════════ */
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-3 sm:p-6 max-w-[1200px]">
+      <style>{`
+        @keyframes scan {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(320%); }
+        }
+        @keyframes ai-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.65; }
+        }
+        @keyframes bar {
+          0%   { transform: scaleY(0.35); }
+          100% { transform: scaleY(1); }
+        }
+        @keyframes ping {
+          75%, 100% { transform: scale(2); opacity: 0; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+      `}</style>
 
       {/* Toast */}
       {toast && (
@@ -906,10 +958,16 @@ export default function PaymentsPage() {
                     입금내역 검토
                   </h2>
                   {aiMatching && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                         style={{ background: 'rgba(29,53,87,0.08)', color: 'var(--color-primary)' }}>
-                      <Loader2 size={11} className="animate-spin" />
-                      AI 매칭 분석 중...
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                         style={{
+                           background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(99,102,241,0.12))',
+                           border: '1px solid rgba(124,58,237,0.25)',
+                           color: '#7c3aed',
+                           animation: 'ai-pulse 2s ease-in-out infinite',
+                         }}>
+                      <Sparkles size={11} style={{ animation: 'spin 3s linear infinite' }} />
+                      Gemini AI 분석 중
+                      <Loader2 size={10} className="animate-spin opacity-60" />
                     </div>
                   )}
                 </div>
@@ -932,6 +990,62 @@ export default function PaymentsPage() {
                 <X size={20} />
               </button>
             </div>
+
+            {/* AI 분석 배너 */}
+            {aiMatching && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(99,102,241,0.06) 50%, rgba(59,130,246,0.06) 100%)',
+                borderBottom: '1px solid rgba(124,58,237,0.12)',
+                padding: '14px 24px',
+              }}>
+                <div className="flex items-center gap-3">
+                  {/* 아이콘 + 핑 */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{
+                      position: 'absolute', inset: -6, borderRadius: '50%',
+                      background: 'rgba(124,58,237,0.15)',
+                      animation: 'ping 1.2s cubic-bezier(0,0,.2,1) infinite',
+                    }} />
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                      boxShadow: '0 0 12px rgba(124,58,237,0.4)',
+                    }}>
+                      <Sparkles size={16} color="white" />
+                    </div>
+                  </div>
+                  {/* 텍스트 */}
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: '#7c3aed', letterSpacing: '-0.01em' }}>
+                      AI가 입금 패턴을 분석하고 있습니다
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(124,58,237,0.65)' }}>
+                      Gemini 2.5 Flash · 입금자명·금액·키워드를 종합해 최적 호실을 추론합니다
+                    </p>
+                  </div>
+                  {/* 음파 바 */}
+                  <div className="ml-auto flex items-center gap-0.5" style={{ height: 24 }}>
+                    {[0.4, 0.7, 1, 0.6, 0.9, 0.5, 0.8, 0.4].map((h, i) => (
+                      <div key={i} style={{
+                        width: 3, borderRadius: 2,
+                        background: 'linear-gradient(to top, #7c3aed, #6366f1)',
+                        height: `${h * 100}%`,
+                        animation: `bar 0.8s ease-in-out ${i * 0.1}s infinite alternate`,
+                        opacity: 0.7,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                {/* 스캔 바 */}
+                <div style={{ marginTop: 10, height: 2, borderRadius: 1, background: 'rgba(124,58,237,0.1)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: '35%',
+                    background: 'linear-gradient(90deg, transparent, #7c3aed, #6366f1, transparent)',
+                    animation: 'scan 1.8s ease-in-out infinite',
+                  }} />
+                </div>
+              </div>
+            )}
 
             {/* 검토 테이블 */}
             <div className="overflow-x-auto">
@@ -1003,9 +1117,13 @@ export default function PaymentsPage() {
                         <td className="px-4 py-3 max-w-[180px] text-xs" style={{ color: 'var(--color-text)' }}>
                           <div className="truncate" title={pm.bankRow.note}>{pm.bankRow.note || '—'}</div>
                           {pm.aiReason && (
-                            <div className="flex items-start gap-1 mt-0.5" style={{ color: '#7c3aed' }}>
-                              <Sparkles size={10} className="mt-0.5 shrink-0" />
-                              <span className="text-[10px] leading-tight">{pm.aiReason}</span>
+                            <div className="flex items-start gap-1 mt-1 px-2 py-1 rounded-md"
+                                 style={{
+                                   background: 'linear-gradient(135deg, rgba(124,58,237,0.07), rgba(99,102,241,0.07))',
+                                   border: '1px solid rgba(124,58,237,0.15)',
+                                 }}>
+                              <Sparkles size={9} className="shrink-0 mt-0.5" style={{ color: '#7c3aed' }} />
+                              <span className="text-[10px] leading-tight font-medium" style={{ color: '#7c3aed' }}>{pm.aiReason}</span>
                             </div>
                           )}
                         </td>
@@ -1040,7 +1158,7 @@ export default function PaymentsPage() {
                               <optgroup label="── 이번 달 청구서 매칭 ──">
                                 {unpaidInvoiceOptions.map(inv => (
                                   <option key={inv.id} value={inv.id}>
-                                    {inv.room?.name} {inv.room?.tenant_name} ({formatKRW(inv.amount)})
+                                    {inv.room?.name} {getTenantByRoom(inv.room_id)?.name ?? ''} ({formatKRW(inv.amount)})
                                   </option>
                                 ))}
                               </optgroup>
@@ -1049,7 +1167,7 @@ export default function PaymentsPage() {
                               <optgroup label="── 새 청구서 생성 후 수납 (과거 내역) ──">
                                 {allRooms.map(r => (
                                   <option key={`new:${r.id}`} value={`new:${r.id}`}>
-                                    {r.name} {r.tenant_name ?? ''} (신규 등록)
+                                    {r.name} {allLeases.find(l => l.room_id === r.id)?.tenant?.name ?? ''} (신규 등록)
                                   </option>
                                 ))}
                               </optgroup>
@@ -1066,7 +1184,7 @@ export default function PaymentsPage() {
                             {!pm.duplicateLabel && selInv && selInv.status === 'paid' && !unpaidInvoiceOptions.find(inv => inv.id === selInv.id) && (
                               <optgroup label="── 이미 완납 ──">
                                 <option key={selInv.id} value={selInv.id}>
-                                  {selInv.room?.name} {selInv.room?.tenant_name} ({formatKRW(selInv.amount)})
+                                  {selInv.room?.name} {getTenantByRoom(selInv.room_id)?.name ?? ''} ({formatKRW(selInv.amount)})
                                 </option>
                               </optgroup>
                             )}
@@ -1086,10 +1204,15 @@ export default function PaymentsPage() {
                               신규 등록
                             </span>
                           ) : isAiMatch ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                                 style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+                            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold"
+                                 style={{
+                                   background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                                   color: 'white',
+                                   boxShadow: '0 2px 8px rgba(124,58,237,0.35)',
+                                   letterSpacing: '0.01em',
+                                 }}>
                               <Sparkles size={10} />
-                              AI 제안
+                              AI 매칭
                             </div>
                           ) : isAutoMatch ? (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1102,9 +1225,15 @@ export default function PaymentsPage() {
                               수동선택
                             </span>
                           ) : aiMatching ? (
-                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-muted)' }}>
-                              <Loader2 size={11} className="animate-spin" />
-                              분석 중
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                                 style={{
+                                   background: 'linear-gradient(135deg, rgba(124,58,237,0.1), rgba(99,102,241,0.1))',
+                                   color: '#7c3aed',
+                                   border: '1px solid rgba(124,58,237,0.2)',
+                                   animation: 'ai-pulse 1.5s ease-in-out infinite',
+                                 }}>
+                              <Sparkles size={9} />
+                              AI 추론 중
                             </div>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1386,7 +1515,7 @@ export default function PaymentsPage() {
                       {inv.room?.name ?? '—'}
                     </td>
                     <td className="px-4 py-3" style={{ color: 'var(--color-text)' }}>
-                      {inv.room?.tenant_name ?? '—'}
+                      {getTenantByRoom(inv.room_id)?.name ?? '—'}
                     </td>
                     <td className="px-4 py-3 tabular">
                       {editingId === inv.id ? (

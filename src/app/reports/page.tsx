@@ -86,10 +86,10 @@ export default function ReportsPage() {
   const occupancyRate = totalRooms > 0
     ? Math.round(((totalRooms - vacantRooms) / totalRooms) * 100) : 0
 
-  const totalUnpaid = unpaidRooms.reduce((s, r) => s + r.monthly_rent, 0)
+  const totalUnpaid = unpaidRooms.reduce((s, r) => s + (r.monthly_rent ?? 0), 0)
   const monthlyExpected = rooms
     .filter(r => r.status !== 'VACANT')
-    .reduce((s, r) => s + r.monthly_rent, 0)
+    .reduce((s, r) => s + (r.monthly_rent ?? 0), 0)
 
   // 이번달 수납률
   const currentMonthInvoices = invoices.filter(i => i.year === currentYear && i.month === currentMonth)
@@ -181,7 +181,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 p-3 sm:p-6">
 
       {/* 헤더 */}
       <div className="flex items-center justify-between">
