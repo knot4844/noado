@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { allRooms as mockRooms } from "@/lib/data";
-import { TossCheckout } from "@/components/payments/TossCheckout";
+import { PortOneCheckout } from "@/components/payments/PortOneCheckout";
 import {
     ArrowLeft,
     CreditCard,
@@ -105,7 +105,7 @@ export default function TenantPaymentPage() {
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-bold text-neutral-500">결제 수단</span>
-                            <span className="text-sm font-bold text-neutral-900">신용카드 (토스페이먼츠)</span>
+                            <span className="text-sm font-bold text-neutral-900">신용카드 (KG이니시스)</span>
                         </div>
                     </div>
                     <Link
@@ -161,7 +161,7 @@ export default function TenantPaymentPage() {
                     </p>
                 </div>
 
-                {/* Toss Payments Widget */}
+                {/* 결제 진행 */}
                 <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
                     <div className="p-5 border-b border-neutral-100 bg-neutral-50/50">
                         <h3 className="font-bold text-neutral-900">결제 진행</h3>
@@ -176,12 +176,17 @@ export default function TenantPaymentPage() {
                     </div>
                 </div>
 
-                {/* Toss Checkout Modal */}
+                {/* PortOne 결제 모달 */}
                 {isCheckoutOpen && (
-                    <TossCheckout
+                    <PortOneCheckout
                         amount={paymentAmount}
                         orderName={`${room.name} 당월 이용료`}
+                        mode="payment"
                         onClose={() => setIsCheckoutOpen(false)}
+                        onSuccess={() => {
+                            setIsCheckoutOpen(false)
+                            setIsSuccess(true)
+                        }}
                     />
                 )}
             </main>

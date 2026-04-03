@@ -210,11 +210,9 @@ export default function CompleteProfilePage() {
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> 발송 중...</> : '인증번호 받기'}
             </button>
 
-            <button type="button" onClick={() => router.push('/dashboard')}
-              className="w-full py-2 text-sm font-medium transition-opacity hover:opacity-80"
-              style={{ color: 'var(--color-muted)' }}>
-              나중에 하기
-            </button>
+            <p className="text-center text-xs mt-2" style={{ color: 'var(--color-muted)' }}>
+              휴대폰 번호는 카카오톡 알림 발송에 필수입니다.
+            </p>
           </form>
         )}
 

@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, Zap, Building2, Crown, ArrowRight, X } from 'lucide-react'
 import Link from 'next/link'
 
-/* ── TossCheckout import ── */
-import { TossCheckout } from '@/components/payments/TossCheckout'
+/* ── PortOne 결제 컴포넌트 ── */
+import { PortOneCheckout } from '@/components/payments/PortOneCheckout'
 
 /* ── 요금제 데이터 ── */
 const PLANS = [
@@ -328,12 +328,17 @@ export default function PricingPage() {
         </div>
       </footer>
 
-      {/* ── TossCheckout 모달 ── */}
+      {/* ── PortOne 정기결제 모달 ── */}
       {selectedPlan && (
-        <TossCheckout
+        <PortOneCheckout
           amount={selectedPlan.amount}
           orderName={selectedPlan.name}
+          mode="billing"
           onClose={() => setSelectedPlan(null)}
+          onSuccess={() => {
+            setSelectedPlan(null)
+            alert('구독이 완료되었습니다!')
+          }}
         />
       )}
     </div>

@@ -1,11 +1,26 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-03-19 (새벽) — 실데이터 임포트 완료 (임차인현황 xlsx + 25년 거래내역 md → DB)
+> **Last Updated:** 2026-04-03 — E2E 결제 플로우 프로덕션 테스트 완료 (가상계좌 발급 성공)
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 21. E2E 결제 플로우 프로덕션 테스트 + DB 스키마 호환성 수정 (2026-04-03)
+- **완료:**
+  - 브라우저에서 호실 추가(101호) → 입주사 등록(테스트컴퍼니) → 청구서 생성(500,000원) → 결제 페이지 → 가상계좌 발급까지 전체 플로우 프로덕션 테스트 성공
+  - 가상계좌 발급 결과: 신한은행 `56211992823621`, 예금주 대우오피스, 입금기한 2026-04-09
+  - `/pay/[invoiceId]/page.tsx` DB 스키마 호환성 수정 — rooms 쿼리에서 제거된 컬럼(tenant_name, tenant_phone, monthly_rent) 참조 제거, leases/tenants 테이블 경유 조회로 변경
+  - `/pay/[invoiceId]/TenantPaymentView.tsx` — tenantName prop 추가, room.tenant_name 참조 제거
+  - `/api/portone/virtual-account/route.ts` — rooms 쿼리 동일 수정 + leases/tenants 경유 조회
+  - `PORTONE_CHANNEL_KEY` 환경변수 폴백 추가 — Vercel에는 `PORTONE_CHANNEL_KEY_VIRTUAL`로 등록되어 있어 `process.env.PORTONE_CHANNEL_KEY || process.env.PORTONE_CHANNEL_KEY_VIRTUAL` 폴백 처리
+  - 3건 커밋 push 및 Vercel 배포 완료
+- **결정:**
+  - migration #16에서 rooms 테이블의 tenant_name, tenant_phone, monthly_rent 컬럼이 제거되었으므로, 입주사 정보는 항상 leases → tenants 경로로 조회해야 함
+  - Vercel 환경변수명: `PORTONE_CHANNEL_KEY_VIRTUAL` (코드에서 폴백 처리)
+- **유저 언급:** 포트원 연동 현황 정리 요청 → 아래 기술 문맥 #7에 기록
+- **다음:** 다른 API 라우트/페이지에서도 rooms 테이블의 제거된 컬럼 참조 잔존 여부 전수 점검 권장
 
 ### 20. 실데이터 임포트 완료 (2026-03-19)
 - **완료:**
@@ -280,6 +295,24 @@
    - `allRooms`: 비어있으면 자동 매칭 전혀 안 됨 → load() 실패 시 반드시 확인
    - `noteMatchesRoom(note, tenantName)`: `note.includes(tenantName)` 단순 포함 검사
 
+7. **포트원(PortOne) 연동 현황 (2026-04-03 기준)**
+   - **PG사:** KG이니시스 1개만 연동
+   - **결제 수단:** 가상계좌 1개만 구현 (카드결제 미연동)
+   - **채널키:** `channel-key-dd35dbea-...` (API 타입, KG이니시스)
+   - **Vercel 환경변수명:** `PORTONE_CHANNEL_KEY_VIRTUAL` (코드에서 `PORTONE_CHANNEL_KEY` 우선, 없으면 폴백)
+   - **지원 은행:** 신한, 국민, 하나, 우리, 농협, IBK기업, 부산, 대구, 광주
+   - **테스트 MID:** `INIpayTest` — 신한은행만 동작 (실 연동 시 전 은행 정상)
+   - **웹훅:** `https://www.noado.kr/api/webhook/portone` (HMAC-SHA256 서명 검증)
+   - **처리 이벤트:** `Transaction.Paid`, `Failed`, `Cancelled`, `Expired`
+   - **E2E 프로덕션 테스트:** 2026-04-03 성공 확인 (101호 테스트컴퍼니 500,000원 → 신한은행 가상계좌 발급)
+
+8. **rooms 테이블 제거된 컬럼 주의 (migration #16 이후)**
+   - `tenant_name`, `tenant_phone`, `tenant_email`, `monthly_rent`, `payment_day`, `deposit`, `lease_start`, `lease_end`, `virtual_account_number` 모두 제거됨
+   - 입주사 정보 조회 시 반드시 `leases` → `tenants` 경로로 조회해야 함
+   - Supabase SELECT에 제거된 컬럼 포함 시 400 에러 → 조회 결과 전체 null 처리됨
+   - 수정 완료 파일: `/pay/[invoiceId]/page.tsx`, `TenantPaymentView.tsx`, `/api/portone/virtual-account/route.ts`
+   - **미점검 파일:** 다른 API 라우트/페이지에서 rooms 제거 컬럼 참조 잔존 가능 → 전수 점검 권장
+
 ---
 
 ## ✅ 해결된 버그 (2026-03-17)
@@ -301,24 +334,27 @@
 
 ### 즉시 확인
 1. `npm run build` — 0 errors 확인
-2. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 삭제 권장
-   - 삭제 방법: Supabase 대시보드 또는 스크립트로 `WHERE name NOT LIKE '%호'` 조건으로 삭제
+2. **rooms 제거 컬럼 전수 점검** — `tenant_name`, `tenant_phone`, `monthly_rent` 등 제거된 컬럼을 참조하는 코드가 남아있는지 전체 codebase grep
+   - `grep -r "tenant_name\|tenant_phone\|monthly_rent" src/` 로 확인
+   - 발견 시 leases → tenants 경유 조회로 변경
+3. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 + 101호 테스트 데이터 삭제 권장
+4. 테스트용 가상계좌 발급 건 정리 — invoice `7367ca88-9b69-4b08-af83-1a532311e1f4` 및 관련 데이터
 
 ### 이어서 개발할 것 (우선순위 순)
-3. **대시보드 KPI leases 기준으로 교체** — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
+5. **대시보드 KPI leases 기준으로 교체** [A단계] — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
    - 파일: `src/app/dashboard/page.tsx`
    - 입주율 = ACTIVE lease 수 / 전체 rooms 수
    - 이번 달 수납 = invoices (lease_id 있는 것) 기준
-4. **billing_items UI** — 실비 항목 관리 (주차/인터넷/전기/커스텀)
+6. **billing_items UI** [B단계] — 실비 항목 관리 (주차/인터넷/전기/커스텀)
    - 계약별 추가 실비 등록·수정·삭제
    - `/units` 또는 `/tenants` 내 계약 상세 탭에 추가
-5. **deposits UI** — 예치금·선납·예약금 관리
+7. **deposits UI** [C단계] — 예치금·선납·예약금 관리
    - 계약 시 예치금 수령 기록, 퇴실 시 환불 처리
-6. **청구서 생성 로직 leases 완전 연동**
+8. **청구서 생성 로직 leases 완전 연동** [D단계]
    - `base_amount` = lease.monthly_rent
    - `extra_amount` = billing_items 합계
    - `amount` = base + extra (현재는 lease.monthly_rent만 사용)
-7. **tax_invoices UI** — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
+9. **tax_invoices UI** [E단계] — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
 
 ---
 
