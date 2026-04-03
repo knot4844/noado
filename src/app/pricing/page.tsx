@@ -310,6 +310,7 @@ export default function PricingPage() {
             fontSize: '11px', color: 'rgba(255,255,255,0.28)', lineHeight: '1.8',
           }}>
             <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>상호</span> 대우오피스</span>
+            <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>대표자</span> 이동윤</span>
             <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>사업자등록번호</span> 127-44-85045</span>
             <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>대표전화</span> 031-970-0600</span>
             <span><span style={{ color: 'rgba(255,255,255,0.15)' }}>주소</span> 경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호</span>
