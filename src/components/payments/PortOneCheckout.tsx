@@ -51,6 +51,7 @@ export function PortOneCheckout({
             customerId: user?.id || `ANON_${Date.now()}`,
             email: user?.email || 'guest@noado.kr',
             fullName: user?.user_metadata?.name || '노아도 이용자',
+            phoneNumber: user?.user_metadata?.phone || user?.phone || '01000000000',
           },
         })
 
@@ -96,6 +97,7 @@ export function PortOneCheckout({
             customerId: user?.id || `ANON_${Date.now()}`,
             email: user?.email || 'guest@noado.kr',
             fullName: user?.user_metadata?.name || '노아도 이용자',
+            phoneNumber: user?.user_metadata?.phone || user?.phone || '01000000000',
           },
         })
 
