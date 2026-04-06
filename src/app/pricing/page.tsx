@@ -334,7 +334,7 @@ export default function PricingPage() {
         <PortOneCheckout
           amount={selectedPlan.amount}
           orderName={selectedPlan.name}
-          mode="billing"
+          mode="payment"
           onClose={() => setSelectedPlan(null)}
           onSuccess={() => {
             setSelectedPlan(null)
