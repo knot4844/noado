@@ -28,9 +28,9 @@ export function PortOneCheckout({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID || 'store-f448cc28-0f2f-4dd8-898c-ec5505ba43ac'
+  const storeId = (process.env.NEXT_PUBLIC_PORTONE_STORE_ID || 'store-f448cc28-0f2f-4dd8-898c-ec5505ba43ac').trim()
   // 결제창 채널키 (KG이니시스 결제창 일반/정기결제)
-  const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || 'channel-key-6b818e51-4872-4a0e-84a7-d8f43eb72a55'
+  const channelKey = (process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || 'channel-key-6b818e51-4872-4a0e-84a7-d8f43eb72a55').trim()
 
   const handlePayment = async () => {
     setIsLoading(true)
