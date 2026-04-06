@@ -992,6 +992,9 @@ function EditLeaseModal({
   const { lease, tenant, room } = item
 
   const [form, setForm] = useState({
+    tenant_name:   tenant.name ?? '',
+    tenant_phone:  tenant.phone ?? '',
+    tenant_email:  tenant.email ?? '',
     monthly_rent:  String(lease.monthly_rent),
     pledge_amount: String(lease.pledge_amount),
     lease_start:   lease.lease_start,
@@ -1011,6 +1014,15 @@ function EditLeaseModal({
 
   const handleSave = async () => {
     setSaving(true)
+    // 입주사 정보 업데이트
+    const { error: tenantErr } = await supabase.from('tenants').update({
+      name:  form.tenant_name || null,
+      phone: form.tenant_phone || null,
+      email: form.tenant_email || null,
+    }).eq('id', tenant.id)
+    if (tenantErr) { setSaving(false); return onError(tenantErr.message) }
+
+    // 계약 정보 업데이트
     const { error } = await supabase.from('leases').update({
       monthly_rent:  Number(form.monthly_rent)  || 0,
       pledge_amount: Number(form.pledge_amount) || 0,
@@ -1058,19 +1070,23 @@ function EditLeaseModal({
           <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
         </div>
 
-        {/* 입주사/호실 고정 표시 */}
+        {/* 호실 표시 (변경 불가) */}
         <div className="px-6 pt-4">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
                style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
             <Home size={14} />
             <span className="font-medium" style={{ color: 'var(--color-text)' }}>{room.name}</span>
-            <User size={14} className="ml-2" />
-            <span className="font-medium" style={{ color: 'var(--color-text)' }}>{tenant.name}</span>
-            <span className="text-xs ml-auto">(변경 불가)</span>
+            <span className="text-xs ml-auto">(호실 변경 불가)</span>
           </div>
         </div>
 
         <div className="px-6 py-4 space-y-4 max-h-[52vh] overflow-y-auto">
+          {/* 입주사 정보 */}
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="입주사명" value={form.tenant_name} onChange={setField('tenant_name')} placeholder="입주사 이름" />
+            <Field label="전화번호" value={form.tenant_phone} onChange={setField('tenant_phone')} type="tel" placeholder="01012345678" />
+            <Field label="이메일" value={form.tenant_email} onChange={setField('tenant_email')} type="email" placeholder="email@example.com" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="월세 (원)"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
             <Field label="예치금 (원)" value={form.pledge_amount} onChange={setField('pledge_amount')} type="number" placeholder="1000000" />
