@@ -13,8 +13,18 @@ import { formatDate } from '@/lib/utils'
 import type { Contract, Room } from '@/types'
 
 /* ─── 타입 ─── */
+interface ContractRoom {
+  name: string
+  tenant_name?: string
+  tenant_phone?: string
+  tenant_email?: string
+  monthly_rent?: number
+  deposit?: number
+  lease_start?: string
+  lease_end?: string
+}
 interface ContractWithRoom extends Contract {
-  room?: Pick<Room, 'name' | 'tenant_name' | 'tenant_phone' | 'tenant_email' | 'monthly_rent' | 'deposit' | 'lease_start' | 'lease_end'>
+  room?: ContractRoom
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
@@ -41,17 +51,54 @@ export default function ContractsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const [{ data: ctData }, { data: rmData }] = await Promise.all([
+    const [{ data: ctData }, { data: rmData }, { data: leaseData }] = await Promise.all([
       supabase
         .from('contracts')
-        .select('*, rooms(name, tenant_name, tenant_phone, tenant_email, monthly_rent, deposit, lease_start, lease_end)')
+        .select('*, rooms(name)')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('rooms').select('*').eq('owner_id', user.id).neq('status', 'VACANT'),
+      supabase.from('rooms').select('id, name, status, owner_id, building, area').eq('owner_id', user.id),
+      supabase
+        .from('leases')
+        .select('room_id, tenant_id, monthly_rent, pledge_amount, lease_start, lease_end, status, tenants(name, phone, email)')
+        .eq('owner_id', user.id)
+        .eq('status', 'ACTIVE'),
     ])
 
-    setContracts((ctData || []).map((c: ContractWithRoom & { rooms?: Room }) => ({ ...c, room: c.rooms })))
-    setRooms(rmData || [])
+    // leases → room별 입주사 정보 매핑
+    const leaseByRoom: Record<string, { tenant_name: string; tenant_phone: string; tenant_email: string; monthly_rent: number; deposit: number; lease_start: string; lease_end: string }> = {}
+    for (const l of (leaseData || []) as Array<Record<string, unknown>>) {
+      const t = l.tenants as Record<string, string> | null
+      leaseByRoom[l.room_id as string] = {
+        tenant_name: t?.name || '',
+        tenant_phone: t?.phone || '',
+        tenant_email: t?.email || '',
+        monthly_rent: (l.monthly_rent as number) || 0,
+        deposit: (l.pledge_amount as number) || 0,
+        lease_start: (l.lease_start as string) || '',
+        lease_end: (l.lease_end as string) || '',
+      }
+    }
+
+    // contracts에 room + lease 정보 병합
+    setContracts((ctData || []).map((c: ContractWithRoom & { rooms?: { name: string } }) => {
+      const roomName = c.rooms?.name || ''
+      const leaseInfo = c.room_id ? leaseByRoom[c.room_id] : undefined
+      return {
+        ...c,
+        room: {
+          name: roomName,
+          ...(leaseInfo || {}),
+        },
+      }
+    }))
+
+    // rooms에 lease 정보 병합 (호실 선택 드롭다운용)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setRooms((rmData || []).map((r: any) => ({
+      ...r,
+      ...(leaseByRoom[r.id] || {}),
+    })))
     setLoading(false)
   }, [supabase])
 
@@ -320,20 +367,20 @@ function CreateContractModal({
   })
   const [saving, setSaving] = useState(false)
 
-  // 호실 선택시 자동 채우기
+  // 호실 선택시 자동 채우기 (leases → tenants 경유)
   const handleRoomSelect = (roomId: string) => {
-    const r = rooms.find(r => r.id === roomId)
+    const r = rooms.find(r => r.id === roomId) as Room & Record<string, unknown> | undefined
     if (!r) return
     setForm(prev => ({
       ...prev,
       room_id:      roomId,
-      tenant_name:  r.tenant_name  ?? '',
-      tenant_phone: r.tenant_phone ?? '',
-      tenant_email: r.tenant_email ?? '',
+      tenant_name:  (r.tenant_name as string)  ?? '',
+      tenant_phone: (r.tenant_phone as string) ?? '',
+      tenant_email: (r.tenant_email as string) ?? '',
       monthly_rent: String(r.monthly_rent ?? ''),
       deposit:      String(r.deposit ?? ''),
-      lease_start:  r.lease_start ?? '',
-      lease_end:    r.lease_end   ?? '',
+      lease_start:  (r.lease_start as string) ?? '',
+      lease_end:    (r.lease_end as string)   ?? '',
     }))
   }
 
@@ -406,7 +453,7 @@ function CreateContractModal({
               style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
               <option value="">호실을 선택하세요</option>
               {rooms.map(r => (
-                <option key={r.id} value={r.id}>{r.name} {r.tenant_name ? `(${r.tenant_name})` : ''}</option>
+                <option key={r.id} value={r.id}>{r.name} {(r as Room & Record<string, unknown>).tenant_name ? `(${(r as Room & Record<string, unknown>).tenant_name})` : ''}</option>
               ))}
             </select>
           </div>
