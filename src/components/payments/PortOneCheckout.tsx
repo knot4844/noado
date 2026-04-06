@@ -49,7 +49,8 @@ export function PortOneCheckout({
           issueName: orderName,
           customer: {
             customerId: user?.id || `ANON_${Date.now()}`,
-            email: user?.email || undefined,
+            email: user?.email || 'guest@noado.kr',
+            fullName: user?.user_metadata?.name || '노아도 이용자',
           },
         })
 
@@ -93,7 +94,8 @@ export function PortOneCheckout({
           payMethod: 'CARD',
           customer: {
             customerId: user?.id || `ANON_${Date.now()}`,
-            email: user?.email || undefined,
+            email: user?.email || 'guest@noado.kr',
+            fullName: user?.user_metadata?.name || '노아도 이용자',
           },
         })
 
