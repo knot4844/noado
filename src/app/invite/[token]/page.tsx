@@ -52,7 +52,7 @@ export default function InvitePage() {
     })()
   }, [token, supabase])
 
-  /* ─── Canvas 서명 이벤트 ─── */
+  /* ─── Canvas 서명 이벤트 (CSS 픽셀 좌표) ─── */
   const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect()
     if ('touches' in e) {
@@ -63,6 +63,22 @@ export default function InvitePage() {
     }
     return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
+
+  /* ─── Canvas 내부 픽셀을 표시 크기에 맞게 리사이즈 ─── */
+  useEffect(() => {
+    if (step !== 'sign') return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width  = Math.round(rect.width  * dpr)
+    canvas.height = Math.round(rect.height * dpr)
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(dpr, dpr)
+    // 다시 보이도록 흰 배경
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, rect.width, rect.height)
+  }, [step])
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
@@ -89,7 +105,10 @@ export default function InvitePage() {
   const clearSig = () => {
     const canvas = canvasRef.current; if (!canvas) return
     const ctx = canvas.getContext('2d')!
+    const rect = canvas.getBoundingClientRect()
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, rect.width, rect.height)
     setHasSig(false)
   }
 
@@ -138,6 +157,15 @@ export default function InvitePage() {
 
   const snap = contract?.contract_snapshot as Record<string, string | number> | null
 
+  // 새로고침 후에도 서명일/해시 표시되도록 contract에서 폴백
+  const displaySignDate = signDate ?? (contract?.signed_at
+    ? (() => {
+        const d = new Date(contract.signed_at!)
+        return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+      })()
+    : null)
+  const displayHash = contentHash ?? contract?.content_hash ?? null
+
   /* ─── 렌더 ─── */
   if (step === 'loading') return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-background)' }}>
@@ -156,40 +184,110 @@ export default function InvitePage() {
   )
 
   if (step === 'done') return (
-    <div className="min-h-screen py-10 px-4 flex items-center justify-center font-sans" style={{ background: 'var(--color-background)' }}>
-      <div className="w-full max-w-lg rounded-3xl p-8 md:p-12 text-center"
+    <div className="min-h-screen py-10 px-4 font-sans print:py-0 print:px-0" style={{ background: 'var(--color-background)' }}>
+      <style jsx global>{`
+        @media print {
+          @page { size: A4; margin: 16mm; }
+          body { background: white !important; }
+          .no-print { display: none !important; }
+          .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
+        }
+      `}</style>
+
+      {/* 성공 카드 (인쇄 시 숨김) */}
+      <div className="no-print w-full max-w-lg mx-auto rounded-3xl p-8 text-center mb-6"
            style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--color-border)' }}>
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
              style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
-          <CheckCircle2 size={40} />
+          <CheckCircle2 size={32} />
         </div>
-        <h1 className="text-2xl font-bold mb-3" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+        <h1 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
           전자 서명이 완료되었습니다
         </h1>
-        <p className="text-sm mb-6" style={{ color: 'var(--color-muted)' }}>
-          계약서에 서명이 안전하게 기록되었으며,<br /> 전자서명법에 따라 법적 효력이 발생합니다.
+        <p className="text-sm mb-5" style={{ color: 'var(--color-muted)' }}>
+          아래 계약서를 PDF로 저장해 보관해주세요.<br />전자서명법에 따라 법적 효력이 발생합니다.
         </p>
-        
-        {/* 법적 증거 정보 */}
-        <div className="rounded-xl p-5 mb-8 text-left space-y-3" style={{ background: 'var(--color-muted-bg)' }}>
-          <div>
-            <span className="text-xs font-bold block mb-0.5" style={{ color: 'var(--color-muted)' }}>📅 서명 일시 (타임스탬프)</span>
-            <span className="text-sm font-mono font-bold" style={{ color: 'var(--color-text)' }}>{signDate}</span>
+        <button onClick={() => window.print()}
+          className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90"
+          style={{ background: 'var(--color-primary)' }}>
+          <Download size={16} />
+          계약서 PDF 다운로드 (인쇄)
+        </button>
+      </div>
+
+      {/* 인쇄 대상 계약서 본문 */}
+      <div className="print-area w-full max-w-2xl mx-auto rounded-2xl p-8"
+           style={{ background: 'white', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--color-border)' }}>
+        <div className="text-center mb-6 pb-4 border-b" style={{ borderColor: '#e5e5e5' }}>
+          <div className="inline-block px-6 py-2 rounded-lg font-bold text-xl"
+               style={{ border: '2px solid #1d3557', color: '#1d3557' }}>
+            임 대 차 계 약 서
           </div>
-          {contentHash && (
-            <div>
-              <span className="text-xs font-bold block mb-0.5" style={{ color: 'var(--color-muted)' }}>🔐 계약 내용 해시 (SHA-256)</span>
-              <span className="text-[11px] font-mono break-all" style={{ color: 'var(--color-muted)' }}>{contentHash}</span>
+        </div>
+
+        {/* 업로드된 양식 */}
+        {contract?.template_url && (
+          <div className="mb-6 pb-6 border-b" style={{ borderColor: '#e5e5e5' }}>
+            {contract.template_mime?.startsWith('image/') ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={contract.template_url} alt="계약서 양식" className="w-full rounded border" style={{ borderColor: '#e5e5e5' }} />
+            ) : contract.template_mime === 'application/pdf' ? (
+              <>
+                <iframe src={contract.template_url} className="w-full rounded border no-print"
+                        style={{ borderColor: '#e5e5e5', height: 480 }} title="계약서 양식" />
+                <p className="text-xs text-center mt-2" style={{ color: '#777' }}>
+                  ※ PDF 양식은 인쇄 시 별도로 다운로드해 함께 보관해주세요.
+                </p>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* 계약 정보 */}
+        <dl className="space-y-3 mb-6">
+          {[
+            { label: '이용자',    value: contract?.tenant_name ?? '—' },
+            { label: '소재지',    value: (snap?.address as string) ?? '—' },
+            { label: '선납금',    value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
+            { label: '월 이용료', value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
+            { label: '계약 시작', value: contract?.lease_start ? formatDate(contract.lease_start) : '—' },
+            { label: '계약 만료', value: contract?.lease_end   ? formatDate(contract.lease_end)   : '—' },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex gap-3">
+              <dt className="text-sm font-medium w-24 shrink-0" style={{ color: '#555' }}>{label}</dt>
+              <dd className="text-sm" style={{ color: '#111' }}>{value}</dd>
+            </div>
+          ))}
+          {snap?.special_terms && (
+            <div className="pt-2">
+              <dt className="text-sm font-medium mb-1" style={{ color: '#555' }}>특약사항</dt>
+              <dd className="text-sm whitespace-pre-wrap p-3 rounded" style={{ background: '#f7f7f7', color: '#111' }}>
+                {snap.special_terms as string}
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        {/* 서명 */}
+        <div className="pt-5 mt-5 border-t" style={{ borderColor: '#e5e5e5' }}>
+          <p className="text-sm font-bold mb-2" style={{ color: '#1d3557' }}>임차인 전자서명</p>
+          {contract?.signature_data_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={contract.signature_data_url} alt="서명" className="max-h-28 border rounded p-2" style={{ borderColor: '#e5e5e5', background: 'white' }} />
+          ) : (
+            <p className="text-xs" style={{ color: '#999' }}>서명 이미지 없음</p>
+          )}
+        </div>
+
+        {/* 법적 증거 */}
+        <div className="mt-6 pt-4 border-t text-xs space-y-1.5" style={{ borderColor: '#e5e5e5', color: '#555' }}>
+          <div><strong>📅 서명 일시:</strong> {displaySignDate}</div>
+          {displayHash && (
+            <div className="break-all">
+              <strong>🔐 콘텐츠 해시(SHA-256):</strong> <span className="font-mono">{displayHash}</span>
             </div>
           )}
         </div>
-        
-        <button onClick={() => window.print()}
-          className="w-full py-4 rounded-xl text-md font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
-          style={{ background: 'var(--color-primary)' }}>
-          <Download size={20} />
-          계약서 PDF 다운로드 (화면 인쇄)
-        </button>
       </div>
     </div>
   )
@@ -294,9 +392,9 @@ export default function InvitePage() {
                 </button>
               </div>
               <canvas
-                ref={canvasRef} width={440} height={180}
+                ref={canvasRef}
                 className="w-full touch-none"
-                style={{ cursor: 'crosshair', display: 'block', background: 'white' }}
+                style={{ cursor: 'crosshair', display: 'block', background: 'white', height: 180 }}
                 onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
                 onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
               />
