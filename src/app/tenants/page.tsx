@@ -309,9 +309,11 @@ export default function TenantsPage() {
       {editItem && (
         <EditLeaseModal
           item={editItem}
+          availableRooms={availableRooms}
           onClose={() => setEditItem(null)}
           onSaved={() => { setEditItem(null); load(); showToast('success', '저장되었습니다.') }}
           onEvicted={() => { setEditItem(null); load(); showToast('success', '퇴실 처리되었습니다.') }}
+          onTransferred={() => { setEditItem(null); load(); showToast('success', '호실 이동이 완료되었습니다.') }}
           onError={(msg) => showToast('error', msg)}
         />
       )}
@@ -980,13 +982,15 @@ function AddLeaseModal({
 
 /* ─── 리스 수정 모달 ─────────────────────────────────────── */
 function EditLeaseModal({
-  item, onClose, onSaved, onEvicted, onError,
+  item, availableRooms, onClose, onSaved, onEvicted, onTransferred, onError,
 }: {
-  item:      LeaseItem
-  onClose:   () => void
-  onSaved:   () => void
-  onEvicted: () => void
-  onError:   (msg: string) => void
+  item:           LeaseItem
+  availableRooms: Room[]
+  onClose:        () => void
+  onSaved:        () => void
+  onEvicted:      () => void
+  onTransferred:  () => void
+  onError:        (msg: string) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const { lease, tenant, room } = item
@@ -1007,6 +1011,10 @@ function EditLeaseModal({
   const [saving,       setSaving]       = useState(false)
   const [confirmEvict, setConfirmEvict] = useState(false)
   const [evicting,     setEvicting]     = useState(false)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [transferRoomId, setTransferRoomId] = useState('')
+  const [transferDate,   setTransferDate]   = useState(new Date().toISOString().split('T')[0])
 
   const setField = (k: string) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -1051,6 +1059,46 @@ function EditLeaseModal({
     onEvicted()
   }
 
+  const handleTransfer = async () => {
+    if (!transferRoomId) return onError('이동할 호실을 선택해주세요.')
+    if (!transferDate)   return onError('이동일을 선택해주세요.')
+    setTransferring(true)
+
+    // 1. 기존 lease 종료
+    const { error: termErr } = await supabase.from('leases').update({
+      status:    'TERMINATED',
+      lease_end: transferDate,
+    }).eq('id', lease.id)
+    if (termErr) { setTransferring(false); return onError(termErr.message) }
+
+    // 2. 기존 호실 공실 처리
+    await supabase.from('rooms').update({ status: 'VACANT' }).eq('id', room.id)
+
+    // 3. 새 lease 생성 (같은 tenant, 새 room)
+    const { error: insErr } = await supabase.from('leases').insert({
+      owner_id:      lease.owner_id,
+      tenant_id:     tenant.id,
+      room_id:       transferRoomId,
+      monthly_rent:  Number(form.monthly_rent)  || 0,
+      pledge_amount: Number(form.pledge_amount) || 0,
+      lease_start:   transferDate,
+      lease_end:     form.lease_end || null,
+      contract_type: form.contract_type,
+      vat_type:      form.vat_type,
+      payment_day:   Number(form.payment_day) || 25,
+      rate_type:     lease.rate_type ?? 'MONTHLY',
+      status:        'ACTIVE',
+      memo:          form.memo || null,
+    })
+    if (insErr) { setTransferring(false); return onError(insErr.message) }
+
+    // 4. 새 호실 상태 UNPAID로 전환
+    await supabase.from('rooms').update({ status: 'UNPAID' }).eq('id', transferRoomId)
+
+    setTransferring(false)
+    onTransferred()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: 'rgba(0,0,0,0.4)' }}
@@ -1070,14 +1118,49 @@ function EditLeaseModal({
           <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
         </div>
 
-        {/* 호실 표시 (변경 불가) */}
+        {/* 호실 표시 + 호실 이동 */}
         <div className="px-6 pt-4">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
                style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
             <Home size={14} />
             <span className="font-medium" style={{ color: 'var(--color-text)' }}>{room.name}</span>
-            <span className="text-xs ml-auto">(호실 변경 불가)</span>
+            <button
+              onClick={() => setShowTransfer(v => !v)}
+              className="ml-auto text-xs font-semibold px-2 py-1 rounded-md border"
+              style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)', background: 'var(--color-surface)' }}>
+              {showTransfer ? '취소' : '호실 이동'}
+            </button>
           </div>
+
+          {showTransfer && (
+            <div className="mt-2 px-4 py-3 rounded-xl space-y-3"
+                 style={{ background: 'var(--color-surface)', border: '1px solid var(--color-primary)' }}>
+              <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+                기존 계약을 이동일로 종료하고, 새 호실에 동일 조건으로 신규 계약을 생성합니다. 납부 이력은 보존됩니다.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>이동할 호실</label>
+                  <select value={transferRoomId} onChange={e => setTransferRoomId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+                    <option value="">선택</option>
+                    {availableRooms.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <Field label="이동일" value={transferDate}
+                  onChange={e => setTransferDate(e.target.value)} type="date" />
+              </div>
+              <button onClick={handleTransfer} disabled={transferring || !transferRoomId}
+                className="w-full py-2 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-60"
+                style={{ background: 'var(--color-primary)' }}>
+                {transferring ? <Loader2 size={12} className="animate-spin" /> : <Home size={12} />}
+                호실 이동 확정
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 space-y-4 max-h-[52vh] overflow-y-auto">
