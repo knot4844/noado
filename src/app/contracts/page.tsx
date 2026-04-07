@@ -367,9 +367,11 @@ function CreateContractModal({
     special_terms:'',
   })
   const [templateFile, setTemplateFile] = useState<File | null>(null)
+  const [convertingPdf, setConvertingPdf] = useState(false)
+  const [originalPdfName, setOriginalPdfName] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -377,10 +379,32 @@ function CreateContractModal({
       onError('PDF 또는 이미지(JPG/PNG/WEBP) 파일만 업로드 가능합니다.')
       return
     }
-    if (f.size > 10 * 1024 * 1024) {
-      onError('파일 크기는 10MB 이하여야 합니다.')
+    if (f.size > 50 * 1024 * 1024) {
+      onError('파일 크기는 50MB 이하여야 합니다.')
       return
     }
+
+    // PDF인 경우 자동으로 PNG 이미지로 변환 (인쇄/미리보기 모두 가능하게)
+    if (f.type === 'application/pdf') {
+      setConvertingPdf(true)
+      setOriginalPdfName(f.name)
+      try {
+        const { convertPdfToPngBlob } = await import('@/lib/pdf-to-image')
+        const { blob } = await convertPdfToPngBlob(f)
+        const baseName = f.name.replace(/\.pdf$/i, '')
+        const pngFile  = new File([blob], `${baseName}.png`, { type: 'image/png' })
+        setTemplateFile(pngFile)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'PDF 변환 실패'
+        onError(`PDF → 이미지 변환 실패: ${msg}`)
+        setOriginalPdfName(null)
+      } finally {
+        setConvertingPdf(false)
+      }
+      return
+    }
+
+    setOriginalPdfName(null)
     setTemplateFile(f)
   }
 
@@ -520,7 +544,7 @@ function CreateContractModal({
           {/* 계약서 양식 업로드 */}
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>
-              계약서 양식 업로드 (PDF / 이미지, 최대 10MB)
+              계약서 양식 업로드 (PDF / 이미지, 최대 50MB)
             </label>
             <input
               ref={fileInputRef}
@@ -529,7 +553,13 @@ function CreateContractModal({
               onChange={onPickFile}
               className="hidden"
             />
-            {!templateFile ? (
+            {convertingPdf ? (
+              <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
+                   style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
+                <Loader2 size={14} className="animate-spin" />
+                PDF를 이미지로 변환 중...
+              </div>
+            ) : !templateFile ? (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -542,20 +572,31 @@ function CreateContractModal({
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm"
                    style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)' }}>
                 <FileText size={14} style={{ color: 'var(--color-accent-dark)' }} />
-                <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>{templateFile.name}</span>
+                <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>
+                  {originalPdfName ?? templateFile.name}
+                  {originalPdfName && (
+                    <span className="ml-1 text-[10px]" style={{ color: 'var(--color-muted)' }}>
+                      (PDF → 이미지 변환 완료)
+                    </span>
+                  )}
+                </span>
                 <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
                   {(templateFile.size / 1024).toFixed(0)} KB
                 </span>
                 <button
                   type="button"
-                  onClick={() => { setTemplateFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                  onClick={() => {
+                    setTemplateFile(null)
+                    setOriginalPdfName(null)
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                  }}
                   style={{ color: 'var(--color-muted)' }}>
                   <X size={14} />
                 </button>
               </div>
             )}
             <p className="text-[11px] mt-1" style={{ color: 'var(--color-muted)' }}>
-              업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다. 미업로드 시 자동 양식이 사용됩니다.
+              업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다. PDF는 자동으로 이미지로 변환되어 인쇄까지 지원됩니다.
             </p>
           </div>
 

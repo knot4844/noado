@@ -1,11 +1,57 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-04-03 — E2E 결제 플로우 프로덕션 테스트 완료 (가상계좌 발급 성공)
+> **Last Updated:** 2026-04-03 — Toss Payments 제거, PortOne(KG이니시스) 결제 통일 + KG이니시스 사전심사 준비
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 22. Toss Payments 제거 + PortOne(KG이니시스) 결제 통일 + KG이니시스 사전심사 준비 (2026-04-03)
+- **완료:**
+  - **Toss Payments 완전 제거:**
+    - `@tosspayments/payment-widget-sdk` 패키지 삭제 (`package.json`)
+    - `src/components/payments/TossCheckout.tsx` 삭제
+    - pricing 페이지, portal 결제 페이지에서 TossCheckout → PortOneCheckout 교체
+  - **PortOneCheckout 컴포넌트 신규 생성** (`src/components/payments/PortOneCheckout.tsx`):
+    - `@portone/browser-sdk/v2` 사용
+    - `mode="payment"` → 일반결제 (카드 단건) — `PortOne.requestPayment()` 호출
+    - `mode="billing"` → 정기결제 (빌링키 발급) — `PortOne.requestIssueBillingKey()` 호출
+    - 검증 API: 일반결제 → `/api/portone/payment-complete`, 정기결제 → `/api/portone/subscribe`
+  - **API 라우트 2개 생성:**
+    - `/api/portone/payment-complete/route.ts` — 일반결제 검증 (PortOne V2 `/payments/{id}` 조회)
+    - `/api/portone/subscribe/route.ts` — 빌링키 결제 실행 (PortOne V2 `/payments/{id}/billing-key`)
+  - **사이드바에 "이용료 결제" 메뉴 추가** → `/pricing` 페이지 연결
+    - `Sidebar.tsx`에 Wallet 아이콘 + `/pricing` 항목 추가
+    - `AppLayout.tsx`에서 `/pricing`을 PUBLIC_PATHS에서 제거 (로그인 시 사이드바 표시)
+  - **대표자명(이동윤) 푸터에 추가:** `page.tsx` (메인), `pricing/page.tsx`
+  - **KG이니시스 사전심사 테스트 계정 생성:**
+    - 이메일: `test-reviewer@noado.kr` / 비밀번호: `TestReview2026!`
+    - 테스트 데이터: 사업자(대우오피스텔), 호실(301호), 입주사(테스트입주사), 계약(ACTIVE), 청구서(500,000원, 2026년 4월)
+    - 테스트 결제 URL: `https://www.noado.kr/pay/{invoiceId}` (가상계좌 발급 테스트 가능)
+  - **환경변수 추가 (`.env.local` + Vercel):**
+    - `NEXT_PUBLIC_PORTONE_STORE_ID=store-f448cc28-0f2f-4dd8-898c-ec5505ba43ac`
+    - `NEXT_PUBLIC_PORTONE_CHANNEL_KEY=channel-key-6b818e51-4872-4a0e-84a7-d8f43eb72a55`
+  - **4건 커밋 push + Vercel 배포 완료**
+- **결정:**
+  - 포트원 채널키 2개 모두 일반결제+정기결제 지원 확인 (별도 채널 신청 불필요)
+    - `channel-key-6b818e51-...` — 결제창 타입 (브라우저 SDK용, NEXT_PUBLIC)
+    - `channel-key-dd35dbea-...` — API 타입 (서버 가상계좌 발급용)
+  - 임대료 카드 단건결제 추가 시 별도 프로세스 불필요 — `/pay/[invoiceId]` 페이지에 카드결제 버튼만 추가하면 됨
+  - 이용료 정기결제 = `/pricing` 페이지 (Beginner ₩9,900 / Pro ₩19,900)
+  - 임대료 일반결제 = `/pay/[invoiceId]` 페이지 (가상계좌 + 추후 카드결제 추가)
+- **KG이니시스 사전심사 체크리스트 진행 상황:**
+  1. ✅ 판매상품 정보 — 공유오피스 임대관리 SaaS (이용료 결제 + 임대료 수납)
+  2. ✅ 판매가격 표시 — `/pricing` 페이지에 요금제 표시
+  3. ⚠️ 이용약관/개인정보처리방침 — `/terms`, `/privacy` 페이지 존재 (내용 검토 필요)
+  4. ⚠️ 사업자 정보 — 푸터에 표시됨, **통신판매신고번호 미등록** (유저에게 확인 필요)
+  5. ✅ 결제창 정상 노출 — PortOneCheckout으로 KG이니시스 결제창 호출 확인
+  6. ✅ 테스트 계정/데이터 — 생성 완료
+- **미완료/다음 작업:**
+  - 통신판매신고번호 확보 후 푸터에 추가
+  - `/pay/[invoiceId]` 페이지에 카드결제 옵션 추가 (가상계좌 옆에 버튼)
+  - pricing 페이지 로그인 시 네비게이션 중복 (자체 nav + 사이드바) — 추후 수정
+  - `/billing-pay` 페이지 불필요 — 정리 대상
 
 ### 21. E2E 결제 플로우 프로덕션 테스트 + DB 스키마 호환성 수정 (2026-04-03)
 - **완료:**
@@ -134,11 +180,12 @@
 - **`tenants` 테이블 활용** — rooms.tenant_name 단순 비교에서 tenants.name 정규화 매칭으로 개선
 - 폴백: tenants 매칭 실패 시 rooms.tenant_name으로 이전 방식 유지
 
-### 9. Solapi 환경변수 설정 완료 (2026-03-18)
+### 9. Solapi 환경변수 설정 완료 (2026-03-18) — ✅ 모든 템플릿 검수 완료 (2026-04-07 유저 확인)
 - **`SOLAPI_FROM_NUMBER=01088854844`** — 솔라피 발신번호 등록 확인 후 `.env.local` 및 Vercel에 추가
-- **`SOLAPI_TEMPLATE_PAYMENT_NOTIFY_ADMIN=GX3F22DndC`** — "납부 완료 관리자 알림" 템플릿 신규 생성 후 카카오 검수 제출 (검수진행중, 1~3 영업일 소요)
+- **`SOLAPI_TEMPLATE_PAYMENT_NOTIFY_ADMIN=GX3F22DndC`** — "납부 완료 관리자 알림" 템플릿 ✅ **검수 완료**
   - 템플릿 내용: `[노아도] 납부 완료 안내\n\n#{호실}호 #{입주사}님이 임대료를 납부했습니다.\n\n납부 금액: #{금액}원`
-- **`SOLAPI_TEMPLATE_CONTRACT_SIGN`** (INVOICE_ISSUED) — 기존 재제출, 검수진행중
+- **`SOLAPI_TEMPLATE_CONTRACT_SIGN`** ✅ **검수 완료**
+- **⚠️ 더 이상 솔라피 템플릿 검수 상태를 묻지 말 것** — 모든 템플릿 승인 완료된 상태
 - Vercel 환경변수 2개 추가 완료 (전체 환경)
 
 ### 10. ESLint 에러 전체 수정 완료 (2026-03-18)
@@ -295,16 +342,24 @@
    - `allRooms`: 비어있으면 자동 매칭 전혀 안 됨 → load() 실패 시 반드시 확인
    - `noteMatchesRoom(note, tenantName)`: `note.includes(tenantName)` 단순 포함 검사
 
-7. **포트원(PortOne) 연동 현황 (2026-04-03 기준)**
-   - **PG사:** KG이니시스 1개만 연동
-   - **결제 수단:** 가상계좌 1개만 구현 (카드결제 미연동)
-   - **채널키:** `channel-key-dd35dbea-...` (API 타입, KG이니시스)
-   - **Vercel 환경변수명:** `PORTONE_CHANNEL_KEY_VIRTUAL` (코드에서 `PORTONE_CHANNEL_KEY` 우선, 없으면 폴백)
-   - **지원 은행:** 신한, 국민, 하나, 우리, 농협, IBK기업, 부산, 대구, 광주
+7. **포트원(PortOne) 연동 현황 (2026-04-03 최종 업데이트)**
+   - **PG사:** KG이니시스 1개만 연동 (사전심사 진행 중)
+   - **결제 수단:** 가상계좌(구현 완료) + 카드결제(컴포넌트 준비됨, `/pay` 페이지 연결 미완)
+   - **채널키 2개:**
+     - `channel-key-6b818e51-...` — 결제창 타입 (브라우저 SDK, 카드결제/빌링키) → `NEXT_PUBLIC_PORTONE_CHANNEL_KEY`
+     - `channel-key-dd35dbea-...` — API 타입 (서버 가상계좌 발급) → `PORTONE_CHANNEL_KEY` / `PORTONE_CHANNEL_KEY_VIRTUAL`
+   - **SDK:** `@portone/browser-sdk/v2` (Toss SDK는 제거 완료)
+   - **결제 컴포넌트:** `src/components/payments/PortOneCheckout.tsx`
+     - `mode="payment"` → 일반결제 (카드 단건) → `/api/portone/payment-complete` 검증
+     - `mode="billing"` → 정기결제 (빌링키) → `/api/portone/subscribe` 실행
+   - **Vercel 환경변수:** `PORTONE_CHANNEL_KEY_VIRTUAL`, `NEXT_PUBLIC_PORTONE_STORE_ID`, `NEXT_PUBLIC_PORTONE_CHANNEL_KEY`
+   - **지원 은행(가상계좌):** 신한, 국민, 하나, 우리, 농협, IBK기업, 부산, 대구, 광주
    - **테스트 MID:** `INIpayTest` — 신한은행만 동작 (실 연동 시 전 은행 정상)
    - **웹훅:** `https://www.noado.kr/api/webhook/portone` (HMAC-SHA256 서명 검증)
    - **처리 이벤트:** `Transaction.Paid`, `Failed`, `Cancelled`, `Expired`
    - **E2E 프로덕션 테스트:** 2026-04-03 성공 확인 (101호 테스트컴퍼니 500,000원 → 신한은행 가상계좌 발급)
+   - **KG이니시스 사전심사:** 진행 중 (통신판매신고번호 미등록 외 체크리스트 완료)
+   - **테스트 계정:** `test-reviewer@noado.kr` / `TestReview2026!` (301호, 테스트입주사, 500,000원 청구서)
 
 8. **rooms 테이블 제거된 컬럼 주의 (migration #16 이후)**
    - `tenant_name`, `tenant_phone`, `tenant_email`, `monthly_rent`, `payment_day`, `deposit`, `lease_start`, `lease_end`, `virtual_account_number` 모두 제거됨
@@ -332,29 +387,37 @@
 
 ## 🚀 다음 세션 시작 순서
 
-### 즉시 확인
+### 즉시 확인 (세션 시작 시 브리핑)
 1. `npm run build` — 0 errors 확인
-2. **rooms 제거 컬럼 전수 점검** — `tenant_name`, `tenant_phone`, `monthly_rent` 등 제거된 컬럼을 참조하는 코드가 남아있는지 전체 codebase grep
+2. **KG이니시스 사전심사 현황 확인** — 유저에게 통신판매신고번호 확보 여부 문의 → 푸터에 추가
+3. **rooms 제거 컬럼 전수 점검** — `tenant_name`, `tenant_phone`, `monthly_rent` 등 제거된 컬럼을 참조하는 코드가 남아있는지 전체 codebase grep
    - `grep -r "tenant_name\|tenant_phone\|monthly_rent" src/` 로 확인
    - 발견 시 leases → tenants 경유 조회로 변경
-3. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 + 101호 테스트 데이터 삭제 권장
-4. 테스트용 가상계좌 발급 건 정리 — invoice `7367ca88-9b69-4b08-af83-1a532311e1f4` 및 관련 데이터
+4. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 + 101호 테스트 데이터 삭제 권장
+5. 테스트용 가상계좌 발급 건 정리 — invoice `7367ca88-9b69-4b08-af83-1a532311e1f4` 및 관련 데이터
+
+### 결제 관련 이어서 할 작업 (긴급)
+6. **`/pay/[invoiceId]` 페이지에 카드결제 옵션 추가** — 현재 가상계좌만 있음, "카드결제" 버튼 추가
+   - `PortOneCheckout` `mode="payment"` 사용, 같은 채널키로 동작
+   - 임대료를 현금/이체 불가 시 단발성 카드결제 용도
+7. **pricing 페이지 네비게이션 중복 수정** — 로그인 시 자체 nav + 사이드바가 동시에 보임
+8. **`/billing-pay` 페이지 정리** — 불필요 페이지 삭제 (사이드바가 /pricing으로 직접 연결)
 
 ### 이어서 개발할 것 (우선순위 순)
-5. **대시보드 KPI leases 기준으로 교체** [A단계] — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
+9. **대시보드 KPI leases 기준으로 교체** [A단계] — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
    - 파일: `src/app/dashboard/page.tsx`
    - 입주율 = ACTIVE lease 수 / 전체 rooms 수
    - 이번 달 수납 = invoices (lease_id 있는 것) 기준
-6. **billing_items UI** [B단계] — 실비 항목 관리 (주차/인터넷/전기/커스텀)
+10. **billing_items UI** [B단계] — 실비 항목 관리 (주차/인터넷/전기/커스텀)
    - 계약별 추가 실비 등록·수정·삭제
    - `/units` 또는 `/tenants` 내 계약 상세 탭에 추가
-7. **deposits UI** [C단계] — 예치금·선납·예약금 관리
+11. **deposits UI** [C단계] — 예치금·선납·예약금 관리
    - 계약 시 예치금 수령 기록, 퇴실 시 환불 처리
-8. **청구서 생성 로직 leases 완전 연동** [D단계]
+12. **청구서 생성 로직 leases 완전 연동** [D단계]
    - `base_amount` = lease.monthly_rent
    - `extra_amount` = billing_items 합계
    - `amount` = base + extra (현재는 lease.monthly_rent만 사용)
-9. **tax_invoices UI** [E단계] — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
+13. **tax_invoices UI** [E단계] — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
 
 ---
 

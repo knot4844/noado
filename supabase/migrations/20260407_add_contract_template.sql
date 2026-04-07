@@ -13,7 +13,7 @@ VALUES (
   'contract-templates',
   'contract-templates',
   TRUE, -- 임차인이 sign_token 페이지에서 직접 보기 때문에 public read
-  10485760, -- 10 MB
+  52428800, -- 50 MB (PDF→PNG 변환 후 다중 페이지 대응)
   ARRAY['application/pdf','image/jpeg','image/png','image/webp']
 )
 ON CONFLICT (id) DO UPDATE
