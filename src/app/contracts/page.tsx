@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Plus, FileText, Send, CheckCircle2, AlertCircle,
   Loader2, X, Clock, RefreshCw, Download, Eye,
-  Pencil, Trash2,
+  Pencil, Trash2, Upload,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Contract, Room } from '@/types'
@@ -353,6 +353,7 @@ function CreateContractModal({
   onError: (msg: string) => void
 }) {
   const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     room_id:      '',
     tenant_name:  '',
@@ -365,7 +366,23 @@ function CreateContractModal({
     lease_end:    '',
     special_terms:'',
   })
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(f.type)) {
+      onError('PDF 또는 이미지(JPG/PNG/WEBP) 파일만 업로드 가능합니다.')
+      return
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      onError('파일 크기는 10MB 이하여야 합니다.')
+      return
+    }
+    setTemplateFile(f)
+  }
 
   // 호실 선택시 자동 채우기 (leases → tenants 경유)
   const handleRoomSelect = (roomId: string) => {
@@ -391,9 +408,32 @@ function CreateContractModal({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
 
+    // 양식 파일 업로드
+    let template_url: string | null = null
+    let template_name: string | null = null
+    let template_mime: string | null = null
+    if (templateFile) {
+      const ext  = templateFile.name.split('.').pop() || 'bin'
+      const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('contract-templates')
+        .upload(path, templateFile, {
+          contentType: templateFile.type,
+          cacheControl: '3600',
+          upsert: false,
+        })
+      if (upErr) { setSaving(false); return onError(`양식 업로드 실패: ${upErr.message}`) }
+      const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
+      template_url  = pub.publicUrl
+      template_name = templateFile.name
+      template_mime = templateFile.type
+    }
+
     // 계약 스냅샷 + 해시
     const snapshot = {
       ...form,
+      template_url:  template_url  ?? '',
+      template_name: template_name ?? '',
       created_at: new Date().toISOString(),
       owner_id:   user.id,
     }
@@ -422,6 +462,9 @@ function CreateContractModal({
       sign_token_expires_at: expires_at,
       content_hash:          hashHex,
       contract_snapshot:     snapshot,
+      template_url,
+      template_name,
+      template_mime,
     })
     if (error) { onError(error.message); setSaving(false); return }
     setSaving(false)
@@ -474,6 +517,48 @@ function CreateContractModal({
             <CField label="계약 시작일" value={form.lease_start} onChange={set('lease_start')} type="date" />
             <CField label="계약 만료일" value={form.lease_end} onChange={set('lease_end')} type="date" />
           </div>
+          {/* 계약서 양식 업로드 */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>
+              계약서 양식 업로드 (PDF / 이미지, 최대 10MB)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              onChange={onPickFile}
+              className="hidden"
+            />
+            {!templateFile ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}>
+                <Upload size={14} />
+                양식 파일 선택
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm"
+                   style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)' }}>
+                <FileText size={14} style={{ color: 'var(--color-accent-dark)' }} />
+                <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>{templateFile.name}</span>
+                <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
+                  {(templateFile.size / 1024).toFixed(0)} KB
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setTemplateFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                  style={{ color: 'var(--color-muted)' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <p className="text-[11px] mt-1" style={{ color: 'var(--color-muted)' }}>
+              업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다. 미업로드 시 자동 양식이 사용됩니다.
+            </p>
+          </div>
+
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>특약사항</label>
             <textarea value={form.special_terms} onChange={set('special_terms')} rows={4}
@@ -542,6 +627,29 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
               임 대 차 계 약 서
             </div>
           </div>
+
+          {/* 업로드된 계약서 양식 */}
+          {contract.template_url && (
+            <div className="mb-5 pb-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>업로드된 계약서 양식</p>
+                <a href={contract.template_url} target="_blank" rel="noreferrer"
+                   className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
+                  <Download size={11} /> {contract.template_name || '다운로드'}
+                </a>
+              </div>
+              {contract.template_mime?.startsWith('image/') ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={contract.template_url} alt={contract.template_name || '계약서 양식'}
+                     className="w-full rounded-lg border" style={{ borderColor: 'var(--color-border)' }} />
+              ) : contract.template_mime === 'application/pdf' ? (
+                <iframe src={contract.template_url} className="w-full rounded-lg border"
+                        style={{ borderColor: 'var(--color-border)', height: 360 }} title="계약서 양식" />
+              ) : (
+                <p className="text-xs" style={{ color: 'var(--color-muted)' }}>미리보기를 지원하지 않는 형식입니다. 다운로드 후 확인해주세요.</p>
+              )}
+            </div>
+          )}
 
           <dl className="space-y-3">
             {rows.map(({ label, value }) => (

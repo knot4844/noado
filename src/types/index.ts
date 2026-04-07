@@ -215,6 +215,9 @@ export interface Contract {
   signed_at:             string | null
   signature_data_url:    string | null
   contract_snapshot:     Record<string, string | number> | null
+  template_url:          string | null
+  template_name:         string | null
+  template_mime:         string | null
   created_at:            string
 }
 

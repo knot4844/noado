@@ -216,6 +216,30 @@ export default function InvitePage() {
               아래 계약 내용을 확인 후 서명해주세요.
             </p>
 
+            {/* 임대인이 업로드한 계약서 양식 */}
+            {contract?.template_url && (
+              <div className="rounded-2xl p-4 mb-4"
+                   style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>계약서 원본</p>
+                  <a href={contract.template_url} target="_blank" rel="noreferrer"
+                     className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
+                    <Download size={11} /> 다운로드
+                  </a>
+                </div>
+                {contract.template_mime?.startsWith('image/') ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={contract.template_url} alt={contract.template_name || '계약서'}
+                       className="w-full rounded-lg border" style={{ borderColor: 'var(--color-border)' }} />
+                ) : contract.template_mime === 'application/pdf' ? (
+                  <iframe src={contract.template_url} className="w-full rounded-lg border"
+                          style={{ borderColor: 'var(--color-border)', height: 480 }} title="계약서 양식" />
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--color-muted)' }}>다운로드 후 확인해주세요.</p>
+                )}
+              </div>
+            )}
+
             <div className="rounded-2xl p-5 mb-6 space-y-4"
                  style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)' }}>
               {[
