@@ -7,9 +7,11 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Plus, FileText, Send, CheckCircle2, AlertCircle,
   Loader2, X, Clock, RefreshCw, Download, Eye,
-  Pencil, Trash2, Upload,
+  Pencil, Trash2, Upload, LayoutTemplate,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { BUILT_IN_TEMPLATES, generateTemplateImage } from '@/lib/contract-templates'
+import type { TemplateData } from '@/lib/contract-templates'
 import type { Contract, Room } from '@/types'
 
 /* ─── 타입 ─── */
@@ -370,6 +372,9 @@ function CreateContractModal({
   const [convertingPdf, setConvertingPdf] = useState(false)
   const [originalPdfName, setOriginalPdfName] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [templateTab, setTemplateTab] = useState<'builtin' | 'upload'>('builtin')
+  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>(null)
+  const [generatingTemplate, setGeneratingTemplate] = useState(false)
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -432,25 +437,57 @@ function CreateContractModal({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
 
+    // 기본 양식 선택 시 이미지 생성
+    let finalTemplateFile = templateFile
+    let finalOriginalName = originalPdfName
+    if (templateTab === 'builtin' && selectedBuiltIn && !templateFile) {
+      setGeneratingTemplate(true)
+      try {
+        const selectedRoom = rooms.find(r => r.id === form.room_id)
+        const tplData: TemplateData = {
+          tenant_name:   form.tenant_name,
+          tenant_phone:  form.tenant_phone,
+          address:       form.address,
+          monthly_rent:  form.monthly_rent,
+          deposit:       form.deposit,
+          lease_start:   form.lease_start,
+          lease_end:     form.lease_end,
+          special_terms: form.special_terms,
+          room_name:     selectedRoom?.name ?? '',
+        }
+        const blob = await generateTemplateImage(selectedBuiltIn, tplData)
+        const tplInfo = BUILT_IN_TEMPLATES.find(t => t.id === selectedBuiltIn)
+        finalTemplateFile = new File([blob], `${tplInfo?.name ?? '계약서'}.png`, { type: 'image/png' })
+        finalOriginalName = null
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '양식 생성 실패'
+        onError(`양식 생성 실패: ${msg}`)
+        setSaving(false)
+        setGeneratingTemplate(false)
+        return
+      }
+      setGeneratingTemplate(false)
+    }
+
     // 양식 파일 업로드
     let template_url: string | null = null
     let template_name: string | null = null
     let template_mime: string | null = null
-    if (templateFile) {
-      const ext  = templateFile.name.split('.').pop() || 'bin'
+    if (finalTemplateFile) {
+      const ext  = finalTemplateFile.name.split('.').pop() || 'bin'
       const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('contract-templates')
-        .upload(path, templateFile, {
-          contentType: templateFile.type,
+        .upload(path, finalTemplateFile, {
+          contentType: finalTemplateFile.type,
           cacheControl: '3600',
           upsert: false,
         })
       if (upErr) { setSaving(false); return onError(`양식 업로드 실패: ${upErr.message}`) }
       const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
       template_url  = pub.publicUrl
-      template_name = templateFile.name
-      template_mime = templateFile.type
+      template_name = finalOriginalName ?? finalTemplateFile.name
+      template_mime = finalTemplateFile.type
     }
 
     // 계약 스냅샷 + 해시
@@ -541,63 +578,131 @@ function CreateContractModal({
             <CField label="계약 시작일" value={form.lease_start} onChange={set('lease_start')} type="date" />
             <CField label="계약 만료일" value={form.lease_end} onChange={set('lease_end')} type="date" />
           </div>
-          {/* 계약서 양식 업로드 */}
+          {/* 계약서 양식 선택 */}
           <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>
-              계약서 양식 업로드 (PDF / 이미지, 최대 50MB)
+            <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>
+              계약서 양식
             </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
-              onChange={onPickFile}
-              className="hidden"
-            />
-            {convertingPdf ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
-                   style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
-                <Loader2 size={14} className="animate-spin" />
-                PDF를 이미지로 변환 중...
-              </div>
-            ) : !templateFile ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}>
-                <Upload size={14} />
-                양식 파일 선택
+
+            {/* 탭 */}
+            <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--color-background)' }}>
+              <button type="button"
+                onClick={() => { setTemplateTab('builtin'); setTemplateFile(null); setOriginalPdfName(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all"
+                style={{
+                  background: templateTab === 'builtin' ? 'var(--color-surface)' : 'transparent',
+                  color: templateTab === 'builtin' ? 'var(--color-primary)' : 'var(--color-muted)',
+                  boxShadow: templateTab === 'builtin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}>
+                <LayoutTemplate size={13} />
+                기본 양식 선택
               </button>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm"
-                   style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)' }}>
-                <FileText size={14} style={{ color: 'var(--color-accent-dark)' }} />
-                <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>
-                  {originalPdfName ?? templateFile.name}
-                  {originalPdfName && (
-                    <span className="ml-1 text-[10px]" style={{ color: 'var(--color-muted)' }}>
-                      (PDF → 이미지 변환 완료)
-                    </span>
-                  )}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                  {(templateFile.size / 1024).toFixed(0)} KB
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTemplateFile(null)
-                    setOriginalPdfName(null)
-                    if (fileInputRef.current) fileInputRef.current.value = ''
-                  }}
-                  style={{ color: 'var(--color-muted)' }}>
-                  <X size={14} />
-                </button>
+              <button type="button"
+                onClick={() => { setTemplateTab('upload'); setSelectedBuiltIn(null) }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all"
+                style={{
+                  background: templateTab === 'upload' ? 'var(--color-surface)' : 'transparent',
+                  color: templateTab === 'upload' ? 'var(--color-primary)' : 'var(--color-muted)',
+                  boxShadow: templateTab === 'upload' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}>
+                <Upload size={13} />
+                직접 업로드
+              </button>
+            </div>
+
+            {/* 기본 양식 탭 */}
+            {templateTab === 'builtin' && (
+              <div className="space-y-2">
+                {BUILT_IN_TEMPLATES.map(tpl => (
+                  <button key={tpl.id} type="button"
+                    onClick={() => setSelectedBuiltIn(tpl.id === selectedBuiltIn ? null : tpl.id)}
+                    className="w-full text-left px-4 py-3 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: selectedBuiltIn === tpl.id ? tpl.color : 'var(--color-border)',
+                      background: selectedBuiltIn === tpl.id ? `${tpl.color}08` : 'var(--color-background)',
+                    }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                           style={{ background: `${tpl.color}18`, color: tpl.color }}>
+                        <FileText size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold" style={{ color: selectedBuiltIn === tpl.id ? tpl.color : 'var(--color-text)' }}>
+                          {tpl.name}
+                        </div>
+                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                          {tpl.desc}
+                        </div>
+                      </div>
+                      {selectedBuiltIn === tpl.id && (
+                        <CheckCircle2 size={18} style={{ color: tpl.color }} className="shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+                <p className="text-[11px]" style={{ color: 'var(--color-muted)' }}>
+                  위 양식에 입력한 계약 정보가 자동으로 채워져 임차인에게 발송됩니다.
+                </p>
               </div>
             )}
-            <p className="text-[11px] mt-1" style={{ color: 'var(--color-muted)' }}>
-              업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다. PDF는 자동으로 이미지로 변환되어 인쇄까지 지원됩니다.
-            </p>
+
+            {/* 직접 업로드 탭 */}
+            {templateTab === 'upload' && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={onPickFile}
+                  className="hidden"
+                />
+                {convertingPdf ? (
+                  <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
+                       style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
+                    <Loader2 size={14} className="animate-spin" />
+                    PDF를 이미지로 변환 중...
+                  </div>
+                ) : !templateFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}>
+                    <Upload size={14} />
+                    양식 파일 선택 (PDF / 이미지, 최대 50MB)
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm"
+                       style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)' }}>
+                    <FileText size={14} style={{ color: 'var(--color-accent-dark)' }} />
+                    <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>
+                      {originalPdfName ?? templateFile.name}
+                      {originalPdfName && (
+                        <span className="ml-1 text-[10px]" style={{ color: 'var(--color-muted)' }}>
+                          (PDF → 이미지 변환 완료)
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
+                      {(templateFile.size / 1024).toFixed(0)} KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTemplateFile(null)
+                        setOriginalPdfName(null)
+                        if (fileInputRef.current) fileInputRef.current.value = ''
+                      }}
+                      style={{ color: 'var(--color-muted)' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <p className="text-[11px] mt-1" style={{ color: 'var(--color-muted)' }}>
+                  업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다.
+                </p>
+              </>
+            )}
           </div>
 
           <div>
@@ -613,11 +718,11 @@ function CreateContractModal({
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>취소</button>
-          <button onClick={handleCreate} disabled={saving}
+          <button onClick={handleCreate} disabled={saving || generatingTemplate}
             className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ background: 'var(--color-primary)' }}>
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            계약서 생성
+            {(saving || generatingTemplate) && <Loader2 size={14} className="animate-spin" />}
+            {generatingTemplate ? '양식 생성 중...' : '계약서 생성'}
           </button>
         </div>
       </div>
