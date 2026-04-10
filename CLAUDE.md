@@ -1,11 +1,65 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-04-03 — Toss Payments 제거, PortOne(KG이니시스) 결제 통일 + KG이니시스 사전심사 준비
+> **Last Updated:** 2026-04-07 — 카카오 가입 리디렉트 + /billing mock 제거 버그픽스 + 입금 매칭 4단계 (분할/FIFO/PREPAY/잔액) 구현
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 23. 입금 매칭 4단계 구현 + 버그픽스 2건 (2026-04-07)
+- **버그픽스 1: 카카오 가입 후 전화번호 입력 → 대시보드 미이동** (`src/app/complete-profile/page.tsx`)
+  - 원인: `supabase.auth.updateUser({ data: { phone } })` 후에도 JWT 쿠키가 옛 값이라 미들웨어가 phone 없음으로 판단 → 무한 리디렉트
+  - 수정: ① `supabase.auth.refreshSession()` 호출로 JWT 갱신 ② `router.push` → `window.location.href`로 변경 (full reload — 미들웨어 재실행) ③ 초기 useEffect 진입 조건 `phoneExists && emailExists` → `phoneExists`만 (카카오 이메일은 선택)
+- **버그픽스 2: /billing 정기청구 탭 47개 mock rooms 표시** (`src/app/billing/page.tsx`)
+  - 원인: `getRoomsByBusiness(selectedBusinessId)`가 `/lib/data.ts`의 mock 47개 반환
+  - 수정: useBusiness mock 제거 → Supabase에서 활성 계약(`leases.status='ACTIVE'`) 실시간 조회 (rooms 경유 — leases는 business_id 없음). 표시 문구 "N개 호실 데이터 스캔 완료" → "N개 활성 계약 스캔 완료"
+
+- **Stage 1: 분할 매칭 모달** (`src/app/payments/page.tsx`)
+  - `PendingMatch.splits: { invoiceId; amount }[] | null` 추가
+  - `UnpaidInvoiceForSplit` 타입 신설
+  - `openSplitModal(rowIdx)`: 해당 호실의 전 기간 미납 청구서 조회, 기존 splits prefill 또는 FIFO 자동 제안
+  - `confirmSplit` / `clearSplit` / `closeSplitModal`
+  - 드롭다운 옆 "분할" 버튼 (활성 시 분할 개수 표시 + 행 하단에 충당 요약)
+  - SplitMatchModal UI: 입금 정보 + 미납 청구서 테이블 + 충당액 입력 + 합계/잔여/초과 표시 + "분할 해제" / "분할 확정"
+  - `executeMatches` 분기 추가: `pm.splits` 있으면 각 split마다 invoice 조회 → `paid_amount` 누적 → `payments` 행 INSERT (부분 수납이면 status='ready' 유지, 전액이면 'paid')
+  - 매칭 변경 시 splits 자동 해제
+
+- **Stage 2: FIFO 자동 충당** (`src/app/payments/page.tsx`)
+  - `load()`에서 `allUnpaidInvoices` (전 기간 미납) 추가 로드
+  - `openReview` 자동 매칭 로직 확장: 단일 청구서 일치 실패 + 입주사 식별 성공 시 → 해당 호실 미납을 오래된 것부터 채움
+  - `splits.length≥2` 또는 `1건+잔여`일 때만 자동 채택
+  - UI 일관성을 위해 첫 split의 invoice ID를 `selectedInvoiceId`로 세팅 → "분할 N" 배지 자동 표시
+
+- **Stage 3: PREPAY 자동 차감 + 잔여 적립** (신규 `src/lib/prepay.ts` + 3곳 wiring)
+  - **모델**: `deposits.type='PREPAY'` 행을 누적 잔액 원장으로 사용. 양수=적립, 음수=소비. 잔액 = `SUM(amount) WHERE type='PREPAY' AND refunded_at IS NULL`
+  - **`src/lib/prepay.ts`**: `getPrepayBalance`, `deductPrepayForInvoice`, `addPrepayCredit` 헬퍼 (SupabaseClient 인자로 받아 client/service 양쪽 호환)
+  - **수동 `generateInvoices`** (payments page): 청구서 생성 직후 leases 순회하며 자동 차감, 토스트에 차감 건수 표시
+  - **분할 매칭 `executeMatches`**: 모든 split 성공 후 leftover > 0이면 해당 lease에 PREPAY 적립
+  - **Cron `/api/cron/generate-invoices`**: 전면 리팩토링
+    - 기존 코드: `rooms.tenant_*`, `rooms.monthly_rent` 등 migration #16에서 제거된 컬럼 참조 → 사실상 broken 상태였음
+    - 신규: ACTIVE leases 직접 쿼리 (room+tenant 조인), `lease_id` 기준 멱등성 체크, INSERT 직후 PREPAY 자동 차감 루프
+    - PREPAY로 100% 충당된 청구서는 결제 안내 알림톡 발송 생략
+
+- **Stage 4: Tenant 카드 잔액 표시** (`src/app/tenants/page.tsx`)
+  - `LeaseItem` 타입 확장: `unpaidTotal`, `prepayBalance`
+  - `load()`에서 `deposits` 일괄 조회 후 lease별 PREPAY 합산 맵 구성
+  - 미수납 합계 = 미납 청구서의 `amount - paid_amount` 합
+  - 카드 UI: 월세/예치금 아래에 잔액 박스 — 미수납이 있으면 빨간 배경 + `미수납 ₩X`, 선납이 있으면 초록 강조 + `선납 +₩X`, 둘 다 0이면 박스 숨김
+
+- **결정/유저 언급:**
+  - 솔라피 템플릿 검수는 이미 모두 완료됨 (CONTRACT_SIGN, PAYMENT_NOTIFY_ADMIN). **더 이상 묻지 말 것** — 이 기록 그대로 유지
+  - "234 실행 1번 테스트는 나중에 한번에 같이 하자" — Stage 1~4 통합 테스트는 다음 세션에 일괄 진행 예정
+
+- **검증 시 주의사항:**
+  1. **deposits 테이블 존재 여부**: `src/types/index.ts`엔 정의돼 있으나 Supabase에 실제 마이그레이션이 적용됐는지 직접 확인 필요. 없으면 PREPAY INSERT 모두 실패. → migration 파일 확인 또는 `supabase/migrations` 디렉토리에서 deposits 관련 SQL 검색
+  2. **Cron 멱등성**: 신규 cron은 `lease_id`로 중복 체크. 기존 invoices 중 `lease_id`가 NULL인 옛 데이터가 있으면 이번 달에 중복 생성될 가능성 있음
+  3. **rooms 제거 컬럼 잔존 점검**: 다른 API/페이지에서 `tenant_name`/`tenant_phone`/`monthly_rent` 직접 참조 잔존 가능 → 전수 grep 필요
+
+- **미해결/다음 작업:**
+  - Stage 1~4 통합 E2E 테스트 (분할 매칭 정상 저장 + FIFO 자동 제안 동작 + PREPAY 차감 후 카드 잔액 갱신)
+  - deposits 테이블 마이그레이션 미적용 시 작성 + 적용
+  - billing_items UI [B단계], 대시보드 KPI leases 전환 [A단계] 등 기존 로드맵
 
 ### 22. Toss Payments 제거 + PortOne(KG이니시스) 결제 통일 + KG이니시스 사전심사 준비 (2026-04-03)
 - **완료:**

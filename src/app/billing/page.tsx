@@ -450,8 +450,8 @@ function SendModal({
 
 /* ── 메인 페이지 ── */
 export default function BillingAutomationPage() {
-  const { getRoomsByBusiness, selectedBusinessId } = useBusiness()
-  const rooms = getRoomsByBusiness(selectedBusinessId)
+  const { selectedBusinessId } = useBusiness()
+  const [activeLeaseCount, setActiveLeaseCount] = useState(0)
 
   const [invoices, setInvoices]   = useState<InvoiceRow[]>([])
   const [invYear, setInvYear]     = useState(new Date().getFullYear())
@@ -489,6 +489,33 @@ export default function BillingAutomationPage() {
   }, [selectedBusinessId])
 
   useEffect(() => { loadInvoices() }, [loadInvoices])
+
+  // ── 활성 계약 수 (실제 데이터) ────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setActiveLeaseCount(0); return }
+      // 활성 계약(ACTIVE) 수 — leases는 business_id가 없어 rooms 경유 조회
+      let roomQ = supabase
+        .from('rooms')
+        .select('id')
+        .eq('owner_id', user.id)
+      if (selectedBusinessId && selectedBusinessId !== 'ALL') {
+        roomQ = roomQ.eq('business_id', selectedBusinessId)
+      }
+      const { data: roomRows } = await roomQ
+      const roomIds = (roomRows ?? []).map(r => r.id)
+      if (roomIds.length === 0) { setActiveLeaseCount(0); return }
+      const { count } = await supabase
+        .from('leases')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', user.id)
+        .eq('status', 'ACTIVE')
+        .in('room_id', roomIds)
+      setActiveLeaseCount(count ?? 0)
+    })()
+  }, [selectedBusinessId])
 
   const unpaidInvoices  = invoices.filter(i => i.status !== 'paid')
   const sendableCount   = unpaidInvoices.filter(i => i.rooms?.tenant_contact).length
@@ -575,7 +602,7 @@ export default function BillingAutomationPage() {
           <p className="text-sm text-neutral-500 mb-6">등록된 입주사의 계약정보(보증금, 월세, 약정일)를 바탕으로 이번 달 청구 기준 데이터를 생성합니다.</p>
           <div className="bg-neutral-50 rounded-lg p-4 flex items-center gap-3">
             <CheckCircle2 className="text-emerald-500" />
-            <span className="text-sm font-bold">{rooms.length}개 호실 데이터 스캔 완료</span>
+            <span className="text-sm font-bold">{activeLeaseCount}개 활성 계약 스캔 완료</span>
           </div>
         </div>
 

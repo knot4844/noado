@@ -7,9 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
   Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw, Trash2,
-  GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles,
+  GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles, Split, Calendar,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
+import { deductPrepayForInvoice, addPrepayCredit, getPrepayBalance } from '@/lib/prepay'
 import type { Invoice, Room } from '@/types'
 
 /* ─── leases + tenants 조인 결과 타입 ─── */
@@ -106,6 +107,20 @@ interface PendingMatch {
   aiSuggestedId:      string | null  // AI 제안
   aiReason:           string | null  // AI 추론 이유
   matchedTenantName:  string | null  // 매칭된 입주사명 (표시용)
+  /** 분할 매칭: 한 입금을 여러 청구서에 나눠 충당 */
+  splits:             { invoiceId: string; amount: number }[] | null
+}
+
+/* ─── 분할 매칭용 미납 청구서 (월별, 모든 연도) ─── */
+interface UnpaidInvoiceForSplit {
+  id:          string
+  room_id:     string
+  year:        number
+  month:       number
+  amount:      number
+  paid_amount: number
+  due_date:    string
+  status:      string
 }
 
 /* ─── 가상계좌 모달 ─── */
@@ -125,6 +140,8 @@ export default function PaymentsPage() {
   const [invoices, setInvoices] = useState<InvoiceWithRoom[]>([])
   const [allRooms,    setAllRooms]    = useState<{ id: string; name: string }[]>([])
   const [allLeases,   setAllLeases]   = useState<ActiveLease[]>([])
+  /** 전 기간 미납 청구서 — FIFO 자동 충당용 */
+  const [allUnpaidInvoices, setAllUnpaidInvoices] = useState<UnpaidInvoiceForSplit[]>([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState<FilterStatus>('ALL')
   const [search, setSearch]     = useState('')
@@ -143,6 +160,12 @@ export default function PaymentsPage() {
   const [aiMatching, setAiMatching]         = useState(false)
   const [sortCol, setSortCol]   = useState<'date' | 'amount' | 'note' | 'room' | 'status'>('date')
   const [sortAsc, setSortAsc]   = useState(true)
+
+  /* ─── 분할 매칭 모달 상태 ─── */
+  const [splitRowIdx,    setSplitRowIdx]    = useState<number | null>(null)
+  const [splitInvoices,  setSplitInvoices]  = useState<UnpaidInvoiceForSplit[]>([])
+  const [splitLoading,   setSplitLoading]   = useState(false)
+  const [splitAllocs,    setSplitAllocs]    = useState<Record<string, string>>({})
 
   /* ─── 청구금액 인라인 수정 ─── */
   const [editingId, setEditingId]   = useState<string | null>(null)
@@ -198,6 +221,16 @@ export default function PaymentsPage() {
       lease_end:    l.lease_end,
       tenant:       Array.isArray(l.tenant) ? (l.tenant[0] ?? null) : l.tenant,
     })))
+
+    // 전 기간 미납 청구서 — Stage 2: FIFO 자동 충당 + Stage 1 분할 매칭에 사용
+    const { data: allUnpaid } = await supabase
+      .from('invoices')
+      .select('id, room_id, year, month, amount, paid_amount, due_date, status')
+      .eq('owner_id', user.id)
+      .neq('status', 'paid')
+      .order('year',  { ascending: true })
+      .order('month', { ascending: true })
+    setAllUnpaidInvoices((allUnpaid ?? []) as UnpaidInvoiceForSplit[])
 
     setLoading(false)
   }, [supabase, yearMonth])
@@ -368,6 +401,7 @@ export default function PaymentsPage() {
           aiSuggestedId:      null,
           aiReason:           null,
           matchedTenantName:  bestTenantName,
+          splits:             null,
         }
       }
 
@@ -378,11 +412,41 @@ export default function PaymentsPage() {
         return false
       }) ?? null
 
+      /* ─── Stage 2: FIFO 자동 충당 ───
+         단일 청구서와 금액 일치하지 않지만 입주사가 식별된 경우,
+         해당 호실의 전 기간 미납 청구서를 가장 오래된 것부터 채워본다. */
+      let autoSplits: { invoiceId: string; amount: number }[] | null = null
+      if (!suggested && bestLeaseMatch) {
+        const roomUnpaid = allUnpaidInvoices
+          .filter(u => u.room_id === bestLeaseMatch.lease.room_id)
+          .sort((a, b) => a.year - b.year || a.month - b.month)
+        if (roomUnpaid.length > 0) {
+          let remaining = row.amount
+          const splits: { invoiceId: string; amount: number }[] = []
+          for (const u of roomUnpaid) {
+            if (remaining <= 0) break
+            const due = Math.max(0, (u.amount || 0) - (u.paid_amount || 0))
+            if (due <= 0) continue
+            const take = Math.min(due, remaining)
+            splits.push({ invoiceId: u.id, amount: take })
+            remaining -= take
+          }
+          // 분할이 의미 있는 경우만 채택: ① 두 건 이상이거나 ② 한 건이라도 잔여가 있어 부분 수납인 경우
+          if (splits.length >= 2 || (splits.length === 1 && remaining > 0)) {
+            autoSplits = splits
+          }
+        }
+      }
+
       /* 자동 매칭 2순위: 청구서 없을 경우 — lease로 호실 찾아 신규 등록 */
-      const suggestedNewRoom = !suggested && bestLeaseMatch
+      const suggestedNewRoom = !suggested && !autoSplits && bestLeaseMatch
         ? allRooms.find(r => r.id === bestLeaseMatch.lease.room_id) ?? null
         : null
-      const suggestedId = suggested?.id ?? (suggestedNewRoom ? `new:${suggestedNewRoom.id}` : null)
+
+      // FIFO 분할이 채택된 경우엔 가상의 selectedInvoiceId로 첫 번째 invoice를 가리키게 한다 (UI 일관성)
+      const suggestedId = suggested?.id
+        ?? (autoSplits ? autoSplits[0].invoiceId : null)
+        ?? (suggestedNewRoom ? `new:${suggestedNewRoom.id}` : null)
 
       return {
         rowIdx:             idx,
@@ -395,6 +459,7 @@ export default function PaymentsPage() {
         aiSuggestedId:      null,
         aiReason:           null,
         matchedTenantName:  bestTenantName,
+        splits:             autoSplits,
       }
     })
 
@@ -451,6 +516,117 @@ export default function PaymentsPage() {
 
 
   /* ══════════════════════════════════
+     분할 매칭 모달
+  ══════════════════════════════════ */
+  /** PendingMatch에서 roomId 추출 (분할 매칭용) */
+  const resolveRoomId = (pm: PendingMatch): string | null => {
+    if (!pm.selectedInvoiceId) return null
+    if (pm.selectedInvoiceId.startsWith('new:')) {
+      return pm.selectedInvoiceId.replace('new:', '')
+    }
+    const inv = invoices.find(i => i.id === pm.selectedInvoiceId)
+    return inv?.room_id ?? null
+  }
+
+  const openSplitModal = async (rowIdx: number) => {
+    const pm = pendingMatches.find(m => m.rowIdx === rowIdx)
+    if (!pm) return
+    const roomId = resolveRoomId(pm)
+    if (!roomId) {
+      showToast('error', '매칭 호실을 먼저 선택해주세요.')
+      return
+    }
+
+    setSplitRowIdx(rowIdx)
+    setSplitLoading(true)
+    setSplitInvoices([])
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSplitLoading(false); return }
+
+    // 해당 호실의 모든 미납 청구서 (전 기간)
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id, year, month, amount, paid_amount, due_date, status')
+      .eq('owner_id', user.id)
+      .eq('room_id', roomId)
+      .neq('status', 'paid')
+      .order('year',  { ascending: true })
+      .order('month', { ascending: true })
+
+    if (error) {
+      console.error('[openSplitModal] 미납 청구서 조회 오류:', error.message)
+      showToast('error', '미납 청구서 조회 실패')
+      setSplitLoading(false)
+      setSplitRowIdx(null)
+      return
+    }
+
+    const list = (data ?? []) as UnpaidInvoiceForSplit[]
+    setSplitInvoices(list)
+
+    // 기존 splits가 있으면 prefill, 없으면 FIFO로 자동 배분 제안
+    if (pm.splits && pm.splits.length > 0) {
+      const prev: Record<string, string> = {}
+      for (const s of pm.splits) prev[s.invoiceId] = String(s.amount)
+      setSplitAllocs(prev)
+    } else {
+      // FIFO 자동 제안: 잔액이 가장 적게 남은 옛날 청구서부터 채움
+      let remaining = pm.bankRow.amount
+      const next: Record<string, string> = {}
+      for (const inv of list) {
+        if (remaining <= 0) break
+        const due  = Math.max(0, (inv.amount || 0) - (inv.paid_amount || 0))
+        const take = Math.min(due, remaining)
+        if (take > 0) {
+          next[inv.id] = String(take)
+          remaining -= take
+        }
+      }
+      setSplitAllocs(next)
+    }
+
+    setSplitLoading(false)
+  }
+
+  const closeSplitModal = () => {
+    setSplitRowIdx(null)
+    setSplitInvoices([])
+    setSplitAllocs({})
+  }
+
+  const confirmSplit = () => {
+    if (splitRowIdx === null) return
+    const splits: { invoiceId: string; amount: number }[] = []
+    for (const [invoiceId, raw] of Object.entries(splitAllocs)) {
+      const amt = Number(raw) || 0
+      if (amt > 0) splits.push({ invoiceId, amount: amt })
+    }
+
+    setPendingMatches(prev =>
+      prev.map(m => m.rowIdx === splitRowIdx
+        ? {
+            ...m,
+            splits,
+            // 분할이 한 건도 없으면 splits 해제
+            ...(splits.length === 0 ? { splits: null } : {}),
+            included: splits.length > 0 ? true : m.included,
+          }
+        : m
+      )
+    )
+    closeSplitModal()
+  }
+
+  const clearSplit = () => {
+    if (splitRowIdx === null) return
+    setPendingMatches(prev =>
+      prev.map(m => m.rowIdx === splitRowIdx ? { ...m, splits: null } : m)
+    )
+    closeSplitModal()
+  }
+
+  /* ══════════════════════════════════
      수납 확정 실행
   ══════════════════════════════════ */
   const executeMatches = async () => {
@@ -464,6 +640,76 @@ export default function PaymentsPage() {
 
     for (const pm of pendingMatches) {
       if (!pm.included || !pm.selectedInvoiceId) { skipped++; continue }
+
+      /* ─── 분할 매칭: 한 입금을 여러 청구서에 나눠 충당 ─── */
+      if (pm.splits && pm.splits.length > 0) {
+        const { isoDate } = parseBankDate(pm.bankRow.date)
+        let splitOk = true
+        const splitTotal = pm.splits.reduce((s, x) => s + x.amount, 0)
+        const leftover   = pm.bankRow.amount - splitTotal
+        // 분할 대상 호실의 lease — leftover를 PREPAY로 적립할 때 사용
+        const firstInv = invoices.find(i => i.id === pm.splits![0].invoiceId)
+          ?? allUnpaidInvoices.find(u => u.id === pm.splits![0].invoiceId)
+        const splitLease = firstInv ? allLeases.find(l => l.room_id === firstInv.room_id) : null
+
+        for (const s of pm.splits) {
+          // 1) 현재 청구서 상태 조회 (paid_amount 누적용)
+          const { data: invRow, error: invErr } = await supabase
+            .from('invoices')
+            .select('id, room_id, amount, paid_amount')
+            .eq('id', s.invoiceId)
+            .single()
+          if (invErr || !invRow) {
+            console.error('[split] 청구서 조회 오류:', invErr?.message)
+            splitOk = false
+            break
+          }
+
+          const newPaid = (invRow.paid_amount || 0) + s.amount
+          const fullyPaid = newPaid >= (invRow.amount || 0)
+
+          const { error: updErr } = await supabase.from('invoices').update({
+            paid_amount: newPaid,
+            status:      fullyPaid ? 'paid' : invRow.amount > newPaid ? 'ready' : 'paid',
+            paid_at:     fullyPaid ? isoDate : null,
+          }).eq('id', s.invoiceId)
+          if (updErr) {
+            console.error('[split] 청구서 업데이트 오류:', updErr.message)
+            splitOk = false
+            break
+          }
+
+          const { error: payErr } = await supabase.from('payments').insert({
+            owner_id:   user.id,
+            invoice_id: s.invoiceId,
+            room_id:    invRow.room_id,
+            amount:     s.amount,
+            paid_at:    isoDate,
+            note:       pm.bankRow.note,
+          })
+          if (payErr) {
+            console.error('[split] 입금 기록 오류:', payErr.message)
+            splitOk = false
+            break
+          }
+        }
+
+        if (splitOk) {
+          // ─── Stage 3: 잔여 → PREPAY 자동 적립 ───
+          if (leftover > 0 && splitLease) {
+            await addPrepayCredit(supabase, {
+              ownerId: user.id,
+              leaseId: splitLease.id,
+              amount:  leftover,
+              note:    `분할 매칭 잔여 (${pm.bankRow.date} ${formatKRW(pm.bankRow.amount)})`,
+            })
+          }
+          matched++
+        } else {
+          skipped++
+        }
+        continue
+      }
 
       /* ─── 새 청구서 생성 후 수납 (과거 수납 내역 등록) ─── */
       if (pm.selectedInvoiceId.startsWith('new:')) {
@@ -764,6 +1010,23 @@ export default function PaymentsPage() {
 
     if (error) { showToast('error', error.message); setImporting(false); return }
 
+    // ─── Stage 3: PREPAY 자동 차감 ───
+    let prepayUsedCount = 0
+    if (insertedInvoices) {
+      for (const inv of insertedInvoices) {
+        const lease = leaseByRoom[inv.room_id]
+        if (!lease) continue
+        const result = await deductPrepayForInvoice(supabase, {
+          ownerId:       user.id,
+          leaseId:       lease.id,
+          invoiceId:     inv.id,
+          roomId:        inv.room_id,
+          invoiceAmount: inv.amount ?? 0,
+        })
+        if (result.deducted > 0) prepayUsedCount++
+      }
+    }
+
     // 알림톡 발송
     if (insertedInvoices) {
       for (const inv of insertedInvoices) {
@@ -794,7 +1057,8 @@ export default function PaymentsPage() {
       }
     }
 
-    showToast('success', `${newRooms.length}건 청구서를 생성했습니다.`)
+    const prepayMsg = prepayUsedCount > 0 ? ` · 선납금 자동 차감 ${prepayUsedCount}건` : ''
+    showToast('success', `${newRooms.length}건 청구서를 생성했습니다.${prepayMsg}`)
     load()
     setImporting(false)
   }
@@ -1128,8 +1392,9 @@ export default function PaymentsPage() {
                           )}
                         </td>
 
-                        {/* 매칭 선택 드롭다운 */}
+                        {/* 매칭 선택 드롭다운 + 분할 매칭 버튼 */}
                         <td className="px-4 py-3">
+                          <div className="flex items-start gap-1.5">
                           <select
                             value={pm.selectedInvoiceId ?? ''}
                             onChange={e => {
@@ -1142,6 +1407,7 @@ export default function PaymentsPage() {
                                     included:          !!val,
                                     isDuplicate:       false,  // 수동 변경 시 중복 해제
                                     duplicateLabel:    null,
+                                    splits:            null,   // 매칭 변경 시 분할 해제
                                   } : m
                                 )
                               )
@@ -1189,6 +1455,31 @@ export default function PaymentsPage() {
                               </optgroup>
                             )}
                           </select>
+                          <button
+                            type="button"
+                            onClick={() => openSplitModal(pm.rowIdx)}
+                            disabled={!pm.selectedInvoiceId || pm.isDuplicate}
+                            title="여러 달 청구서에 나눠 충당"
+                            className="shrink-0 flex items-center gap-1 px-2 py-2 rounded-lg text-xs font-semibold border transition disabled:opacity-30 disabled:cursor-not-allowed"
+                            style={{
+                              borderColor: pm.splits && pm.splits.length > 0 ? 'var(--color-primary)' : 'var(--color-border)',
+                              background:  pm.splits && pm.splits.length > 0 ? 'var(--color-primary)' : 'var(--color-surface)',
+                              color:       pm.splits && pm.splits.length > 0 ? '#fff' : 'var(--color-muted)',
+                            }}>
+                            <Split size={12} />
+                            {pm.splits && pm.splits.length > 0 ? `분할 ${pm.splits.length}` : '분할'}
+                          </button>
+                          </div>
+                          {pm.splits && pm.splits.length > 0 && (
+                            <div className="mt-1.5 text-[10px] leading-tight" style={{ color: 'var(--color-muted)' }}>
+                              {pm.splits.map(s => {
+                                const inv = splitInvoices.find(i => i.id === s.invoiceId)
+                                  ?? invoices.find(i => i.id === s.invoiceId)
+                                const ym = inv ? `${('year' in inv ? inv.year : '')}-${String('month' in inv ? inv.month : '').padStart(2,'0')}` : ''
+                                return `${ym} ${formatKRW(s.amount)}`
+                              }).join(' · ')}
+                            </div>
+                          )}
                         </td>
 
                         {/* 상태 배지 */}
@@ -1278,6 +1569,189 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════
+          분할 매칭 모달
+      ══════════════════════════════════════════════ */}
+      {splitRowIdx !== null && (() => {
+        const pm = pendingMatches.find(m => m.rowIdx === splitRowIdx)
+        if (!pm) return null
+        const deposit = pm.bankRow.amount
+        const allocTotal = Object.values(splitAllocs).reduce((s, v) => s + (Number(v) || 0), 0)
+        const remaining  = deposit - allocTotal
+        const overflow   = allocTotal > deposit
+        const roomId     = resolveRoomId(pm)
+        const roomName   = allRooms.find(r => r.id === roomId)?.name ?? ''
+        const tenantName = roomId ? (allLeases.find(l => l.room_id === roomId)?.tenant?.name ?? '') : ''
+
+        return (
+          <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4"
+               onClick={e => { if (e.target === e.currentTarget) closeSplitModal() }}>
+            <div className="rounded-2xl w-full max-w-2xl shadow-2xl"
+                 style={{ background: 'var(--color-surface)' }}>
+
+              {/* 헤더 */}
+              <div className="flex items-center justify-between px-6 py-4 border-b"
+                   style={{ borderColor: 'var(--color-border)' }}>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Split size={18} style={{ color: 'var(--color-primary)' }} />
+                    <h2 className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>분할 매칭</h2>
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                    한 입금을 여러 달 청구서에 나눠 충당합니다.
+                  </p>
+                </div>
+                <button onClick={closeSplitModal} style={{ color: 'var(--color-muted)' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* 입금 정보 + 호실 */}
+              <div className="px-6 py-4 grid grid-cols-3 gap-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--color-muted)' }}>입금일</div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>{pm.bankRow.date || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--color-muted)' }}>입금액</div>
+                  <div className="text-sm font-bold tabular" style={{ color: 'var(--color-primary)' }}>
+                    {formatKRW(deposit)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase mb-1" style={{ color: 'var(--color-muted)' }}>매칭 호실</div>
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>
+                    {roomName} {tenantName && <span style={{ color: 'var(--color-muted)' }}>· {tenantName}</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* 미납 청구서 목록 */}
+              <div className="max-h-[50vh] overflow-y-auto">
+                {splitLoading ? (
+                  <div className="py-12 flex flex-col items-center justify-center gap-2">
+                    <Loader2 size={20} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
+                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>미납 청구서 조회 중...</p>
+                  </div>
+                ) : splitInvoices.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <CheckCircle2 size={24} className="mx-auto mb-2" style={{ color: 'var(--color-success)' }} />
+                    <p className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>해당 호실의 미납 청구서가 없습니다.</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>분할 매칭을 사용할 수 없습니다.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ background: 'var(--color-muted-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase" style={{ color: 'var(--color-muted)' }}>청구월</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase" style={{ color: 'var(--color-muted)' }}>청구금액</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase" style={{ color: 'var(--color-muted)' }}>기수납</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase" style={{ color: 'var(--color-muted)' }}>잔여</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-semibold uppercase" style={{ color: 'var(--color-muted)' }}>충당액</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {splitInvoices.map(inv => {
+                        const due = Math.max(0, (inv.amount || 0) - (inv.paid_amount || 0))
+                        const allocVal = splitAllocs[inv.id] ?? ''
+                        const allocNum = Number(allocVal) || 0
+                        const isOverDue = allocNum > due
+                        return (
+                          <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar size={12} style={{ color: 'var(--color-muted)' }} />
+                                <span className="text-xs font-medium" style={{ color: 'var(--color-text)' }}>
+                                  {inv.year}-{String(inv.month).padStart(2,'0')}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-xs tabular" style={{ color: 'var(--color-muted)' }}>
+                              {formatKRW(inv.amount)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-xs tabular" style={{ color: 'var(--color-muted)' }}>
+                              {formatKRW(inv.paid_amount || 0)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-xs tabular font-semibold" style={{ color: 'var(--color-danger)' }}>
+                              {formatKRW(due)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={allocVal}
+                                onChange={e => {
+                                  const v = e.target.value.replace(/[^0-9]/g, '')
+                                  setSplitAllocs(prev => ({ ...prev, [inv.id]: v }))
+                                }}
+                                placeholder="0"
+                                className="w-28 px-2 py-1.5 rounded-md text-right text-xs tabular outline-none"
+                                style={{
+                                  border:     `1px solid ${isOverDue ? 'var(--color-danger)' : 'var(--color-border)'}`,
+                                  background: 'var(--color-muted-bg)',
+                                  color:      isOverDue ? 'var(--color-danger)' : 'var(--color-foreground)',
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* 합계 + 잔여 */}
+              <div className="px-6 py-3 border-t" style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--color-muted)' }}>충당 합계</span>
+                  <span className="font-bold tabular" style={{ color: overflow ? 'var(--color-danger)' : 'var(--color-text)' }}>
+                    {formatKRW(allocTotal)} / {formatKRW(deposit)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span style={{ color: 'var(--color-muted)' }}>
+                    {remaining >= 0 ? '잔여 (선납 처리 예정)' : '초과'}
+                  </span>
+                  <span className="font-bold tabular" style={{ color: overflow ? 'var(--color-danger)' : remaining > 0 ? '#f59e0b' : 'var(--color-success)' }}>
+                    {formatKRW(Math.abs(remaining))}
+                  </span>
+                </div>
+                {overflow && (
+                  <p className="text-[10px] mt-1.5" style={{ color: 'var(--color-danger)' }}>
+                    충당 합계가 입금액을 초과합니다. 금액을 조정해주세요.
+                  </p>
+                )}
+              </div>
+
+              {/* 푸터 */}
+              <div className="flex items-center justify-between px-6 py-4 border-t gap-3"
+                   style={{ borderColor: 'var(--color-border)' }}>
+                <button onClick={clearSplit}
+                  className="px-3 py-2 rounded-lg text-xs border"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+                  분할 해제
+                </button>
+                <div className="flex gap-2">
+                  <button onClick={closeSplitModal}
+                    className="px-4 py-2 rounded-lg text-sm border"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+                    취소
+                  </button>
+                  <button onClick={confirmSplit}
+                    disabled={overflow || allocTotal === 0}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                    style={{ background: 'var(--color-primary)' }}>
+                    <CheckCircle2 size={14} />
+                    분할 확정
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ══════════════════════════════════════════════
           가상계좌 발급 모달

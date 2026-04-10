@@ -42,8 +42,8 @@ export default function CompleteProfilePage() {
       if (meta.phone) setPhone(meta.phone)
       if (user.email && !user.email.endsWith('@kakao.com')) setEmail(user.email)
 
-      // 이미 둘 다 있으면 대시보드로
-      if (phoneExists && emailExists) {
+      // 휴대폰 번호만 있으면 대시보드로 (이메일은 선택사항)
+      if (phoneExists) {
         router.push('/dashboard')
         return
       }
@@ -105,9 +105,12 @@ export default function CompleteProfilePage() {
       })
       if (updateErr) { setError(updateErr.message); setLoading(false); return }
 
+      // JWT 쿠키 새로고침 — 미들웨어가 최신 user_metadata.phone 을 읽도록
+      await supabase.auth.refreshSession()
+
       setStep('done')
-      // 1.5초 후 대시보드로 이동
-      setTimeout(() => router.push('/dashboard'), 1500)
+      // 1.5초 후 대시보드로 이동 (full reload — 미들웨어 재실행)
+      setTimeout(() => { window.location.href = '/dashboard' }, 1500)
     } catch (err: unknown) {
       const e = err as { message?: string }
       setError(e.message || '저장에 실패했습니다.')

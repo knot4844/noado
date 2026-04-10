@@ -54,8 +54,8 @@ export async function convertPdfToPngBlob(file: File): Promise<PdfConversionResu
       canvas,
       canvasContext: ctx,
       viewport,
-      // @ts-expect-error v5 타입 호환
-      intent: 'print',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      intent: 'print' as any,
     }).promise
     pages.push(canvas)
     totalHeight += canvas.height

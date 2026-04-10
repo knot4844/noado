@@ -8,7 +8,7 @@ import {
   Search, Plus, Phone, Calendar, ChevronRight, ChevronLeft,
   User, Home, Loader2, X, AlertCircle, CheckCircle2,
   History, Pencil, LogOut, TrendingUp, LayoutList, GanttChartSquare,
-  Send,
+  Send, Wallet,
 } from 'lucide-react'
 import { formatKRW, formatDate, formatPhone } from '@/lib/utils'
 import type { Room, Invoice, Payment, Tenant, Lease, ContractType, VatType } from '@/types'
@@ -20,6 +20,10 @@ interface LeaseItem {
   room:          Room
   invoices:      Invoice[]
   latestInvoice: Invoice | null
+  /** 미수납 합계 (잔여 청구액 — Stage 4) */
+  unpaidTotal:   number
+  /** PREPAY 잔액 (선납금 — Stage 4) */
+  prepayBalance: number
 }
 
 interface InvoiceWithPayments extends Invoice {
@@ -90,7 +94,21 @@ export default function TenantsPage() {
 
     if (invErr) console.error('[tenants] invoices error:', invErr)
 
-    // 4. 조인
+    // 4. 각 lease의 PREPAY 잔액 (deposits)
+    const leaseIds = (leasesData ?? []).map((l: Lease) => l.id)
+    const { data: depData } = await supabase
+      .from('deposits')
+      .select('lease_id, amount, type, refunded_at')
+      .in('lease_id', leaseIds.length > 0 ? leaseIds : ['00000000-0000-0000-0000-000000000000'])
+      .eq('type', 'PREPAY')
+      .is('refunded_at', null)
+
+    const prepayByLease: Record<string, number> = {}
+    for (const d of (depData ?? []) as { lease_id: string; amount: number }[]) {
+      prepayByLease[d.lease_id] = (prepayByLease[d.lease_id] || 0) + (d.amount || 0)
+    }
+
+    // 5. 조인
     const invoicesByRoom: Record<string, Invoice[]> = {}
     for (const inv of (invData ?? [])) {
       if (!invoicesByRoom[inv.room_id]) invoicesByRoom[inv.room_id] = []
@@ -102,12 +120,18 @@ export default function TenantsPage() {
       .map((l: Lease & { room?: Room; tenant?: Tenant }) => {
         const invs    = invoicesByRoom[l.room_id] ?? []
         const current = invs.find(i => i.year === year && i.month === month) ?? null
+        // 미수납 합계: 미납 청구서의 (amount - paid_amount) 합
+        const unpaidTotal = invs
+          .filter(i => i.status !== 'paid')
+          .reduce((s, i) => s + Math.max(0, (i.amount || 0) - (i.paid_amount || 0)), 0)
         return {
           lease:         l,
           tenant:        l.tenant as Tenant,
           room:          l.room as Room,
           invoices:      invs,
           latestInvoice: current,
+          unpaidTotal,
+          prepayBalance: prepayByLease[l.id] || 0,
         }
       })
       .sort((a: LeaseItem, b: LeaseItem) => a.room.name.localeCompare(b.room.name, 'ko'))
@@ -340,7 +364,7 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
   onRequestPayment: () => void
   isRequesting:     boolean
 }) {
-  const { lease, tenant, room, invoices } = item
+  const { lease, tenant, room, invoices, unpaidTotal, prepayBalance } = item
   const isPaid      = room.status === 'PAID'
   const statusColor = isPaid ? 'var(--color-success)' : 'var(--color-danger)'
   const statusBg    = isPaid ? 'var(--color-success-bg)' : 'var(--color-danger-bg)'
@@ -419,6 +443,27 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
             </p>
           </div>
         </div>
+
+        {/* 잔액: 미수납 / 선납금 (Stage 4) */}
+        {(unpaidTotal > 0 || prepayBalance > 0) && (
+          <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-lg"
+               style={{
+                 background: unpaidTotal > 0 ? 'var(--color-danger-bg)' : 'rgba(16,185,129,0.08)',
+                 border:     `1px solid ${unpaidTotal > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.18)'}`,
+               }}>
+            <Wallet size={12} style={{ color: unpaidTotal > 0 ? 'var(--color-danger)' : 'var(--color-success)' }} />
+            {unpaidTotal > 0 && (
+              <span className="text-xs font-semibold tabular" style={{ color: 'var(--color-danger)' }}>
+                미수납 {formatKRW(unpaidTotal)}
+              </span>
+            )}
+            {prepayBalance > 0 && (
+              <span className="text-xs font-semibold tabular ml-auto" style={{ color: 'var(--color-success)' }}>
+                선납 +{formatKRW(prepayBalance)}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* 연락처 */}
         <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--color-muted)' }}>

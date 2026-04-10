@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
   let query = admin
     .from('invoices')
-    .select('*, rooms(id, name, status, tenant_name, tenant_contact, monthly_rent, business_id)')
+    .select('*, rooms(id, name, status, business_id)')
     .eq('owner_id', user.id)
     .eq('year', year)
     .eq('month', month)
@@ -67,7 +67,39 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ invoices: data ?? [], year, month })
+  // leases → tenants 경유로 입주사 정보 보강 (rooms 테이블에서 tenant_* 컬럼 제거됨)
+  const invoiceRows = data ?? []
+  if (invoiceRows.length > 0) {
+    const roomIds = [...new Set(invoiceRows.map((i: { room_id: string }) => i.room_id))]
+    const { data: leaseData } = await admin
+      .from('leases')
+      .select('room_id, monthly_rent, tenant:tenants(name, phone)')
+      .eq('status', 'ACTIVE')
+      .in('room_id', roomIds)
+
+    const leaseByRoom: Record<string, { tenant_name: string | null; tenant_contact: string | null; monthly_rent: number | null }> = {}
+    for (const l of (leaseData ?? []) as unknown as { room_id: string; monthly_rent: number | null; tenant: { name: string; phone: string } | { name: string; phone: string }[] | null }[]) {
+      const t = Array.isArray(l.tenant) ? l.tenant[0] : l.tenant
+      leaseByRoom[l.room_id] = {
+        tenant_name: t?.name ?? null,
+        tenant_contact: t?.phone ?? null,
+        monthly_rent: l.monthly_rent,
+      }
+    }
+
+    // rooms 객체에 tenant 정보 병합 (프론트엔드 호환성 유지)
+    for (const inv of invoiceRows) {
+      const room = (inv as { rooms: Record<string, unknown> | null }).rooms
+      const lease = leaseByRoom[(inv as { room_id: string }).room_id]
+      if (room && lease) {
+        room.tenant_name = lease.tenant_name
+        room.tenant_contact = lease.tenant_contact
+        room.monthly_rent = lease.monthly_rent
+      }
+    }
+  }
+
+  return NextResponse.json({ invoices: invoiceRows, year, month })
 }
 
 /* ─── POST ─── */
