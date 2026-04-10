@@ -37,8 +37,9 @@ export default async function TenantPaymentPage({ params }: PageProps) {
     notFound()
   }
 
-  // lease/tenant 정보 조회 (입주사명 등)
+  // lease/tenant 정보 조회 (입주사명, 전화번호 등)
   let tenantName = ''
+  let tenantPhone = ''
   if (invoice.lease_id) {
     const { data: lease } = await supabase
       .from('leases')
@@ -48,6 +49,7 @@ export default async function TenantPaymentPage({ params }: PageProps) {
     if (lease) {
       const tenant = lease.tenants as unknown as { name: string; phone: string } | null
       tenantName = tenant?.name || ''
+      tenantPhone = tenant?.phone || ''
     }
   } else if (invoice.tenant_id) {
     const { data: tenant } = await supabase
@@ -56,6 +58,7 @@ export default async function TenantPaymentPage({ params }: PageProps) {
       .eq('id', invoice.tenant_id)
       .single()
     tenantName = tenant?.name || ''
+    tenantPhone = tenant?.phone || ''
   }
 
   // 계약서 조회 (contract_id가 있을 때만)
@@ -75,7 +78,7 @@ export default async function TenantPaymentPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4 selection:bg-blue-100">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100">
-        <TenantPaymentView invoice={invoice as Invoice} room={room} contract={contract} tenantName={tenantName} />
+        <TenantPaymentView invoice={invoice as Invoice} room={room} contract={contract} tenantName={tenantName} tenantPhone={tenantPhone} />
       </div>
     </div>
   )

@@ -26,9 +26,10 @@ interface Props {
   room?:    Room
   contract?: Contract | null
   tenantName?: string
+  tenantPhone?: string
 }
 
-export default function TenantPaymentView({ invoice, room, contract, tenantName }: Props) {
+export default function TenantPaymentView({ invoice, room, contract, tenantName, tenantPhone }: Props) {
   const [bank, setBank]             = useState<string>('SHINHAN')
   const [loading, setLoading]       = useState(false)
   const [cardLoading, setCardLoading] = useState(false)
@@ -98,6 +99,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName 
           customerId: `TENANT_${invoice.id}`,
           email: 'noreply@noado.kr',
           fullName: tenantName || '이용자',
+          phoneNumber: tenantPhone || '01000000000',
         },
       })
 
