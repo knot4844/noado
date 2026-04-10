@@ -26,19 +26,50 @@ export async function GET(
     .select('*')
     .eq('owner_id', userId)
 
-  /* 3) 호실 */
-  const { data: rooms } = await admin
+  /* 3) 호실 + leases→tenants 병합 */
+  const { data: rawRooms } = await admin
     .from('rooms')
-    .select('*')
+    .select('id, name, status, owner_id, business_id, building, area, memo, created_at')
     .eq('owner_id', userId)
     .order('name')
+
+  const { data: leaseData } = await admin
+    .from('leases')
+    .select('room_id, monthly_rent, pledge_amount, lease_start, lease_end, payment_day, status, tenant:tenants(name, phone, email)')
+    .eq('owner_id', userId)
+    .eq('status', 'ACTIVE')
+
+  // rooms에 lease 정보 병합
+  const leaseByRoom: Record<string, Record<string, unknown>> = {}
+  for (const l of (leaseData ?? []) as unknown as { room_id: string; monthly_rent: number; pledge_amount: number; lease_start: string; lease_end: string; tenant: { name: string; phone: string; email: string } | { name: string; phone: string; email: string }[] | null }[]) {
+    const t = Array.isArray(l.tenant) ? l.tenant[0] : l.tenant
+    leaseByRoom[l.room_id] = {
+      tenant_name:  t?.name ?? null,
+      tenant_phone: t?.phone ?? null,
+      tenant_email: t?.email ?? null,
+      monthly_rent: l.monthly_rent ?? 0,
+      deposit:      l.pledge_amount ?? 0,
+      lease_start:  l.lease_start,
+      lease_end:    l.lease_end,
+    }
+  }
+  const rooms = (rawRooms ?? []).map(r => ({
+    ...r,
+    tenant_name:  null as string | null,
+    tenant_phone: null as string | null,
+    monthly_rent: 0,
+    deposit:      0,
+    lease_start:  null as string | null,
+    lease_end:    null as string | null,
+    ...(leaseByRoom[r.id] || {}),
+  }))
 
   /* 4) 청구서 (최근 6개월) */
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
   const { data: invoices } = await admin
     .from('invoices')
-    .select('*, rooms(name, tenant_name)')
+    .select('*, rooms(name)')
     .eq('owner_id', userId)
     .gte('created_at', sixMonthsAgo.toISOString())
     .order('created_at', { ascending: false })

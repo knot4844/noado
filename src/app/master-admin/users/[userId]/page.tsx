@@ -28,7 +28,7 @@ const invColor   = (s: string) => s === 'paid' ? { c: '#34d399', bg: '#064e3b' }
 const invLabel   = (s: string) => s === 'paid' ? '완납' : s === 'overdue' ? '연체' : '미납'
 const ctColor    = (s: string) => s === 'signed' ? { c: '#34d399', bg: '#064e3b' } : s === 'sent' ? { c: '#60a5fa', bg: '#1e3a5f' } : s === 'expired' ? { c: '#f87171', bg: '#450a0a' } : { c: '#94a3b8', bg: '#1e293b' }
 const ctLabel    = (s: string) => s === 'signed' ? '서명완료' : s === 'sent' ? '발송됨' : s === 'expired' ? '만료' : '초안'
-const fmt        = (n: number) => `₩${n.toLocaleString('ko-KR')}`
+const fmt        = (n: number | null | undefined) => `₩${(n ?? 0).toLocaleString('ko-KR')}`
 const fmtDate    = (s: string | null) => s ? new Date(s).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—'
 const fmtDT      = (s: string | null) => s ? new Date(s).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
