@@ -2107,7 +2107,7 @@ export default function PaymentsPage() {
                                 발송
                                 <ChevronDown size={10} />
                               </button>
-                              <div className="absolute left-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl border border-neutral-200 py-1 z-50 hidden group-hover/send:block">
+                              <div className="absolute left-0 bottom-full mb-1 w-32 bg-white rounded-lg shadow-xl border border-neutral-200 py-1 z-50 hidden group-hover/send:block">
                                 <button onClick={() => sendInvoiceKakao(inv)}
                                   className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50 flex items-center gap-2 font-medium text-neutral-700">
                                   <MessageSquare size={12} className="text-yellow-500" />
