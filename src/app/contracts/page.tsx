@@ -16,7 +16,7 @@ import type { TemplateData } from '@/lib/contract-templates'
 import type { Contract, Room } from '@/types'
 
 /* ─── 마스터 계정 (양식 관리 권한) ─── */
-const MASTER_EMAIL = 'ehdbs0903@naver.com'
+const MASTER_EMAIL = 'knot4844@gmail.com'
 
 /* ─── 샘플 양식 타입 ─── */
 interface SampleTemplate {
