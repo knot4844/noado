@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Upload, Download, Search, CheckCircle2, AlertCircle,
   Loader2, RefreshCw, FileSpreadsheet, X, CreditCard, Building2, Copy, Pencil, RotateCcw, Trash2,
-  GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles, Split, Calendar,
+  GitMerge, Eye, AlertTriangle, MessageSquare, Sparkles, Split, Calendar, Send, Link2, ChevronDown,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import { deductPrepayForInvoice, addPrepayCredit, getPrepayBalance } from '@/lib/prepay'
@@ -924,30 +924,75 @@ export default function PaymentsPage() {
     load()
   }
 
+  /* ─── 임차인 전화번호 조회 헬퍼 ─── */
+  const getTenantPhone = async (roomId: string): Promise<string | null> => {
+    const lease = allLeases.find(l => l.room_id === roomId)
+    if (!lease?.tenant?.id) return null
+    const { data } = await supabase.from('tenants').select('phone').eq('id', lease.tenant.id).single()
+    return data?.phone || null
+  }
+
+  /* ─── 결제 링크 생성 ─── */
+  const getPaymentLink = (inv: InvoiceWithRoom) =>
+    `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`
+
   /* ─── 청구서 카톡 발송 (수동) ─── */
   const sendInvoiceKakao = async (inv: InvoiceWithRoom) => {
     const t = getTenantByRoom(inv.room_id)
-    if (!t?.name) return showToast('error', '연락처가 없습니다.')
+    if (!t?.name) return showToast('error', '입주사 정보가 없습니다.')
+    const phone = await getTenantPhone(inv.room_id)
+    if (!phone) return showToast('error', '연락처가 없습니다. 입주사 정보에 전화번호를 등록해주세요.')
     try {
       const res = await fetch('/api/alimtalk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateKey: 'INVOICE_ISSUED',
-          phone:       '',  // tenants 테이블에 phone 필드 있음 (별도 조회 필요)
+          phone,
           roomName:    inv.room?.name ?? '',
           tenantName:  t.name,
           amount:      String(inv.amount),
           dueDate:     inv.due_date || '',
-          paymentLink: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/pay/${inv.id}`,
+          paymentLink: getPaymentLink(inv),
           roomId:      inv.room_id
         })
       })
       if (!res.ok) throw new Error('발송 실패')
-      showToast('success', '청구서 알림톡을 발송했습니다.')
+      showToast('success', '카카오 알림톡을 발송했습니다.')
     } catch (e) {
       showToast('error', e instanceof Error ? e.message : '발송 오류')
     }
+  }
+
+  /* ─── 청구서 문자 발송 (SMS/LMS) ─── */
+  const sendInvoiceSMS = async (inv: InvoiceWithRoom) => {
+    const t = getTenantByRoom(inv.room_id)
+    if (!t?.name) return showToast('error', '입주사 정보가 없습니다.')
+    const phone = await getTenantPhone(inv.room_id)
+    if (!phone) return showToast('error', '연락처가 없습니다. 입주사 정보에 전화번호를 등록해주세요.')
+    const link = getPaymentLink(inv)
+    const text = `[대우오피스] ${inv.year}년 ${inv.month}월 이용료 안내\n\n${inv.room?.name ?? ''}호 ${t.name}님\n금액: ${formatKRW(inv.amount)}\n납부기한: ${inv.due_date || '확인요망'}\n\n결제하기: ${link}`
+    try {
+      const res = await fetch('/api/sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, text, roomId: inv.room_id, tenantName: t.name })
+      })
+      if (!res.ok) throw new Error('발송 실패')
+      showToast('success', '문자를 발송했습니다.')
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : '발송 오류')
+    }
+  }
+
+  /* ─── 결제 링크 복사 ─── */
+  const copyPaymentLink = (inv: InvoiceWithRoom) => {
+    const t = getTenantByRoom(inv.room_id)
+    const link = getPaymentLink(inv)
+    const text = `[대우오피스] ${inv.room?.name ?? ''}호 ${t?.name ?? ''}\n${inv.year}년 ${inv.month}월 이용료: ${formatKRW(inv.amount)}\n결제링크: ${link}`
+    navigator.clipboard.writeText(text)
+      .then(() => showToast('success', '결제 링크가 복사되었습니다.'))
+      .catch(() => showToast('error', '복사에 실패했습니다.'))
   }
 
   /* ─── 청구서 일괄생성 ─── */
@@ -2053,11 +2098,35 @@ export default function PaymentsPage() {
                           </button>
                         ) : (
                           <>
-                            <button onClick={() => sendInvoiceKakao(inv)}
+                            {/* 메시지 발송 드롭다운 */}
+                            <div className="relative group/send">
+                              <button
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                                style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid currentColor' }}>
+                                <Send size={11} />
+                                발송
+                                <ChevronDown size={10} />
+                              </button>
+                              <div className="absolute left-0 top-full mt-1 w-32 bg-white rounded-lg shadow-xl border border-neutral-200 py-1 z-50 hidden group-hover/send:block">
+                                <button onClick={() => sendInvoiceKakao(inv)}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50 flex items-center gap-2 font-medium text-neutral-700">
+                                  <MessageSquare size={12} className="text-yellow-500" />
+                                  카카오톡
+                                </button>
+                                <button onClick={() => sendInvoiceSMS(inv)}
+                                  className="w-full px-3 py-2 text-left text-xs hover:bg-neutral-50 flex items-center gap-2 font-medium text-neutral-700">
+                                  <Send size={12} className="text-green-500" />
+                                  문자(SMS)
+                                </button>
+                              </div>
+                            </div>
+                            {/* 결제 링크 복사 */}
+                            <button onClick={() => copyPaymentLink(inv)}
                               className="px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
-                              style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid currentColor' }}>
-                              <MessageSquare size={11} />
-                              카톡재발송
+                              style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid currentColor' }}
+                              title="결제 링크 복사 (금액 포함)">
+                              <Link2 size={11} />
+                              링크복사
                             </button>
                             <button
                               onClick={() => {
