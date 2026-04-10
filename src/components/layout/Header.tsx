@@ -181,7 +181,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                         </div>
                         <div className="text-left hidden sm:block">
                             <p className="text-sm font-medium text-neutral-900 leading-none truncate max-w-[150px]">
-                                {user?.email?.split('@')[0] || "관리자"}
+                                {user?.user_metadata?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || "관리자"}
                             </p>
                             <p className="text-xs text-neutral-500 mt-1 leading-none truncate max-w-[150px]">
                                 {currentBusiness?.name || "noado"}
