@@ -8,7 +8,7 @@ import { useBusiness } from '@/components/providers/BusinessProvider'
 import {
   Calendar, CheckCircle2, AlertCircle, Play,
   X, Loader2, ChevronRight, Building2, Wrench,
-  Send, Phone, AlertTriangle,
+  Send, Phone, AlertTriangle, MessageSquare,
 } from 'lucide-react'
 
 /* ── 타입 ── */
@@ -209,6 +209,7 @@ function UtilityModal({
 
 /* ── 모달: 발송 스케줄러 ── */
 type SendState = 'confirm' | 'sending' | 'result'
+type SendMethod = 'kakao' | 'sms'
 interface SendResult { roomName: string; tenantName: string; ok: boolean; reason?: string }
 
 function SendModal({
@@ -228,6 +229,7 @@ function SendModal({
   const [stage, setStage]     = useState<SendState>('confirm')
   const [progress, setProgress] = useState(0)
   const [results, setResults] = useState<SendResult[]>([])
+  const [sendMethod, setSendMethod] = useState<SendMethod>('kakao')
 
   async function startSend() {
     setStage('sending')
@@ -242,21 +244,35 @@ function SendModal({
       const due    = inv.due_date
         ? new Date(inv.due_date).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
         : `${month}월 10일`
+      const paymentLink = `${window.location.origin}/pay/${inv.id}`
 
       try {
-        const r = await fetch('/api/alimtalk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            templateKey: 'UNPAID_REMINDER',
-            phone,
-            roomName:   room.name,
-            tenantName: room.tenant_name ?? '',
-            amount,
-            dueDate:    due,
-            roomId:     room.id,
-          }),
-        })
+        let r: Response
+
+        if (sendMethod === 'kakao') {
+          r = await fetch('/api/alimtalk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              templateKey: 'INVOICE_ISSUED',
+              phone,
+              roomName:    room.name,
+              tenantName:  room.tenant_name ?? '',
+              amount,
+              dueDate:     due,
+              paymentLink,
+              roomId:      room.id,
+            }),
+          })
+        } else {
+          const text = `[대우오피스] ${year}년 ${month}월 이용료 안내\n\n${room.name}호 ${room.tenant_name ?? ''}님\n금액: ${amount}\n납부기한: ${due}\n\n결제하기: ${paymentLink}`
+          r = await fetch('/api/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, text, roomId: room.id, tenantName: room.tenant_name ?? '' }),
+          })
+        }
+
         const data = await r.json()
         res.push({
           roomName:   room.name,
@@ -289,7 +305,7 @@ function SendModal({
               <Send size={18} className="text-emerald-600" />
             </div>
             <div>
-              <h3 className="font-bold text-neutral-900 text-base">청구서 알림톡 발송</h3>
+              <h3 className="font-bold text-neutral-900 text-base">청구서 발송</h3>
               <p className="text-xs text-neutral-500 mt-0.5">{year}년 {month}월 청구서</p>
             </div>
           </div>
@@ -306,11 +322,39 @@ function SendModal({
           {/* ─── 확인 단계 ─── */}
           {stage === 'confirm' && (
             <div className="p-6 space-y-4">
+              {/* 발송 방법 선택 */}
+              <div className="flex gap-2 p-1 rounded-xl bg-neutral-100">
+                <button
+                  onClick={() => setSendMethod('kakao')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    sendMethod === 'kakao'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-500 hover:text-neutral-700'
+                  }`}>
+                  <MessageSquare size={14} className="text-yellow-500" />
+                  카카오톡
+                </button>
+                <button
+                  onClick={() => setSendMethod('sms')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    sendMethod === 'sms'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-500 hover:text-neutral-700'
+                  }`}>
+                  <Send size={14} className="text-green-500" />
+                  문자(SMS)
+                </button>
+              </div>
+
               <div className="bg-emerald-50 rounded-xl p-4 flex items-start gap-3">
                 <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-emerald-800">발송 대상 {sendable.length}명</p>
-                  <p className="text-xs text-emerald-600 mt-0.5">카카오톡 알림톡으로 이번 달 청구서를 안내합니다.</p>
+                  <p className="text-xs text-emerald-600 mt-0.5">
+                    {sendMethod === 'kakao'
+                      ? '카카오톡 알림톡으로 이번 달 청구서를 안내합니다.'
+                      : '문자(SMS)로 이번 달 청구서와 결제 링크를 안내합니다.'}
+                  </p>
                 </div>
               </div>
 
@@ -377,7 +421,7 @@ function SendModal({
                 </div>
               </div>
               <div className="text-center">
-                <p className="font-bold text-neutral-800">알림톡 발송 중...</p>
+                <p className="font-bold text-neutral-800">{sendMethod === 'kakao' ? '카카오톡' : '문자'} 발송 중...</p>
                 <p className="text-sm text-neutral-500 mt-1">{sendable.length}명에게 순차 발송 중입니다.</p>
               </div>
             </div>
@@ -638,7 +682,7 @@ export default function BillingAutomationPage() {
             청구서 자동 발송
           </h3>
           <p className={`text-sm mb-6 ${step3Enabled ? 'text-neutral-500' : 'text-neutral-400'}`}>
-            검토가 끝난 청구서를 카카오톡 알림톡으로 입주사들에게 일괄 전송합니다.
+            검토가 끝난 청구서를 카카오톡 또는 문자로 입주사들에게 일괄 전송합니다.
           </p>
           {step3Enabled ? (
             <button onClick={() => setShowSendModal(true)}
