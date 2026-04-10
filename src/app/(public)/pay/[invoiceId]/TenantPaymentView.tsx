@@ -83,7 +83,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
     setErrorObj(null)
     try {
       const PortOne = await import('@portone/browser-sdk/v2')
-      const paymentId = `RENT_${invoice.id}_${Date.now()}`
+      const paymentId = `R${invoice.id.replace(/-/g, '').slice(0, 20)}_${Date.now()}`
       const storeId = (process.env.NEXT_PUBLIC_PORTONE_STORE_ID || '').trim()
       const channelKey = (process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || '').trim()
 
