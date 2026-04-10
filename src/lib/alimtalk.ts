@@ -71,8 +71,10 @@ export async function sendKakaoAlimtalk(payload: AlimtalkPayload): Promise<boole
 
   try {
     const messageService = new SolapiMessageService(apiKey, apiSecret)
+    const fromNumber = process.env.SOLAPI_FROM_NUMBER ?? ''
     await messageService.send({
       to,
+      from: fromNumber,
       kakaoOptions: {
         pfId:       channelId,
         templateId: resolvedCode,
