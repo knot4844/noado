@@ -1033,9 +1033,25 @@ export default function PaymentsPage() {
       leaseByRoom[l.room_id] = { ...l, tenant: Array.isArray(l.tenant) ? (l.tenant[0] ?? null) : l.tenant }
     }
 
+    // billing_items 조회 (활성 MONTHLY 항목 합산)
+    const leaseIdsForBilling = Object.values(leaseByRoom).map(l => l.id).filter(Boolean)
+    let extraByLease: Record<string, number> = {}
+    if (leaseIdsForBilling.length > 0) {
+      const { data: billingItems } = await supabase
+        .from('billing_items')
+        .select('lease_id, amount')
+        .in('lease_id', leaseIdsForBilling)
+        .eq('is_active', true)
+        .eq('billing_cycle', 'MONTHLY')
+      for (const bi of (billingItems ?? []) as { lease_id: string; amount: number | null }[]) {
+        extraByLease[bi.lease_id] = (extraByLease[bi.lease_id] ?? 0) + (bi.amount ?? 0)
+      }
+    }
+
     const { data: insertedInvoices, error } = await supabase.from('invoices').insert(
       newRooms.map(r => {
         const lease = leaseByRoom[r.id]
+        const extra = lease ? (extraByLease[lease.id] ?? 0) : 0
         return {
           owner_id:     user.id,
           room_id:      r.id,
@@ -1043,9 +1059,9 @@ export default function PaymentsPage() {
           tenant_id:    lease?.tenant_id || null,
           year,
           month,
-          amount:       lease?.monthly_rent ?? 0,
+          amount:       (lease?.monthly_rent ?? 0) + extra,
           base_amount:  lease?.monthly_rent ?? 0,
-          extra_amount: 0,
+          extra_amount: extra,
           paid_amount:  0,
           status:       'ready',
           due_date:     new Date(year, month - 1, lease?.payment_day || 10).toISOString().split('T')[0],

@@ -1,11 +1,84 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-04-07 — 카카오 가입 리디렉트 + /billing mock 제거 버그픽스 + 입금 매칭 4단계 (분할/FIFO/PREPAY/잔액) 구현
+> **Last Updated:** 2026-04-13 — A~E 단계 전체 완료 + rooms 제거 컬럼 전수 점검 + pricing/billing-pay 정리
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 25. A~E 단계 전체 완료 + rooms 제거 컬럼 전수 점검 + 정리 (2026-04-13)
+- **완료:**
+  - **rooms 제거 컬럼 전수 점검** — migration #16에서 제거된 컬럼(tenant_name, tenant_phone, monthly_rent 등)을 참조하는 4개 파일 수정
+    - `reports/page.tsx` — `rooms(tenant_name, tenant_phone, monthly_rent)` 조인 → leases 경유 보강
+    - `portal/[tenantId]/page.tsx` — rooms 제거 컬럼 전부 쿼리 → leases+tenants 경유
+    - `tenant-portal/page.tsx` — rooms `select('*')` → tenants 경유 lease 조회
+    - `BusinessProvider.tsx` — rooms `select('*')` → leases 조인으로 tenant/rent 정보 보강
+  - **[A단계] 대시보드 KPI** — 확인 결과 이미 leases 기준으로 구현되어 있었음 (추가 작업 불필요)
+  - **[B단계] billing_items UI** — `BillingItemsPanel` 컴포넌트 신규 생성
+    - CRUD (추가/삭제/활성·비활성 토글), 타입별 아이콘 (PARKING/INTERNET/ELECTRICITY/CUSTOM)
+    - MONTHLY/ACTUAL 청구 방식, 활성 항목 월 합계 표시
+    - `/tenants` 페이지 계약 카드에 통합
+  - **[C단계] deposits UI** — `DepositsPanel` 컴포넌트 신규 생성
+    - PLEDGE(예치금)/PREPAY(선납)/RESERVE(예약금) 등록, 환불 처리
+    - 예치금·선납금 잔액 합계 표시, PREPAY는 환불 버튼 비활성
+    - `/tenants` 페이지 계약 카드에 통합
+  - **[D단계] 청구서 생성 billing_items 연동**
+    - `/api/cron/generate-invoices/route.ts` — billing_items MONTHLY 활성 항목 합산 → `extra_amount` 반영
+    - `/payments/page.tsx` 수동 생성 — 동일하게 billing_items 합산 반영
+    - `amount = base_amount(monthly_rent) + extra_amount(billing_items 합계)`
+  - **[E단계] tax_invoices UI** — `TaxInvoicesPanel` 컴포넌트 신규 생성
+    - DRAFT → ISSUED → CANCELLED 상태 관리, 국세청 승인번호(ntax_id) 편집
+    - `vat_type = 'VAT_INVOICE'` 계약에만 표시 (조건부 렌더링)
+    - 합계금액 입력 시 공급가/세액 자동 계산 (÷1.1)
+    - `/tenants` 페이지 계약 카드에 통합
+  - **pricing 페이지 네비게이션 중복 수정** — 로그인 상태 체크 → 자체 nav 숨김 (사이드바만 사용)
+  - **/billing-pay 불필요 페이지 삭제** — 참조 없음 확인 후 제거
+- **파일 변경:**
+  - 신규: `src/components/billing/BillingItemsPanel.tsx`, `src/components/deposits/DepositsPanel.tsx`, `src/components/tax/TaxInvoicesPanel.tsx`
+  - 수정: `reports/page.tsx`, `portal/[tenantId]/page.tsx`, `tenant-portal/page.tsx`, `BusinessProvider.tsx`, `tenants/page.tsx`, `cron/generate-invoices/route.ts`, `payments/page.tsx`, `pricing/page.tsx`
+  - 삭제: `src/app/billing-pay/page.tsx`
+- **다음:**
+  - 커밋 + Vercel 배포
+  - KG이니시스 통신판매신고번호 확보 후 푸터 추가
+  - 기존 테스트 데이터 정리 (rooms 이름에 "호" 없는 것들)
+  - billing_items ACTUAL(실비) 매월 입력 플로우 고도화
+  - 프로덕션 E2E 테스트 (billing_items → 청구서 extra_amount 반영 확인)
+
+### 24. 카드결제 + 수납매칭 발송/링크 + 정기청구 발송 선택 + 버그픽스 다수 (2026-04-10)
+- **완료:**
+  - **임대료 카드결제 추가** (`/pay/[invoiceId]` 페이지)
+    - 기존 가상계좌 전용 → **계좌이체 / 카드결제** 탭 선택 UI 추가
+    - `PortOne.requestPayment()` (브라우저 SDK) → KG이니시스 카드결제창 호출
+    - `/api/portone/card-payment/route.ts` 신규 — 서버 검증 + invoice 수납 처리 + payments 기록
+    - KG이니시스 필수값 대응: `customer.phoneNumber` 추가 (tenant phone DB 조회)
+    - `paymentId` 길이 40자 이내로 축소 (KG이니시스 oid 제한)
+  - **수납매칭 페이지 메시지 발송 + 링크 복사** (`/payments`)
+    - 기존 "카톡재발송" → **"발송" 드롭다운** (hover 시 위로 표시): 카카오톡 / 문자(SMS) 선택
+    - **"링크복사" 버튼** 추가 — 호실명·금액·결제링크 포함 텍스트 클립보드 복사
+    - 카톡 발송 시 임차인 전화번호 DB 조회 (기존 빈값 버그 수정)
+    - `/api/sms/route.ts` 신규 — SMS 단건 발송 + notification_logs 기록
+  - **정기청구 발송 카톡/문자 선택** (`/billing`)
+    - 발송 모달에 **카카오톡 / 문자(SMS)** 탭 추가
+    - 문자 선택 시 결제 링크 포함 SMS 발송
+  - **기타 버그픽스 (이전 세션에서 수행, 이번 세션에서 push):**
+    - `/billing` 47개 mock 데이터 제거 + rooms 제거 컬럼 수정
+    - 전자계약 양식 3종 + 샘플 양식 관리 + 링크 복사
+    - 알림톡 발신번호 미등록 수정 (`from` 필드 누락)
+    - 마스터 어드민 유저 상세 crash 수정 (toLocaleString on undefined)
+    - 헤더 우측 사용자명 실제 이름 표시
+    - 가상계좌 예금주 '노아도' 설정 (`remitteeName`)
+    - 납부 요청 API `tenants.room_id` 제거 컬럼 참조 수정
+- **결정:**
+  - 카드결제/가상계좌 모두 같은 `/pay/[invoiceId]` 링크 사용 — 별도 링크 불필요
+  - 가상계좌 발급 시 건당 수수료 발생 (200~300원) — 중복 발급 방지 고려 필요
+  - 마스터 이메일: `knot4844@gmail.com`
+- **파일 변경:**
+  - 신규: `/api/portone/card-payment/route.ts`, `/api/sms/route.ts`
+  - 수정: `TenantPaymentView.tsx`, `/pay/[invoiceId]/page.tsx`, `/payments/page.tsx`, `/billing/page.tsx`
+- **다음:**
+  - 카드결제 프로덕션 테스트 (KG이니시스 사전심사 완료 후)
+  - 가상계좌 중복 발급 방지 로직 추가 검토
 
 ### 23. 입금 매칭 4단계 구현 + 버그픽스 2건 (2026-04-07)
 - **버그픽스 1: 카카오 가입 후 전화번호 입력 → 대시보드 미이동** (`src/app/complete-profile/page.tsx`)
@@ -444,81 +517,56 @@
 ### 즉시 확인 (세션 시작 시 브리핑)
 1. `npm run build` — 0 errors 확인
 2. **KG이니시스 사전심사 현황 확인** — 유저에게 통신판매신고번호 확보 여부 문의 → 푸터에 추가
-3. **rooms 제거 컬럼 전수 점검** — `tenant_name`, `tenant_phone`, `monthly_rent` 등 제거된 컬럼을 참조하는 코드가 남아있는지 전체 codebase grep
-   - `grep -r "tenant_name\|tenant_phone\|monthly_rent" src/` 로 확인
-   - 발견 시 leases → tenants 경유 조회로 변경
-4. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 + 101호 테스트 데이터 삭제 권장
-5. 테스트용 가상계좌 발급 건 정리 — invoice `7367ca88-9b69-4b08-af83-1a532311e1f4` 및 관련 데이터
+3. 기존 테스트 데이터 정리 — rooms 이름에 "호" 없는 것들 + 101호 테스트 데이터 삭제 권장
+4. 테스트용 가상계좌 발급 건 정리 — invoice `7367ca88-9b69-4b08-af83-1a532311e1f4` 및 관련 데이터
 
-### 결제 관련 이어서 할 작업 (긴급)
-6. **`/pay/[invoiceId]` 페이지에 카드결제 옵션 추가** — 현재 가상계좌만 있음, "카드결제" 버튼 추가
-   - `PortOneCheckout` `mode="payment"` 사용, 같은 채널키로 동작
-   - 임대료를 현금/이체 불가 시 단발성 카드결제 용도
-7. **pricing 페이지 네비게이션 중복 수정** — 로그인 시 자체 nav + 사이드바가 동시에 보임
-8. **`/billing-pay` 페이지 정리** — 불필요 페이지 삭제 (사이드바가 /pricing으로 직접 연결)
+### 프로덕션 테스트 (긴급)
+5. **billing_items → 청구서 extra_amount 반영 E2E 테스트** — 실비 항목 등록 후 청구서 생성 시 금액 정상 반영 확인
+6. **deposits 등록/환불 E2E 테스트** — PLEDGE 등록 → 환불 처리 플로우 확인
+7. **tax_invoices 생성/발행 E2E 테스트** — VAT_INVOICE 계약에서 세금계산서 DRAFT → ISSUED 확인
+8. **카드결제 프로덕션 테스트** — KG이니시스 사전심사 완료 후
 
 ### 이어서 개발할 것 (우선순위 순)
-9. **대시보드 KPI leases 기준으로 교체** [A단계] — 현재 `rooms` 테이블 기준 → `leases` 기준으로 변경
-   - 파일: `src/app/dashboard/page.tsx`
-   - 입주율 = ACTIVE lease 수 / 전체 rooms 수
-   - 이번 달 수납 = invoices (lease_id 있는 것) 기준
-10. **billing_items UI** [B단계] — 실비 항목 관리 (주차/인터넷/전기/커스텀)
-   - 계약별 추가 실비 등록·수정·삭제
-   - `/units` 또는 `/tenants` 내 계약 상세 탭에 추가
-11. **deposits UI** [C단계] — 예치금·선납·예약금 관리
-   - 계약 시 예치금 수령 기록, 퇴실 시 환불 처리
-12. **청구서 생성 로직 leases 완전 연동** [D단계]
-   - `base_amount` = lease.monthly_rent
-   - `extra_amount` = billing_items 합계
-   - `amount` = base + extra (현재는 lease.monthly_rent만 사용)
-13. **tax_invoices UI** [E단계] — 세금계산서 발행 관리 (VAT_INVOICE 계약에 한해)
+9. **billing_items ACTUAL(실비) 매월 입력 플로우** — 현재 MONTHLY만 청구서에 자동 합산, ACTUAL은 관리자가 매월 금액 입력하는 UI 필요
+10. **contracts 페이지 정리** — 전자계약 관련 rooms 제거 컬럼 참조는 contracts 자체 필드(snapshot)이므로 동작하나, leases 연동 개선 검토
+11. **types/index.ts Room 인터페이스 deprecated 필드 정리** — `tenant_name`, `monthly_rent` 등 @deprecated 마킹된 필드 완전 제거 검토
 
 ---
 
 ## 📋 다음 개발 계획 (Next Feature Roadmap)
 
-> ✅ 이전 1~5단계 로드맵 (tenants/leases 전환) 전부 완료됨 (2026-03-17~19)
-> 아래는 leases 중심 구조 완료 이후 이어서 개발할 기능들
+> ✅ A~E 단계 로드맵 전부 완료됨 (2026-04-13)
+> 아래는 완료 후 추가 개선 사항들
 
 ---
 
-### [A단계] 대시보드 KPI — leases 기준으로 교체
-- 입주율: ACTIVE lease 수 / 전체 rooms 수
-- 이번 달 수납: invoices.lease_id 기반
-- 만료 예정: leases.lease_end 기준 30일 내
-- 파일: `src/app/dashboard/page.tsx`
+### [A단계] 대시보드 KPI — ✅ 완료 (이미 leases 기준 구현)
+
+### [B단계] billing_items UI — ✅ 완료 (BillingItemsPanel)
+- 추가 작업: ACTUAL(실비) 매월 변동 입력 플로우 필요
+
+### [C단계] deposits UI — ✅ 완료 (DepositsPanel)
+
+### [D단계] 청구서 생성 완전 leases 연동 — ✅ 완료
+- `amount = base_amount + extra_amount` (billing_items MONTHLY 합산)
+
+### [E단계] tax_invoices UI — ✅ 완료 (TaxInvoicesPanel)
 
 ---
 
-### [B단계] billing_items UI — 실비 항목 관리
-- 계약(lease)별 추가 실비 등록·수정·삭제
-- 항목 유형: PARKING / INTERNET / ELECTRICITY / CUSTOM
-- 월정액(MONTHLY) vs 실비(ACTUAL) 구분
-- 청구서 생성 시 `extra_amount`에 자동 합산
-- 위치: `/units` 또는 `/tenants` 계약 상세 탭
+### 신규 과제
 
----
+#### 보고서 페이지 고도화
+- reports/page.tsx 엑셀 내보내기에 leases 정보 포함 (현재 rooms만)
+- 연간 세금계산서 발행 현황 리포트 추가
 
-### [C단계] deposits UI — 예치금 관리
-- 입주 시 예치금(PLEDGE) 수령 등록
-- 퇴실 시 환불 처리 (refunded_at 세팅)
-- 선납(PREPAY), 예약금(RESERVE) 구분 표시
-- 위치: 계약 상세 or 별도 `/deposits` 페이지
+#### 알림 자동화 고도화
+- 계약 만료 D-30 알림톡 자동 발송
+- 미납 3일 초과 시 자동 독촉 알림
 
----
-
-### [D단계] 청구서 생성 완전 leases 연동
-- `base_amount` = lease.monthly_rent
-- `extra_amount` = 해당 lease의 billing_items 합계
-- `amount` = base + extra (현재는 lease.monthly_rent만 사용 중)
-- 파일: `/api/cron/generate-invoices/route.ts`, `payments/page.tsx`
-
----
-
-### [E단계] tax_invoices UI — 세금계산서 관리
-- vat_type = VAT_INVOICE 계약에 한해 발행
-- DRAFT → ISSUED → CANCELLED 상태 관리
-- 국세청 승인번호(ntax_id) 입력
+#### 임차인 포털 leases 전환
+- portal/tenant-portal 페이지 → 실제 납부 내역 연동 (현재 mock)
+- 임차인 본인 결제 내역 조회 + 영수증 다운로드
 
 ---
 

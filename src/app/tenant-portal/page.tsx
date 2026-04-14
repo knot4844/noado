@@ -16,8 +16,7 @@ export default function TenantPortalPage() {
     const [roomInfo, setRoomInfo] = useState<{
       name?: string; deposit?: number; monthly_rent?: number;
       lease_start?: string; lease_end?: string; due_date?: string;
-      businesses?: { name?: string };
-      [key: string]: unknown;
+      businessName?: string;
     } | null>(null);
     const [payments, setPayments] = useState<Record<string, unknown>[]>([]);
 
@@ -26,32 +25,53 @@ export default function TenantPortalPage() {
 
         const fetchTenantData = async () => {
             try {
-                // 임차인 이메일로 매핑된 호실 정보 찾기
-                const { data: roomData } = await supabase
-                    .from('rooms')
-                    .select('*, businesses(name)')
-                    // 임차인의 email과 정확히 일치하는 경우 (또는 향후 tenant_id 연동)
-                    // 현재 DB 스키마상 tenant_id가 있지만 이메일 기반 매칭을 위해 우선 서버 API나 여기 클라이언트에서 조회
-                    // 데모용으로 우선 최상단에 하나 보여주거나, 실제로는 API로 감싸는게 좋음.
-                    .eq('tenant_id', user.id)
+                // tenants.auth_id → leases → rooms 경유로 임차인 계약 정보 조회
+                const { data: tenantRow } = await supabase
+                    .from('tenants')
+                    .select('id')
+                    .eq('auth_id', user.id)
                     .single();
 
-                if (roomData) {
-                    setRoomInfo(roomData);
+                if (tenantRow) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const { data: leaseRow } = await supabase
+                        .from('leases')
+                        .select('room_id, monthly_rent, pledge_amount, payment_day, lease_start, lease_end, rooms(id, name, business_id, businesses(name))')
+                        .eq('tenant_id', tenantRow.id)
+                        .eq('status', 'ACTIVE')
+                        .single() as { data: Record<string, unknown> | null };
 
-                    // 납부 내역
-                    const { data: payData } = await supabase
-                        .from('payments')
-                        .select('*')
-                        .eq('room_id', roomData.id)
-                        .order('paid_at', { ascending: false });
+                    if (leaseRow) {
+                        const roomRaw = leaseRow.rooms as Record<string, unknown> | Record<string, unknown>[] | null;
+                        const room = Array.isArray(roomRaw) ? roomRaw[0] : roomRaw;
+                        const bizRaw = room?.businesses as { name?: string } | { name?: string }[] | null;
+                        const bizName = Array.isArray(bizRaw) ? bizRaw[0]?.name : bizRaw?.name;
+                        setRoomInfo({
+                            name: (room?.name as string) ?? '',
+                            deposit: (leaseRow.pledge_amount as number) ?? 0,
+                            monthly_rent: (leaseRow.monthly_rent as number) ?? 0,
+                            due_date: leaseRow.payment_day ? `매월 ${leaseRow.payment_day}일` : '매월 25일',
+                            lease_start: leaseRow.lease_start as string,
+                            lease_end: (leaseRow.lease_end as string) ?? undefined,
+                            businessName: (bizName as string) ?? '',
+                        });
 
-                    if (payData) setPayments(payData);
+                        // 납부 내역
+                        const { data: payData } = await supabase
+                            .from('payments')
+                            .select('*')
+                            .eq('room_id', (room?.id as string))
+                            .order('paid_at', { ascending: false });
+
+                        if (payData) setPayments(payData);
+                    } else {
+                        setRoomInfo(null);
+                    }
                 } else {
-                    // 데모 유저이거나 아직 호실 매핑이 안된 경우 Mock 데이터 표시
+                    // 데모 유저이거나 아직 매핑이 안된 경우 Mock 데이터 표시
                     setRoomInfo({
                         name: "101호",
-                        businesses: { name: "" },
+                        businessName: "",
                         deposit: 10000000,
                         monthly_rent: 800000,
                         due_date: "매월 25일",
@@ -114,7 +134,7 @@ export default function TenantPortalPage() {
                         <div className="space-y-4">
                             <div>
                                 <p className="text-sm font-medium text-neutral-500">계약 건물 및 호실</p>
-                                <p className="text-lg font-bold text-neutral-900 mt-0.5">{roomInfo?.businesses?.name} {roomInfo?.name}</p>
+                                <p className="text-lg font-bold text-neutral-900 mt-0.5">{roomInfo?.businessName} {roomInfo?.name}</p>
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-neutral-500">임대 조건 (보증금 / 월세)</p>

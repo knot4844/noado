@@ -2,8 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { CheckCircle2, Zap, Building2, Crown, ArrowRight, X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -79,6 +80,14 @@ const PLANS = [
 export default function PricingPage() {
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState<{ amount: number; name: string } | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setIsLoggedIn(true)
+    })
+  }, [])
 
   return (
     <div style={{
@@ -110,34 +119,36 @@ export default function PricingPage() {
         filter: 'blur(60px)',
       }} />
 
-      {/* ── NAV ── */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        padding: '0 40px', height: '64px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'rgba(7,13,26,0.80)', backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(168,218,220,0.08)',
-      }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-            <rect width="28" height="28" rx="8" fill="#a8dadc" fillOpacity="0.13" />
-            <path d="M7 20V10l7-4 7 4v10" stroke="#a8dadc" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <rect x="11" y="14" width="6" height="6" rx="1" stroke="#a8dadc" strokeWidth="1.6" />
-          </svg>
-          <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.4px' }}>noado</span>
-        </Link>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => router.push('/login')} style={{
-            padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
-            color: 'rgba(255,255,255,0.6)', background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer',
-          }}>로그인</button>
-          <button onClick={() => router.push('/signup')} style={{
-            padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
-            color: '#070d1a', background: '#a8dadc', border: 'none', cursor: 'pointer',
-          }}>무료 시작</button>
-        </div>
-      </nav>
+      {/* ── NAV (비로그인 시에만 표시 — 로그인 시 사이드바 사용) ── */}
+      {!isLoggedIn && (
+        <nav style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          padding: '0 40px', height: '64px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'rgba(7,13,26,0.80)', backdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(168,218,220,0.08)',
+        }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="8" fill="#a8dadc" fillOpacity="0.13" />
+              <path d="M7 20V10l7-4 7 4v10" stroke="#a8dadc" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="11" y="14" width="6" height="6" rx="1" stroke="#a8dadc" strokeWidth="1.6" />
+            </svg>
+            <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.4px' }}>noado</span>
+          </Link>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => router.push('/login')} style={{
+              padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 600,
+              color: 'rgba(255,255,255,0.6)', background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer',
+            }}>로그인</button>
+            <button onClick={() => router.push('/signup')} style={{
+              padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 700,
+              color: '#070d1a', background: '#a8dadc', border: 'none', cursor: 'pointer',
+            }}>무료 시작</button>
+          </div>
+        </nav>
+      )}
 
       {/* ── 헤더 ── */}
       <div className="fade-up fade-up-1" style={{

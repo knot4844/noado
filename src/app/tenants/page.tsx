@@ -12,6 +12,9 @@ import {
 } from 'lucide-react'
 import { formatKRW, formatDate, formatPhone } from '@/lib/utils'
 import type { Room, Invoice, Payment, Tenant, Lease, ContractType, VatType } from '@/types'
+import BillingItemsPanel from '@/components/billing/BillingItemsPanel'
+import DepositsPanel from '@/components/deposits/DepositsPanel'
+import TaxInvoicesPanel from '@/components/tax/TaxInvoicesPanel'
 
 /* ─── 내부 통합 타입 ─────────────────────────────────────── */
 interface LeaseItem {
@@ -508,6 +511,13 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
           <ChevronRight size={13} className="shrink-0 ml-1" style={{ color: 'var(--color-muted)' }} />
         </div>
       </button>
+
+      {/* 추가 실비 항목 + 예치금 + 세금계산서 */}
+      <div className="px-5 pb-3 space-y-4">
+        <BillingItemsPanel leaseId={lease.id} ownerId={lease.owner_id} />
+        <DepositsPanel leaseId={lease.id} ownerId={lease.owner_id} />
+        <TaxInvoicesPanel leaseId={lease.id} ownerId={lease.owner_id} vatType={lease.vat_type} />
+      </div>
 
       {/* 하단 액션 */}
       <div className="flex border-t" style={{ borderColor: 'var(--color-border)' }}>

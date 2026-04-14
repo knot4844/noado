@@ -86,19 +86,38 @@ export default function TenantPortalPage() {
                 return;
             }
 
-            // 호실 정보 조회
+            // 호실 기본 정보 조회 (제거 컬럼 없이)
             const { data: row } = await supabase
                 .from("rooms")
-                .select("id, name, status, owner_id, tenant_auth_id, tenant_name, tenant_company_name, monthly_rent, deposit, due_date, lease_start, lease_end, unpaid_months, unpaid_amount, businesses(name)")
+                .select("id, name, status, owner_id, business_id, businesses(name)")
                 .eq("id", id)
                 .single();
 
             if (!row || row.status === "VACANT") { setAuthState("denied"); return; }
 
+            // leases → tenants 경유로 계약/입주사 정보 조회
+            const { data: leaseRow } = await supabase
+                .from("leases")
+                .select("id, monthly_rent, pledge_amount, payment_day, lease_start, lease_end, tenant_id, tenant:tenants(id, name, phone, auth_id)")
+                .eq("room_id", id)
+                .eq("status", "ACTIVE")
+                .single();
+
+            const tenant = Array.isArray(leaseRow?.tenant) ? leaseRow?.tenant[0] : leaseRow?.tenant;
+
             // 관리자(owner) 또는 본인 임차인이면 허용
-            const isOwner  = row.owner_id       === sessionUser.id;
-            const isTenant = row.tenant_auth_id === sessionUser.id;
+            const isOwner  = row.owner_id === sessionUser.id;
+            const isTenant = tenant?.auth_id === sessionUser.id;
             if (!isOwner && !isTenant) { setAuthState("denied"); return; }
+
+            // 미수납 계산
+            const { data: unpaidInvs } = await supabase
+                .from("invoices")
+                .select("amount, paid_amount")
+                .eq("room_id", id)
+                .in("status", ["ready", "overdue"]);
+            const unpaidAmount = (unpaidInvs ?? []).reduce((s, i) => s + ((i.amount ?? 0) - (i.paid_amount ?? 0)), 0);
+            const unpaidMonths = (unpaidInvs ?? []).length;
 
             const bizName = Array.isArray(row.businesses)
                 ? (row.businesses[0] as { name: string })?.name ?? ''
@@ -108,15 +127,15 @@ export default function TenantPortalPage() {
                 id:            row.id,
                 name:          row.name,
                 status:        row.status,
-                tenantName:    row.tenant_name         ?? '미확인',
-                tenantCompany: row.tenant_company_name ?? '',
-                monthlyRent:   row.monthly_rent        ?? 0,
-                deposit:       row.deposit             ?? 0,
-                dueDate:       row.due_date            ?? '매월 15일',
-                leaseStart:    row.lease_start         ?? '',
-                leaseEnd:      row.lease_end           ?? '',
-                unpaidMonths:  row.unpaid_months       ?? 0,
-                unpaidAmount:  row.unpaid_amount       ?? 0,
+                tenantName:    tenant?.name ?? '미확인',
+                tenantCompany: '',
+                monthlyRent:   leaseRow?.monthly_rent ?? 0,
+                deposit:       leaseRow?.pledge_amount ?? 0,
+                dueDate:       leaseRow?.payment_day ? `매월 ${leaseRow.payment_day}일` : '매월 15일',
+                leaseStart:    leaseRow?.lease_start ?? '',
+                leaseEnd:      leaseRow?.lease_end   ?? '',
+                unpaidMonths,
+                unpaidAmount,
                 businessName:  bizName,
             });
             setAuthState("allowed");

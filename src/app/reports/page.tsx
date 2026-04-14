@@ -25,6 +25,7 @@ interface Invoice {
 
 interface UnpaidInvoice {
   id: string
+  room_id: string
   year: number
   month: number
   amount: number
@@ -32,10 +33,10 @@ interface UnpaidInvoice {
   due_date?: string | null
   rooms: {
     name: string
-    tenant_name: string | null
-    tenant_phone: string | null
-    monthly_rent: number
   } | null
+  // leases 경유 보강 데이터
+  tenant_name?: string | null
+  tenant_phone?: string | null
 }
 
 const COLORS = ['#1d3557', '#a8dadc', '#e63946']
@@ -63,16 +64,45 @@ export default function ReportsPage() {
         .order('year').order('month'),
       supabase
         .from('invoices')
-        .select('*, rooms(name, tenant_name, tenant_phone, monthly_rent)')
+        .select('*, rooms(name)')
         .eq('owner_id', user.id)
         .in('status', ['ready', 'overdue'])
         .order('created_at', { ascending: false })
         .limit(20),
     ])
 
+    // 미납 청구서에 leases→tenants 경유로 입주사 정보 보강
+    const unpaidRows = (unpaidList ?? []) as UnpaidInvoice[]
+    if (unpaidRows.length > 0) {
+      const roomIds = [...new Set(unpaidRows.map(i => i.room_id))]
+      const { data: leaseData } = await supabase
+        .from('leases')
+        .select('room_id, monthly_rent, tenant:tenants(name, phone)')
+        .eq('status', 'ACTIVE')
+        .in('room_id', roomIds)
+
+      type LeaseJoin = { room_id: string; monthly_rent: number | null; tenant: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null }
+      const leaseByRoom: Record<string, { tenant_name: string | null; tenant_phone: string | null; monthly_rent: number }> = {}
+      for (const l of (leaseData ?? []) as unknown as LeaseJoin[]) {
+        const t = Array.isArray(l.tenant) ? l.tenant[0] : l.tenant
+        leaseByRoom[l.room_id] = {
+          tenant_name: t?.name ?? null,
+          tenant_phone: t?.phone ?? null,
+          monthly_rent: l.monthly_rent ?? 0,
+        }
+      }
+      for (const inv of unpaidRows) {
+        const lease = leaseByRoom[inv.room_id]
+        if (lease) {
+          inv.tenant_name = lease.tenant_name
+          inv.tenant_phone = lease.tenant_phone
+        }
+      }
+    }
+
     setRooms(roomList ?? [])
     setInvoices(invoiceList ?? [])
-    setUnpaidDetail((unpaidList ?? []) as UnpaidInvoice[])
+    setUnpaidDetail(unpaidRows)
     setLoading(false)
   }, [supabase])
 
@@ -86,13 +116,13 @@ export default function ReportsPage() {
   const occupancyRate = totalRooms > 0
     ? Math.round(((totalRooms - vacantRooms) / totalRooms) * 100) : 0
 
-  const totalUnpaid = unpaidRooms.reduce((s, r) => s + (r.monthly_rent ?? 0), 0)
-  const monthlyExpected = rooms
-    .filter(r => r.status !== 'VACANT')
-    .reduce((s, r) => s + (r.monthly_rent ?? 0), 0)
-
   // 이번달 수납률
   const currentMonthInvoices = invoices.filter(i => i.year === currentYear && i.month === currentMonth)
+
+  // monthly_rent는 rooms에서 제거됨 → invoices 기준으로 계산
+  const currentMonthUnpaidInvoices = currentMonthInvoices.filter(i => i.status !== 'paid')
+  const totalUnpaid = currentMonthUnpaidInvoices.reduce((s, i) => s + (i.amount - i.paid_amount), 0)
+  const monthlyExpected = currentMonthInvoices.reduce((s, i) => s + i.amount, 0)
   const currentMonthPaid = currentMonthInvoices.filter(i => i.status === 'paid').length
   const currentMonthTotal = currentMonthInvoices.length
   const collectionRate = currentMonthTotal > 0
@@ -147,12 +177,7 @@ export default function ReportsPage() {
     ]
     const roomData = rooms.map(r => ({
       호실: r.name,
-      임차인: r.tenant_name || '',
-      월세: r.monthly_rent,
-      보증금: r.deposit || 0,
       상태: r.status,
-      계약시작: r.lease_start || '',
-      계약만료: r.lease_end || '',
     }))
     const monthlyData = monthlyChartData.map(row => ({
       월: row.name,
@@ -349,7 +374,7 @@ export default function ReportsPage() {
                         {inv.rooms?.name ?? '-'}호
                       </td>
                       <td className="py-3 pr-4" style={{ color: 'var(--color-primary)' }}>
-                        {inv.rooms?.tenant_name ?? '-'}
+                        {inv.tenant_name ?? '-'}
                       </td>
                       <td className="py-3 pr-4 tabular-nums" style={{ color: 'var(--color-muted)' }}>
                         {formatKRW(inv.amount)}

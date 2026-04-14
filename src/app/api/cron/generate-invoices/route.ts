@@ -69,24 +69,41 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, created: 0 })
   }
 
+  /* ─── billing_items 조회 (활성 MONTHLY 항목 합산) ─── */
+  const leaseIds = newLeases.map(l => l.id)
+  const { data: billingItems } = await supabase
+    .from('billing_items')
+    .select('lease_id, amount')
+    .in('lease_id', leaseIds)
+    .eq('is_active', true)
+    .eq('billing_cycle', 'MONTHLY')
+
+  const extraByLease: Record<string, number> = {}
+  for (const bi of (billingItems ?? [])) {
+    extraByLease[bi.lease_id] = (extraByLease[bi.lease_id] ?? 0) + (bi.amount ?? 0)
+  }
+
   /* ─── 청구서 일괄 INSERT ─── */
   const { data: insertedInvoices, error: insertErr } = await supabase
     .from('invoices')
     .insert(
-      newLeases.map(l => ({
-        owner_id:     l.owner_id,
-        room_id:      l.room_id,
-        lease_id:     l.id,
-        tenant_id:    l.tenant_id,
-        year,
-        month,
-        amount:       l.monthly_rent,
-        base_amount:  l.monthly_rent,
-        extra_amount: 0,
-        paid_amount:  0,
-        status:       'ready',
-        due_date:     new Date(year, month - 1, l.payment_day || 10).toISOString().split('T')[0],
-      }))
+      newLeases.map(l => {
+        const extra = extraByLease[l.id] ?? 0
+        return {
+          owner_id:     l.owner_id,
+          room_id:      l.room_id,
+          lease_id:     l.id,
+          tenant_id:    l.tenant_id,
+          year,
+          month,
+          amount:       l.monthly_rent + extra,
+          base_amount:  l.monthly_rent,
+          extra_amount: extra,
+          paid_amount:  0,
+          status:       'ready',
+          due_date:     new Date(year, month - 1, l.payment_day || 10).toISOString().split('T')[0],
+        }
+      })
     )
     .select()
 

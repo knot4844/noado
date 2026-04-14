@@ -66,6 +66,8 @@ export default function ContractsPage() {
   const [isMaster, setIsMaster] = useState(false)
   const [showTemplateManager, setShowTemplateManager] = useState(false)
   const [sampleTemplates, setSampleTemplates] = useState<SampleTemplate[]>([])
+  const [builtinUploads, setBuiltinUploads] = useState<BuiltinUploadInfo[]>([])
+  const [showBuiltinUploadManager, setShowBuiltinUploadManager] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,6 +83,12 @@ export default function ContractsPage() {
       .select('*')
       .order('created_at', { ascending: true })
     setSampleTemplates((tplData ?? []) as SampleTemplate[])
+
+    // 자동생성 양식 커스텀 업로드 로드
+    const { data: builtinData } = await supabase
+      .from('contract_builtin_uploads')
+      .select('*')
+    setBuiltinUploads((builtinData ?? []) as BuiltinUploadInfo[])
 
     const [{ data: ctData }, { data: rmData }, { data: leaseData }] = await Promise.all([
       supabase
@@ -213,11 +221,16 @@ export default function ContractsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowBuiltinUploadManager(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+            <LayoutTemplate size={15} /> 내 양식 관리
+          </button>
           {isMaster && (
             <button onClick={() => setShowTemplateManager(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border"
               style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
-              <Settings size={15} /> 양식 관리
+              <Settings size={15} /> 샘플 양식
             </button>
           )}
           <button onClick={() => setShowCreate(true)}
@@ -367,6 +380,7 @@ export default function ContractsPage() {
         <CreateContractModal
           rooms={rooms}
           sampleTemplates={sampleTemplates}
+          builtinUploads={builtinUploads}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); showToast('success', '계약서가 작성되었습니다.') }}
           onError={msg => showToast('error', msg)}
@@ -388,16 +402,35 @@ export default function ContractsPage() {
           onToast={showToast}
         />
       )}
+
+      {/* 내 양식 관리 모달 (모든 사용자) */}
+      {showBuiltinUploadManager && (
+        <BuiltinUploadManagerModal
+          onClose={() => { setShowBuiltinUploadManager(false); load() }}
+          onToast={showToast}
+        />
+      )}
     </div>
   )
 }
 
+/* ─── 자동생성 양식 업로드 타입 ─── */
+interface BuiltinUploadInfo {
+  id: string
+  template_key: string
+  template_url: string
+  template_name: string
+  template_mime: string
+  created_at: string
+}
+
 /* ─── 계약서 작성 모달 ─── */
 function CreateContractModal({
-  rooms, sampleTemplates, onClose, onCreated, onError,
+  rooms, sampleTemplates, builtinUploads, onClose, onCreated, onError,
 }: {
   rooms: Room[]
   sampleTemplates: SampleTemplate[]
+  builtinUploads: BuiltinUploadInfo[]
   onClose: () => void
   onCreated: () => void
   onError: (msg: string) => void
@@ -499,36 +532,51 @@ function CreateContractModal({
       }
     }
 
-    // 기본 양식 선택 시 이미지 생성
+    // 기본 양식 선택 시 — 커스텀 업로드가 있으면 그 URL 사용, 없으면 Canvas 이미지 생성
     let finalTemplateFile = templateFile
     let finalOriginalName = originalPdfName
     if (templateTab === 'builtin' && selectedBuiltIn && !templateFile) {
-      setGeneratingTemplate(true)
-      try {
-        const selectedRoom = rooms.find(r => r.id === form.room_id)
-        const tplData: TemplateData = {
-          tenant_name:   form.tenant_name,
-          tenant_phone:  form.tenant_phone,
-          address:       form.address,
-          monthly_rent:  form.monthly_rent,
-          deposit:       form.deposit,
-          lease_start:   form.lease_start,
-          lease_end:     form.lease_end,
-          special_terms: form.special_terms,
-          room_name:     selectedRoom?.name ?? '',
-        }
-        const blob = await generateTemplateImage(selectedBuiltIn, tplData)
-        const tplInfo = BUILT_IN_TEMPLATES.find(t => t.id === selectedBuiltIn)
-        finalTemplateFile = new File([blob], `${tplInfo?.name ?? '계약서'}.png`, { type: 'image/png' })
-        finalOriginalName = null
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '양식 생성 실패'
-        onError(`양식 생성 실패: ${msg}`)
+      // 커스텀 업로드 확인
+      const customUpload = builtinUploads.find(u => u.template_key === selectedBuiltIn)
+      if (customUpload) {
+        // 커스텀 업로드된 파일 URL 직접 사용
+        sampleTemplateUrl  = customUpload.template_url
+        sampleTemplateName = customUpload.template_name
+        sampleTemplateMime = customUpload.template_mime
+      } else if (BUILTIN_TEMPLATE_DEFS.find(d => d.key === selectedBuiltIn)?.uploadOnly) {
+        // uploadOnly 슬롯은 커스텀 업로드 필수
+        onError('이 양식은 "내 양식 관리"에서 파일을 업로드해야 사용할 수 있습니다.')
         setSaving(false)
-        setGeneratingTemplate(false)
         return
+      } else {
+        // Canvas 자동생성
+        setGeneratingTemplate(true)
+        try {
+          const selectedRoom = rooms.find(r => r.id === form.room_id)
+          const tplData: TemplateData = {
+            tenant_name:   form.tenant_name,
+            tenant_phone:  form.tenant_phone,
+            address:       form.address,
+            monthly_rent:  form.monthly_rent,
+            deposit:       form.deposit,
+            lease_start:   form.lease_start,
+            lease_end:     form.lease_end,
+            special_terms: form.special_terms,
+            room_name:     selectedRoom?.name ?? '',
+          }
+          const blob = await generateTemplateImage(selectedBuiltIn, tplData)
+          const tplInfo = BUILT_IN_TEMPLATES.find(t => t.id === selectedBuiltIn)
+          finalTemplateFile = new File([blob], `${tplInfo?.name ?? '계약서'}.png`, { type: 'image/png' })
+          finalOriginalName = null
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '양식 생성 실패'
+          onError(`양식 생성 실패: ${msg}`)
+          setSaving(false)
+          setGeneratingTemplate(false)
+          return
+        }
+        setGeneratingTemplate(false)
       }
-      setGeneratingTemplate(false)
     }
 
     // 양식 파일 업로드
@@ -618,7 +666,7 @@ function CreateContractModal({
               className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
               style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
               <option value="">호실을 선택하세요</option>
-              {rooms.map(r => (
+              {[...rooms].sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true })).map(r => (
                 <option key={r.id} value={r.id}>{r.name} {(r as Room & Record<string, unknown>).tenant_name ? `(${(r as Room & Record<string, unknown>).tenant_name})` : ''}</option>
               ))}
             </select>
@@ -670,7 +718,7 @@ function CreateContractModal({
                   boxShadow: templateTab === 'builtin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                 }}>
                 <LayoutTemplate size={13} />
-                자동 생성
+                계약서 양식
               </button>
               <button type="button"
                 onClick={() => { setTemplateTab('upload'); setSelectedBuiltIn(null); setSelectedSampleId(null) }}
@@ -730,38 +778,62 @@ function CreateContractModal({
               </div>
             )}
 
-            {/* 자동 생성 양식 탭 */}
+            {/* 계약서 양식 탭 */}
             {templateTab === 'builtin' && (
               <div className="space-y-2">
-                {BUILT_IN_TEMPLATES.map(tpl => (
-                  <button key={tpl.id} type="button"
-                    onClick={() => setSelectedBuiltIn(tpl.id === selectedBuiltIn ? null : tpl.id)}
-                    className="w-full text-left px-4 py-3 rounded-xl border-2 transition-all"
-                    style={{
-                      borderColor: selectedBuiltIn === tpl.id ? tpl.color : 'var(--color-border)',
-                      background: selectedBuiltIn === tpl.id ? `${tpl.color}08` : 'var(--color-background)',
-                    }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                           style={{ background: `${tpl.color}18`, color: tpl.color }}>
-                        <FileText size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold" style={{ color: selectedBuiltIn === tpl.id ? tpl.color : 'var(--color-text)' }}>
-                          {tpl.name}
+                {BUILTIN_TEMPLATE_DEFS.map(def => {
+                  const hasCustom = builtinUploads.some(u => u.template_key === def.key)
+                  const isUploadOnly = def.uploadOnly && !hasCustom
+                  const selectable = !isUploadOnly
+                  return (
+                    <button key={def.key} type="button"
+                      onClick={() => {
+                        if (isUploadOnly) return
+                        setSelectedBuiltIn(def.key === selectedBuiltIn ? null : def.key)
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-xl border-2 transition-all"
+                      style={{
+                        borderColor: selectedBuiltIn === def.key ? def.color : 'var(--color-border)',
+                        background: selectedBuiltIn === def.key ? `${def.color}08` : 'var(--color-background)',
+                        opacity: isUploadOnly ? 0.6 : 1,
+                        cursor: selectable ? 'pointer' : 'default',
+                      }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                             style={{ background: `${def.color}18`, color: def.color }}>
+                          {isUploadOnly ? <Upload size={16} /> : <FileText size={16} />}
                         </div>
-                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
-                          {tpl.desc}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold" style={{ color: selectedBuiltIn === def.key ? def.color : 'var(--color-text)' }}>
+                              {def.name}
+                            </span>
+                            {hasCustom && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                                    style={{ background: `${def.color}20`, color: def.color }}>
+                                커스텀
+                              </span>
+                            )}
+                            {isUploadOnly && (
+                              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded"
+                                    style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
+                                미등록
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                            {hasCustom ? '업로드된 양식이 사용됩니다.' : def.desc}
+                          </div>
                         </div>
+                        {selectedBuiltIn === def.key && (
+                          <CheckCircle2 size={18} style={{ color: def.color }} className="shrink-0" />
+                        )}
                       </div>
-                      {selectedBuiltIn === tpl.id && (
-                        <CheckCircle2 size={18} style={{ color: tpl.color }} className="shrink-0" />
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
                 <p className="text-[11px]" style={{ color: 'var(--color-muted)' }}>
-                  위 양식에 입력한 계약 정보가 자동으로 채워져 임차인에게 발송됩니다.
+                  미등록 양식은 &quot;내 양식 관리&quot;에서 파일을 업로드한 뒤 사용할 수 있습니다.
                 </p>
               </div>
             )}
@@ -984,6 +1056,10 @@ function TemplateManagerModal({
   const [convertingPdf, setConvertingPdf] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingOrigName, setPendingOrigName] = useState<string | null>(null)
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [editName, setEditName]     = useState('')
+  const [editDesc, setEditDesc]     = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1078,6 +1154,32 @@ function TemplateManagerModal({
     load()
   }
 
+  const startEdit = (tpl: SampleTemplate) => {
+    setEditingId(tpl.id)
+    setEditName(tpl.name)
+    setEditDesc(tpl.description ?? '')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditName('')
+    setEditDesc('')
+  }
+
+  const handleEditSave = async () => {
+    if (!editingId || !editName.trim()) return
+    setEditSaving(true)
+    const { error } = await supabase
+      .from('contract_sample_templates')
+      .update({ name: editName.trim(), description: editDesc.trim() || null })
+      .eq('id', editingId)
+    setEditSaving(false)
+    if (error) { onToast('error', error.message); return }
+    onToast('success', '양식이 수정되었습니다.')
+    cancelEdit()
+    load()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: 'rgba(0,0,0,0.4)' }}
@@ -1113,34 +1215,75 @@ function TemplateManagerModal({
                 등록된 양식 ({templates.length}/5)
               </div>
               {templates.map(tpl => (
-                <div key={tpl.id} className="flex items-center gap-3 p-3 rounded-xl border"
-                     style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
-                  {tpl.template_mime?.startsWith('image/') ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={tpl.template_url} alt={tpl.name}
-                      className="w-14 h-20 rounded border object-cover shrink-0"
-                      style={{ borderColor: 'var(--color-border)' }} />
-                  ) : (
-                    <div className="w-14 h-20 rounded border flex items-center justify-center shrink-0"
-                         style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
-                      <FileText size={22} style={{ color: 'var(--color-muted)' }} />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{tpl.name}</div>
-                    {tpl.description && (
-                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>{tpl.description}</div>
+                <div key={tpl.id} className="rounded-xl border overflow-hidden"
+                     style={{ borderColor: editingId === tpl.id ? 'var(--color-primary)' : 'var(--color-border)', background: 'var(--color-background)' }}>
+                  <div className="flex items-center gap-3 p-3">
+                    {tpl.template_mime?.startsWith('image/') ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={tpl.template_url} alt={tpl.name}
+                        className="w-14 h-20 rounded border object-cover shrink-0"
+                        style={{ borderColor: 'var(--color-border)' }} />
+                    ) : (
+                      <div className="w-14 h-20 rounded border flex items-center justify-center shrink-0"
+                           style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
+                        <FileText size={22} style={{ color: 'var(--color-muted)' }} />
+                      </div>
                     )}
-                    <div className="text-[10px] mt-1" style={{ color: 'var(--color-muted)' }}>
-                      {tpl.template_name} · {formatDate(tpl.created_at)}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{tpl.name}</div>
+                      {tpl.description && (
+                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>{tpl.description}</div>
+                      )}
+                      <div className="text-[10px] mt-1" style={{ color: 'var(--color-muted)' }}>
+                        {tpl.template_name} · {formatDate(tpl.created_at)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => startEdit(tpl)}
+                        className="p-2 rounded-lg"
+                        style={{ color: 'var(--color-primary)', background: 'rgba(29,53,87,0.06)' }}
+                        title="수정">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(tpl)}
+                        className="p-2 rounded-lg"
+                        style={{ color: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
+                        title="삭제">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
-                  <button onClick={() => handleDelete(tpl)}
-                    className="p-2 rounded-lg shrink-0"
-                    style={{ color: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
-                    title="삭제">
-                    <Trash2 size={14} />
-                  </button>
+                  {/* 인라인 수정 폼 */}
+                  {editingId === tpl.id && (
+                    <div className="px-3 pb-3 pt-1 border-t space-y-2" style={{ borderColor: 'var(--color-border)' }}>
+                      <div>
+                        <label className="block text-[11px] font-medium mb-0.5" style={{ color: 'var(--color-muted)' }}>양식 이름</label>
+                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }} />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium mb-0.5" style={{ color: 'var(--color-muted)' }}>설명</label>
+                        <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)}
+                          placeholder="설명 (선택)"
+                          className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={cancelEdit}
+                          className="flex-1 py-2 rounded-lg text-xs font-medium border"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+                          취소
+                        </button>
+                        <button onClick={handleEditSave} disabled={editSaving || !editName.trim()}
+                          className="flex-1 py-2 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-50"
+                          style={{ background: 'var(--color-primary)' }}>
+                          {editSaving && <Loader2 size={12} className="animate-spin" />}
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1203,6 +1346,293 @@ function TemplateManagerModal({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button onClick={onClose}
+            className="w-full py-2.5 rounded-lg text-sm font-medium border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── 내 양식 관리 모달 (자동생성 3개 양식에 커스텀 파일 업로드) ─── */
+const BUILTIN_TEMPLATE_DEFS: { key: string; name: string; desc: string; color: string; uploadOnly?: boolean }[] = [
+  { key: 'basic-lease', name: '임대차계약서 (기본)', desc: '상가건물임대차보호법 적용, 12개 조항 포함 강화 계약서', color: '#1d3557' },
+  { key: 'slot-2',      name: '계약서 양식 2',       desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
+  { key: 'slot-3',      name: '계약서 양식 3',       desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
+]
+
+function BuiltinUploadManagerModal({
+  onClose, onToast,
+}: {
+  onClose: () => void
+  onToast: (type: 'success' | 'error', msg: string) => void
+}) {
+  const supabase = createClient()
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [uploads, setUploads] = useState<BuiltinUploadInfo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [convertingPdf, setConvertingPdf] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('contract_builtin_uploads')
+      .select('*')
+      .order('created_at', { ascending: true })
+    setUploads((data ?? []) as BuiltinUploadInfo[])
+    setLoading(false)
+  }, [supabase])
+
+  useEffect(() => { load() }, [load])
+
+  const getUpload = (key: string) => uploads.find(u => u.template_key === key)
+
+  const handleFileSelect = async (templateKey: string, file: File) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.type)) {
+      onToast('error', 'PDF 또는 이미지(JPG/PNG/WEBP) 파일만 업로드 가능합니다.')
+      return
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      onToast('error', '파일 크기는 50MB 이하여야 합니다.')
+      return
+    }
+
+    let finalFile = file
+    let origName: string | null = null
+
+    if (file.type === 'application/pdf') {
+      setConvertingPdf(templateKey)
+      try {
+        const { convertPdfToPngBlob } = await import('@/lib/pdf-to-image')
+        const { blob } = await convertPdfToPngBlob(file)
+        const baseName = file.name.replace(/\.pdf$/i, '')
+        finalFile = new File([blob], `${baseName}.png`, { type: 'image/png' })
+        origName = file.name
+      } catch {
+        onToast('error', 'PDF → 이미지 변환 실패')
+        setConvertingPdf(null)
+        return
+      }
+      setConvertingPdf(null)
+    }
+
+    setUploading(templateKey)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setUploading(null); onToast('error', '로그인이 필요합니다.'); return }
+
+    const ext = finalFile.name.split('.').pop() || 'bin'
+    const path = `builtin-uploads/${user.id}/${templateKey}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('contract-templates')
+      .upload(path, finalFile, { contentType: finalFile.type, cacheControl: '3600', upsert: false })
+    if (upErr) { setUploading(null); onToast('error', `업로드 실패: ${upErr.message}`); return }
+
+    const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
+
+    const existing = getUpload(templateKey)
+    if (existing) {
+      const urlParts = existing.template_url.split('/contract-templates/')
+      if (urlParts.length > 1) {
+        await supabase.storage.from('contract-templates').remove([urlParts[1]])
+      }
+      const { error: dbErr } = await supabase
+        .from('contract_builtin_uploads')
+        .update({
+          template_url:  pub.publicUrl,
+          template_name: origName ?? finalFile.name,
+          template_mime: finalFile.type,
+          updated_at:    new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+      if (dbErr) { setUploading(null); onToast('error', dbErr.message); return }
+    } else {
+      const { error: dbErr } = await supabase.from('contract_builtin_uploads').insert({
+        owner_id:      user.id,
+        template_key:  templateKey,
+        template_url:  pub.publicUrl,
+        template_name: origName ?? finalFile.name,
+        template_mime: finalFile.type,
+      })
+      if (dbErr) { setUploading(null); onToast('error', dbErr.message); return }
+    }
+
+    setUploading(null)
+    onToast('success', '양식이 업로드되었습니다.')
+    const ref = fileInputRefs.current[templateKey]
+    if (ref) ref.value = ''
+    load()
+  }
+
+  const handleDelete = async (templateKey: string) => {
+    const existing = getUpload(templateKey)
+    if (!existing) return
+    if (!confirm('이 양식 파일을 삭제하시겠습니까? 삭제 후 자동생성 방식으로 복원됩니다.')) return
+
+    const urlParts = existing.template_url.split('/contract-templates/')
+    if (urlParts.length > 1) {
+      await supabase.storage.from('contract-templates').remove([urlParts[1]])
+    }
+    await supabase.from('contract_builtin_uploads').delete().eq('id', existing.id)
+    onToast('success', '삭제되었습니다.')
+    load()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.4)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-2xl rounded-2xl overflow-hidden"
+           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
+
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
+            <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              내 계약서 양식 관리
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+              각 양식에 파일을 업로드하면 자동생성 대신 업로드한 파일이 사용됩니다.
+            </p>
+          </div>
+          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
+        </div>
+
+        {/* 양식 목록 */}
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
+            </div>
+          ) : (
+            BUILTIN_TEMPLATE_DEFS.map(def => {
+              const upload = getUpload(def.key)
+              const isUploading = uploading === def.key
+              const isConverting = convertingPdf === def.key
+
+              return (
+                <div key={def.key}
+                  className="rounded-xl border-2 overflow-hidden transition-all"
+                  style={{ borderColor: upload ? def.color : 'var(--color-border)' }}>
+
+                  {/* 양식 헤더 */}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                         style={{ background: `${def.color}18`, color: def.color }}>
+                      <FileText size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{def.name}</span>
+                        {upload ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ background: `${def.color}20`, color: def.color }}>
+                            커스텀 양식
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-medium px-1.5 py-0.5 rounded"
+                                style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
+                            자동생성
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                        {def.desc}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 업로드된 파일 미리보기 */}
+                  {upload && (
+                    <div className="px-4 pb-3">
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm"
+                           style={{ borderColor: `${def.color}40`, background: `${def.color}06` }}>
+                        {upload.template_mime?.startsWith('image/') ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={upload.template_url} alt={upload.template_name}
+                            className="w-10 h-14 rounded border object-cover shrink-0"
+                            style={{ borderColor: 'var(--color-border)' }} />
+                        ) : (
+                          <div className="w-10 h-14 rounded border flex items-center justify-center shrink-0"
+                               style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
+                            <FileText size={16} style={{ color: 'var(--color-muted)' }} />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                            {upload.template_name}
+                          </div>
+                          <div className="text-[10px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                            {formatDate(upload.created_at)}
+                          </div>
+                        </div>
+                        <a href={upload.template_url} target="_blank" rel="noreferrer"
+                           className="text-[11px] font-semibold px-2 py-1 rounded shrink-0"
+                           style={{ color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.15)', textDecoration: 'none' }}>
+                          보기
+                        </a>
+                        <button onClick={() => handleDelete(def.key)}
+                          className="p-1.5 rounded-lg shrink-0"
+                          style={{ color: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
+                          title="삭제">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 업로드 영역 */}
+                  <div className="px-4 pb-4">
+                    <input
+                      ref={el => { fileInputRefs.current[def.key] = el }}
+                      type="file"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={e => {
+                        const f = e.target.files?.[0]
+                        if (f) handleFileSelect(def.key, f)
+                      }}
+                      className="hidden"
+                    />
+                    {isConverting ? (
+                      <div className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed text-sm"
+                           style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
+                        <Loader2 size={14} className="animate-spin" />
+                        PDF 변환 중...
+                      </div>
+                    ) : isUploading ? (
+                      <div className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed text-sm"
+                           style={{ borderColor: def.color, background: `${def.color}08`, color: def.color }}>
+                        <Loader2 size={14} className="animate-spin" />
+                        업로드 중...
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRefs.current[def.key]?.click()}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-dashed text-sm transition-all"
+                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = def.color; e.currentTarget.style.color = def.color }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-muted)' }}>
+                        <Upload size={14} />
+                        {upload ? '다른 파일로 교체' : '양식 파일 업로드'} (PDF / 이미지)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+
+          <p className="text-[11px]" style={{ color: 'var(--color-muted)' }}>
+            업로드한 양식은 계약서 작성 시 &quot;계약서 양식&quot; 탭에서 자동으로 적용됩니다.
+          </p>
         </div>
 
         <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>

@@ -112,35 +112,50 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
                     }
                 }
 
-                // 2. Fetch Rooms
-                const { data: rData, error: rError } = await supabase.from('rooms').select('*');
+                // 2. Fetch Rooms (제거된 tenant/rent 컬럼 없이)
+                const { data: rData, error: rError } = await supabase.from('rooms').select('id, business_id, name, status, auto_notify, building, area');
                 if (rError) throw rError;
 
+                // 2-1. leases → tenants 경유로 입주사/계약 정보 보강
+                type LeaseJoinRow = { room_id: string; monthly_rent: number | null; pledge_amount: number | null; payment_day: number | null; lease_start: string; lease_end: string | null; tenant: { id: string; name: string; phone: string | null } | { id: string; name: string; phone: string | null }[] | null }
+                const { data: leaseData } = await supabase
+                    .from('leases')
+                    .select('room_id, monthly_rent, pledge_amount, payment_day, lease_start, lease_end, tenant:tenants(id, name, phone)')
+                    .eq('status', 'ACTIVE');
+                const leaseByRoom: Record<string, LeaseJoinRow> = {};
+                for (const l of (leaseData ?? []) as unknown as LeaseJoinRow[]) {
+                    leaseByRoom[l.room_id] = l;
+                }
+
                 if (rData && rData.length > 0) {
-                    const mappedRooms: Room[] = (rData as RoomRow[]).map((d) => ({
-                        id: d.id,
-                        businessId: d.business_id,
-                        name: d.name,
-                        status: d.status,
-                        autoNotify: d.auto_notify,
-                        unpaidMonths: d.unpaid_months,
-                        unpaidAmount: d.unpaid_amount,
-                        leaseStart: d.lease_start,
-                        leaseEnd: d.lease_end,
-                        paymentInfo: {
-                            deposit: d.deposit ?? 0,
-                            monthlyRent: d.monthly_rent ?? 0,
-                            dueDate: d.due_date ?? "매월 25일",
-                            isVATIncluded: d.is_vat_included ?? false
-                        },
-                        tenant: d.tenant_id ? {
-                            id: d.tenant_id,
-                            name: d.tenant_name ?? "미확인",
-                            contact: d.tenant_contact,
-                            companyName: d.tenant_company_name,
-                            businessRegistrationNumber: d.tenant_business_reg_num
-                        } : null
-                    }));
+                    const mappedRooms: Room[] = (rData as RoomRow[]).map((d) => {
+                        const lease = leaseByRoom[d.id];
+                        const tenant = lease?.tenant ? (Array.isArray(lease.tenant) ? lease.tenant[0] : lease.tenant) : null;
+                        return {
+                            id: d.id,
+                            businessId: d.business_id,
+                            name: d.name,
+                            status: d.status,
+                            autoNotify: d.auto_notify,
+                            unpaidMonths: d.unpaid_months,
+                            unpaidAmount: d.unpaid_amount,
+                            leaseStart: lease?.lease_start,
+                            leaseEnd: lease?.lease_end ?? undefined,
+                            paymentInfo: {
+                                deposit: lease?.pledge_amount ?? 0,
+                                monthlyRent: lease?.monthly_rent ?? 0,
+                                dueDate: lease?.payment_day ? `매월 ${lease.payment_day}일` : "매월 25일",
+                                isVATIncluded: false,
+                            },
+                            tenant: tenant ? {
+                                id: tenant.id,
+                                name: tenant.name ?? "미확인",
+                                contact: tenant.phone ?? undefined,
+                                companyName: undefined,
+                                businessRegistrationNumber: undefined,
+                            } : null,
+                        };
+                    });
                     setRooms(mappedRooms);
                 }
 
