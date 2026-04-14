@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
             virtualAccount: {
               bank,
               expiry:  { dueDate: expiredAt },
-              option:  { type: 'NORMAL', remitteeName: '노아도' },
+              option:  { type: 'NORMAL', remitteeName: tenantName },
             },
           },
         }),

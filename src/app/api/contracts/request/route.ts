@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/server'
 import { sendKakaoAlimtalk, sendSMS, normalizePhone } from '@/lib/alimtalk'
 
 export async function POST(request: NextRequest) {
-  const { tenantId } = await request.json()
+  const { tenantId, sendMethod = 'kakao' } = await request.json() as { tenantId: string; sendMethod?: 'kakao' | 'sms' }
   if (!tenantId) {
     return NextResponse.json({ error: 'tenantId 필요' }, { status: 400 })
   }
@@ -159,62 +159,57 @@ export async function POST(request: NextRequest) {
       .eq('id', invoiceId)
   }
 
-  // ── 5. 알림톡 발송 ──────────────────────────────────────────────
+  // ── 5. 메시지 발송 (sendMethod에 따라 카카오톡 또는 SMS) ──────────
   const baseUrl     = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.noado.kr'
   const paymentLink = `${baseUrl}/pay/${invoiceId}`
-  let alimtalkSent  = false
-  let smsSent       = false
+  let messageSent   = false
 
   const normalizedPhone = normalizePhone(tenant.phone)
 
   try {
-    alimtalkSent = await sendKakaoAlimtalk({
-      templateKey: 'INVOICE_ISSUED',
-      to: normalizedPhone,
-      variables: {
-        '#{이름}':    tenant.name,
-        '#{호실}':    room.name,
-        '#{year}':   String(now.getFullYear()),
-        '#{month}':  String(now.getMonth() + 1),
-        '#{금액}':    (lease.monthly_rent ?? 0).toLocaleString('ko-KR'),
-        '#{납부기한}': dueDate,
-        '#{링크}':    paymentLink,
-      },
-    })
+    if (sendMethod === 'sms') {
+      const smsText = `[노아도] ${tenant.name}님, ${room.name} ${now.getMonth() + 1}월 이용료 납부 안내입니다.\n\n금액: ${(lease.monthly_rent ?? 0).toLocaleString('ko-KR')}원\n납부기한: ${dueDate}\n\n아래 링크에서 납부해주세요.\n${paymentLink}`
+      messageSent = await sendSMS(normalizedPhone, smsText)
+    } else {
+      messageSent = await sendKakaoAlimtalk({
+        templateKey: 'INVOICE_ISSUED',
+        to: normalizedPhone,
+        variables: {
+          '#{이름}':    tenant.name,
+          '#{호실}':    room.name,
+          '#{year}':   String(now.getFullYear()),
+          '#{month}':  String(now.getMonth() + 1),
+          '#{금액}':    (lease.monthly_rent ?? 0).toLocaleString('ko-KR'),
+          '#{납부기한}': dueDate,
+          '#{링크}':    paymentLink,
+        },
+      })
+    }
   } catch (e) {
-    console.error('[contracts/request] 알림톡 발송 에러:', e)
-  }
-
-  // SMS: 납부 링크 별도 발송
-  try {
-    const smsText = `[노아도] ${tenant.name}님, ${room.name} ${now.getMonth() + 1}월 이용료 납부 링크입니다.\n${paymentLink}`
-    smsSent = await sendSMS(normalizedPhone, smsText)
-  } catch (e) {
-    console.error('[contracts/request] SMS 발송 에러:', e)
+    console.error(`[contracts/request] ${sendMethod} 발송 에러:`, e)
   }
 
   // 발송 로그
+  const methodLabel = sendMethod === 'sms' ? '문자' : '알림톡'
   await supabaseAdmin.from('notification_logs').insert({
     owner_id:        user.id,
     room_id:         lease.room_id,
-    template_key:    'INVOICE_ISSUED',
+    template_key:    sendMethod === 'sms' ? 'INVOICE_ISSUED_SMS' : 'INVOICE_ISSUED',
     recipient_name:  tenant.name,
     recipient_phone: normalizedPhone,
-    status:          (alimtalkSent || smsSent) ? 'success' : 'failed',
+    status:          messageSent ? 'success' : 'failed',
   })
 
-  console.log(`[contracts/request] 납부요청 완료: tenant=${tenantId} invoice=${invoiceId} contract=${contractId} alimtalk=${alimtalkSent} sms=${smsSent}`)
+  console.log(`[contracts/request] 납부요청 완료: tenant=${tenantId} invoice=${invoiceId} contract=${contractId} ${methodLabel}=${messageSent}`)
 
-  const sentMethods = [alimtalkSent && '알림톡', smsSent && 'SMS'].filter(Boolean).join(' + ')
   return NextResponse.json({
     ok: true,
     invoiceId,
     contractId,
     paymentLink,
-    alimtalkSent,
-    smsSent,
-    message: sentMethods
-      ? `납부 요청이 발송되었습니다. (${room.name} · ${tenant.name} / ${sentMethods})`
-      : `납부 링크가 생성되었습니다. (발송 실패 — 연락처 확인 필요)\n링크: ${paymentLink}`,
+    messageSent,
+    message: messageSent
+      ? `납부 요청이 발송되었습니다. (${room.name} · ${tenant.name} / ${methodLabel})`
+      : `납부 링크가 생성되었습니다. (${methodLabel} 발송 실패 — 연락처 확인 필요)\n링크: ${paymentLink}`,
   })
 }

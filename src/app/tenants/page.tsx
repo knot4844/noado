@@ -8,7 +8,7 @@ import {
   Search, Plus, Phone, Calendar, ChevronRight, ChevronLeft,
   User, Home, Loader2, X, AlertCircle, CheckCircle2,
   History, Pencil, LogOut, TrendingUp, LayoutList, GanttChartSquare,
-  Send, Wallet,
+  Send, Wallet, MessageSquare,
 } from 'lucide-react'
 import { formatKRW, formatDate, formatPhone } from '@/lib/utils'
 import type { Room, Invoice, Payment, Tenant, Lease, ContractType, VatType } from '@/types'
@@ -151,14 +151,14 @@ export default function TenantsPage() {
   }
 
   /* ─── 납부 요청 핸들러 ──────────────────────────────────── */
-  const handlePaymentRequest = async (item: LeaseItem) => {
+  const handlePaymentRequest = async (item: LeaseItem, sendMethod: 'kakao' | 'sms' = 'kakao') => {
     if (requestingId) return
     setRequestingId(item.lease.id)
     try {
       const res = await fetch('/api/contracts/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: item.tenant.id }),
+        body: JSON.stringify({ tenantId: item.tenant.id, sendMethod }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '납부 요청 실패')
@@ -316,7 +316,7 @@ export default function TenantsPage() {
               item={item}
               onHistory={() => setHistoryItem(item)}
               onEdit={() => setEditItem(item)}
-              onRequestPayment={() => handlePaymentRequest(item)}
+              onRequestPayment={(method) => handlePaymentRequest(item, method)}
               isRequesting={requestingId === item.lease.id}
             />
           ))}
@@ -364,7 +364,7 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
   item:             LeaseItem
   onHistory:        () => void
   onEdit:           () => void
-  onRequestPayment: () => void
+  onRequestPayment: (method: 'kakao' | 'sms') => void
   isRequesting:     boolean
 }) {
   const { lease, tenant, room, invoices, unpaidTotal, prepayBalance } = item
@@ -526,19 +526,35 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
           style={{ color: 'var(--color-primary)', borderRight: '1px solid var(--color-border)' }}>
           <History size={13} /> 납부 이력
         </button>
-        <button
-          onClick={e => { e.stopPropagation(); onRequestPayment() }}
-          disabled={isRequesting || room.status === 'PAID'}
-          title={room.status === 'PAID' ? '이미 완납 상태입니다' : '납부 요청 알림톡 발송'}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-40"
-          style={{
-            color: room.status === 'PAID' ? 'var(--color-muted)' : 'var(--color-success)',
-            borderRight: '1px solid var(--color-border)',
-          }}>
-          {isRequesting
-            ? <><Loader2 size={12} className="animate-spin" /> 발송 중...</>
-            : <><Send size={12} /> 납부 요청</>}
-        </button>
+        <div className="relative flex-1 group/pay" style={{ borderRight: '1px solid var(--color-border)' }}>
+          <button
+            disabled={isRequesting || room.status === 'PAID'}
+            title={room.status === 'PAID' ? '이미 완납 상태입니다' : '납부 요청 발송'}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-40"
+            style={{
+              color: room.status === 'PAID' ? 'var(--color-muted)' : 'var(--color-success)',
+            }}>
+            {isRequesting
+              ? <><Loader2 size={12} className="animate-spin" /> 발송 중...</>
+              : <><Send size={12} /> 납부 요청</>}
+          </button>
+          {!isRequesting && room.status !== 'PAID' && (
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-full w-28 pb-1 hidden group-hover/pay:block z-50">
+              <div className="rounded-lg shadow-lg border" style={{ background: '#ffffff', borderColor: 'var(--color-border)' }}>
+                <button
+                  onClick={e => { e.stopPropagation(); onRequestPayment('kakao') }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/5 rounded-t-lg">
+                  <MessageSquare size={12} /> 카카오톡
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); onRequestPayment('sms') }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-black/5 rounded-b-lg">
+                  <Send size={12} /> 문자(SMS)
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <button onClick={onEdit}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium"
           style={{ color: 'var(--color-muted)' }}>
