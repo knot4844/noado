@@ -695,7 +695,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
     y += 20
   }
 
-  // ── 날짜 + 확인 문구 (서명란은 HTML에서 표시) ──
+  // ── 날짜 + 서명란 ──
   y += 20
   ctx.strokeStyle = clr
   ctx.lineWidth = 2
@@ -711,7 +711,35 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
   y += 40
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
+  y += 60
+
+  ctx.textAlign = 'left'
+  ctx.font = 'bold 22px "Pretendard", sans-serif'
+  ctx.fillStyle = clr
+  ctx.fillText('임 대 인 (갑)', mx, y)
+  y += 35
+  ctx.font = '20px "Pretendard", sans-serif'
+  ctx.fillStyle = '#333'
+  ctx.fillText('상  호 : 대우오피스          사업자번호 : 127-44-85045', mx + 20, y)
   y += 30
+  ctx.fillText('성  명 : 이 동 윤  (인)     연락처 : 010-8885-4844', mx + 20, y)
+  y += 50
+
+  ctx.font = 'bold 22px "Pretendard", sans-serif'
+  ctx.fillStyle = clr
+  ctx.fillText('임 차 인 (을)', mx, y)
+  y += 35
+  ctx.font = '20px "Pretendard", sans-serif'
+  ctx.fillStyle = '#333'
+  ctx.fillText(`성  명 : ${d.tenant_name || '                              '}  (인)`, mx + 20, y)
+  y += 30
+  ctx.fillText(`연락처 : ${d.tenant_phone || ''}`, mx + 20, y)
+  y += 30
+  if (d.address) {
+    ctx.fillText(`주  소 : ${d.address}`, mx + 20, y)
+    y += 30
+  }
+  y += 40
 
   return y
 }
