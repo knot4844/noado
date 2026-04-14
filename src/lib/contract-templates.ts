@@ -51,33 +51,44 @@ export async function generateTemplateImage(
   data: TemplateData,
 ): Promise<Blob> {
   const W = 1200
-  const H = templateId === 'short-term' ? 1600 : (templateId === 'commercial-lease' || templateId === 'basic-lease') ? 4200 : 1900
+  // 초기 높이를 넉넉히 잡고, 실제 사용 영역만 크롭
+  const maxH = 5000
   const canvas = document.createElement('canvas')
   canvas.width = W
-  canvas.height = H
+  canvas.height = maxH
   const ctx = canvas.getContext('2d')!
 
   // 배경
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, W, H)
+  ctx.fillRect(0, 0, W, maxH)
+
+  let usedHeight = maxH
 
   switch (templateId) {
     case 'basic-lease':
-      drawCommercialLease(ctx, W, H, data)
+      usedHeight = drawCommercialLease(ctx, W, maxH, data)
       break
     case 'shared-office':
-      drawSharedOffice(ctx, W, H, data)
+      drawSharedOffice(ctx, W, maxH, data)
       break
     case 'short-term':
-      drawShortTerm(ctx, W, H, data)
+      drawShortTerm(ctx, W, maxH, data)
       break
     case 'commercial-lease':
-      drawCommercialLease(ctx, W, H, data)
+      usedHeight = drawCommercialLease(ctx, W, maxH, data)
       break
   }
 
+  // 실제 사용 영역만 크롭하여 최종 Canvas 생성
+  const finalH = Math.min(usedHeight + 40, maxH) // 하단 여백 40px
+  const finalCanvas = document.createElement('canvas')
+  finalCanvas.width = W
+  finalCanvas.height = finalH
+  const fCtx = finalCanvas.getContext('2d')!
+  fCtx.drawImage(canvas, 0, 0, W, finalH, 0, 0, W, finalH)
+
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(blob => {
+    finalCanvas.toBlob(blob => {
       if (blob) resolve(blob)
       else reject(new Error('Canvas to Blob 실패'))
     }, 'image/png')
@@ -684,7 +695,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
     y += 20
   }
 
-  // ── 날짜 + 서명란 ──
+  // ── 날짜 + 확인 문구 (서명란은 HTML에서 표시) ──
   y += 20
   ctx.strokeStyle = clr
   ctx.lineWidth = 2
@@ -700,32 +711,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
   y += 40
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
-  y += 60
-
-  ctx.textAlign = 'left'
-  ctx.font = 'bold 22px "Pretendard", sans-serif'
-  ctx.fillStyle = clr
-  ctx.fillText('임 대 인 (갑)', mx, y)
-  y += 35
-  ctx.font = '20px "Pretendard", sans-serif'
-  ctx.fillStyle = '#333'
-  ctx.fillText('상  호 : 대우오피스          사업자번호 : 127-44-85045', mx + 20, y)
   y += 30
-  ctx.fillText('성  명 : 이 동 윤  (인)     연락처 : 010-8885-4844', mx + 20, y)
-  y += 50
 
-  ctx.font = 'bold 22px "Pretendard", sans-serif'
-  ctx.fillStyle = clr
-  ctx.fillText('임 차 인 (을)', mx, y)
-  y += 35
-  ctx.font = '20px "Pretendard", sans-serif'
-  ctx.fillStyle = '#333'
-  ctx.fillText(`성  명 : ${d.tenant_name || '                              '}  (인)`, mx + 20, y)
-  y += 30
-  ctx.fillText(`연락처 : ${d.tenant_phone || ''}`, mx + 20, y)
-  y += 40
-
-  ctx.fillStyle = '#888'
-  ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('※ 아래 전자서명란에 서명해주세요.', mx, y)
+  return y
 }

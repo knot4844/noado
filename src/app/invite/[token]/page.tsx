@@ -216,10 +216,12 @@ export default function InvitePage() {
     <div className="min-h-screen py-10 px-4 font-sans print:py-0 print:px-0" style={{ background: 'var(--color-background)' }}>
       <style jsx global>{`
         @media print {
-          @page { size: A4; margin: 16mm; }
+          @page { size: A4; margin: 10mm 12mm; }
           body { background: white !important; }
           .no-print { display: none !important; }
           .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
+          .print-area img { max-height: 92vh; width: auto; max-width: 100%; }
+          .sign-section { page-break-inside: avoid; }
         }
       `}</style>
 
@@ -293,7 +295,7 @@ export default function InvitePage() {
         )}
 
         {/* 계약 당사자 정보 + 전자서명 (2열 레이아웃) */}
-        <div className="px-8 py-5" style={{ borderTop: '2px solid #1d3557' }}>
+        <div className="sign-section px-6 py-4" style={{ borderTop: '2px solid #1d3557' }}>
 
           {/* ── 임대인 (갑) : 좌측 인적사항 + 우측 서명 ── */}
           <div className="flex gap-4 mb-4">
