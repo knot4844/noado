@@ -292,91 +292,101 @@ export default function InvitePage() {
           </div>
         )}
 
-        {/* 임차인 정보 + 전자서명 (계약서 바로 아래 이어짐) */}
-        <div className="px-8 py-6" style={{ borderTop: '2px solid #1d3557' }}>
+        {/* 계약 당사자 정보 + 전자서명 (2열 레이아웃) */}
+        <div className="px-8 py-5" style={{ borderTop: '2px solid #1d3557' }}>
 
-          {/* 임차인 정보 */}
-          <div className="mb-5">
-            <p className="text-sm font-bold mb-2" style={{ color: '#1d3557' }}>▪ 임차인 (을) 정보</p>
-            <table className="w-full border-collapse text-sm">
-              <tbody>
-                {[
-                  { label: '성명 (상호)', value: (snap?.tenant_name as string) || tenantForm.name || contract?.tenant_name || '—' },
-                  { label: '연락처',      value: (snap?.tenant_phone as string) || tenantForm.phone || contract?.tenant_phone || '—' },
-                  { label: '주소',        value: (snap?.tenant_address as string) || tenantForm.address || '' },
-                  { label: '사업자등록번호', value: (snap?.tenant_business_no as string) || tenantForm.business_no || '' },
-                  { label: '업종',        value: (snap?.tenant_biz_type as string) || tenantForm.biz_type || '' },
-                ].filter(({ value }) => value && value !== '—').map(({ label, value }) => (
-                  <tr key={label}>
-                    <td className="border px-3 py-2 font-medium w-32 text-xs" style={{ borderColor: '#ddd', background: '#f8f6f4', color: '#4a4e69' }}>
-                      {label}
-                    </td>
-                    <td className="border px-3 py-2 text-sm" style={{ borderColor: '#ddd', color: '#111' }}>
-                      {value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* 임대인 전자서명 */}
-          {contract?.owner_signature_url && (
-            <div className="mb-4 pt-4 border-t" style={{ borderColor: '#ddd' }}>
-              <p className="text-sm font-bold mb-2" style={{ color: '#1d3557' }}>▪ 임대인 (갑) 전자서명</p>
-              <div className="flex items-center gap-6">
-                <div className="flex-1">
-                  <p className="text-sm" style={{ color: '#333' }}>
-                    임대인: <strong>대우오피스 / 이동윤</strong> (인)
-                  </p>
+          {/* ── 임대인 (갑) : 좌측 인적사항 + 우측 서명 ── */}
+          <div className="flex gap-4 mb-4">
+            {/* 좌측: 임대인 정보 */}
+            <div className="flex-1">
+              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>▪ 임대인 (갑)</p>
+              <table className="w-full border-collapse" style={{ fontSize: '11px' }}>
+                <tbody>
+                  {[
+                    { label: '상호 (성명)', value: (snap?.owner_name as string) || '대우오피스 / 이동윤' },
+                    { label: '사업자번호', value: (snap?.owner_business_no as string) || '179-46-01451' },
+                    { label: '연락처', value: (snap?.owner_phone as string) || '010-8885-4844' },
+                  ].filter(({ value }) => !!value).map(({ label, value }) => (
+                    <tr key={label}>
+                      <td className="border px-2 py-1 font-medium w-20" style={{ borderColor: '#ddd', background: '#f0f4f8', color: '#4a4e69' }}>{label}</td>
+                      <td className="border px-2 py-1" style={{ borderColor: '#ddd', color: '#111' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* 우측: 임대인 서명 */}
+            <div className="w-44 shrink-0 flex flex-col items-center justify-center rounded-lg p-2" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+              {contract?.owner_signature_url ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={contract.owner_signature_url} alt="임대인 서명" className="h-12 mb-1" />
+                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>임대인 (인)</p>
                   {contract.owner_signed_at && (
-                    <p className="text-xs mt-1" style={{ color: '#888' }}>
-                      서명일: {new Date(contract.owner_signed_at).toLocaleDateString('ko-KR')}
+                    <p className="text-center" style={{ fontSize: '9px', color: '#999' }}>
+                      {new Date(contract.owner_signed_at).toLocaleDateString('ko-KR')}
                     </p>
                   )}
-                </div>
-                <div className="shrink-0">
+                  {contract.owner_signer_ip && (
+                    <p className="text-center" style={{ fontSize: '9px', color: '#999' }}>IP: {contract.owner_signer_ip}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-center" style={{ fontSize: '10px', color: '#999' }}>서명 없음</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── 임차인 (을) : 좌측 인적사항 + 우측 서명 ── */}
+          <div className="flex gap-4 mb-4 pt-3" style={{ borderTop: '1px solid #dee2e6' }}>
+            {/* 좌측: 임차인 정보 */}
+            <div className="flex-1">
+              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>▪ 임차인 (을)</p>
+              <table className="w-full border-collapse" style={{ fontSize: '11px' }}>
+                <tbody>
+                  {[
+                    { label: '성명 (상호)', value: (snap?.tenant_name as string) || tenantForm.name || contract?.tenant_name || '—' },
+                    { label: '연락처',      value: (snap?.tenant_phone as string) || tenantForm.phone || contract?.tenant_phone || '—' },
+                    { label: '주소',        value: (snap?.tenant_address as string) || tenantForm.address || '' },
+                    { label: '사업자번호',   value: (snap?.tenant_business_no as string) || tenantForm.business_no || '' },
+                    { label: '업종',        value: (snap?.tenant_biz_type as string) || tenantForm.biz_type || '' },
+                  ].filter(({ value }) => value && value !== '—').map(({ label, value }) => (
+                    <tr key={label}>
+                      <td className="border px-2 py-1 font-medium w-20" style={{ borderColor: '#ddd', background: '#f8f6f4', color: '#4a4e69' }}>{label}</td>
+                      <td className="border px-2 py-1" style={{ borderColor: '#ddd', color: '#111' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* 우측: 임차인 서명 */}
+            <div className="w-44 shrink-0 flex flex-col items-center justify-center rounded-lg p-2" style={{ background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+              {contract?.signature_data_url ? (
+                <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={contract.owner_signature_url} alt="임대인 서명" className="h-16 border rounded p-1.5" style={{ borderColor: '#ddd', background: 'white' }} />
-                </div>
-              </div>
+                  <img src={contract.signature_data_url} alt="임차인 서명" className="h-12 mb-1" />
+                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>임차인 (인)</p>
+                  {contract.signed_at && (
+                    <p className="text-center" style={{ fontSize: '9px', color: '#999' }}>
+                      {new Date(contract.signed_at).toLocaleDateString('ko-KR')}
+                    </p>
+                  )}
+                  {contract.signer_ip && (
+                    <p className="text-center" style={{ fontSize: '9px', color: '#999' }}>IP: {contract.signer_ip}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-center" style={{ fontSize: '10px', color: '#999' }}>서명 없음</p>
+              )}
+            </div>
+          </div>
+
+          {/* 법적 증거 (콘텐츠 해시) */}
+          {displayHash && (
+            <div className="pt-2 border-t break-all" style={{ borderColor: '#e5e5e5', fontSize: '9px', color: '#aaa' }}>
+              <strong>콘텐츠 해시(SHA-256):</strong> <span className="font-mono">{displayHash}</span>
             </div>
           )}
-
-          {/* 임차인 전자서명 */}
-          <div className="mb-4 pt-4 border-t" style={{ borderColor: '#ddd' }}>
-            <p className="text-sm font-bold mb-2" style={{ color: '#1d3557' }}>▪ 임차인 (을) 전자서명</p>
-            <div className="flex items-center gap-6">
-              <div className="flex-1">
-                <p className="text-sm" style={{ color: '#333' }}>
-                  위 계약 내용에 동의하며 전자서명합니다.
-                </p>
-                <p className="text-sm mt-1" style={{ color: '#333' }}>
-                  임차인: <strong>{(snap?.tenant_name as string) || tenantForm.name || contract?.tenant_name || '—'}</strong> (인)
-                </p>
-              </div>
-              <div className="shrink-0">
-                {contract?.signature_data_url ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={contract.signature_data_url} alt="임차인 서명" className="h-16 border rounded p-1.5" style={{ borderColor: '#ddd', background: 'white' }} />
-                ) : (
-                  <div className="w-36 h-16 border-2 border-dashed rounded flex items-center justify-center" style={{ borderColor: '#ccc' }}>
-                    <p className="text-xs" style={{ color: '#999' }}>서명 없음</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 법적 증거 */}
-          <div className="pt-3 border-t text-xs space-y-1" style={{ borderColor: '#e5e5e5', color: '#888' }}>
-            <div><strong>서명 일시:</strong> {displaySignDate}</div>
-            {displayHash && (
-              <div className="break-all">
-                <strong>콘텐츠 해시(SHA-256):</strong> <span className="font-mono">{displayHash}</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
