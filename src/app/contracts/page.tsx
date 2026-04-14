@@ -7,8 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Plus, FileText, Send, CheckCircle2, AlertCircle,
   Loader2, X, Clock, RefreshCw, Download, Eye,
-  Pencil, Trash2, Upload, LayoutTemplate, Link2, Settings,
-  Image as ImageIcon, MessageSquare,
+  Pencil, Trash2, Upload, LayoutTemplate, Link2,
+  MessageSquare, PenTool, RotateCcw,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { BUILT_IN_TEMPLATES, generateTemplateImage } from '@/lib/contract-templates'
@@ -16,19 +16,6 @@ import type { TemplateData } from '@/lib/contract-templates'
 import type { Contract, Room } from '@/types'
 
 /* ─── 마스터 계정 (양식 관리 권한) ─── */
-const MASTER_EMAIL = 'knot4844@gmail.com'
-
-/* ─── 샘플 양식 타입 ─── */
-interface SampleTemplate {
-  id: string
-  owner_id: string
-  name: string
-  description: string | null
-  template_url: string
-  template_name: string
-  template_mime: string
-  created_at: string
-}
 
 /* ─── 타입 ─── */
 interface ContractRoom {
@@ -46,10 +33,11 @@ interface ContractWithRoom extends Contract {
 }
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
-  draft:  { label: '초안',    bg: 'rgba(29,53,87,0.06)',     color: 'var(--color-muted)',    icon: <Pencil size={11} /> },
-  sent:   { label: '발송됨', bg: 'rgba(168,218,220,0.2)',   color: 'var(--color-accent-dark)', icon: <Send size={11} /> },
-  signed: { label: '서명완료',bg: 'var(--color-success-bg)', color: 'var(--color-success)',   icon: <CheckCircle2 size={11} /> },
-  expired:{ label: '만료됨', bg: 'var(--color-danger-bg)',  color: 'var(--color-danger)',    icon: <Clock size={11} /> },
+  draft:        { label: '초안',        bg: 'rgba(29,53,87,0.06)',     color: 'var(--color-muted)',        icon: <Pencil size={11} /> },
+  owner_signed: { label: '임대인서명', bg: 'rgba(59,130,246,0.1)',    color: '#3b82f6',                   icon: <PenTool size={11} /> },
+  sent:         { label: '발송됨',     bg: 'rgba(168,218,220,0.2)',   color: 'var(--color-accent-dark)',   icon: <Send size={11} /> },
+  signed:       { label: '서명완료',   bg: 'var(--color-success-bg)', color: 'var(--color-success)',       icon: <CheckCircle2 size={11} /> },
+  expired:      { label: '만료됨',     bg: 'var(--color-danger-bg)',  color: 'var(--color-danger)',        icon: <Clock size={11} /> },
 }
 
 /* ─── 메인 ─── */
@@ -62,10 +50,8 @@ export default function ContractsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [viewContract, setViewContract] = useState<ContractWithRoom | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
-  const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'signed' | 'expired'>('all')
-  const [isMaster, setIsMaster] = useState(false)
-  const [showTemplateManager, setShowTemplateManager] = useState(false)
-  const [sampleTemplates, setSampleTemplates] = useState<SampleTemplate[]>([])
+  const [filter, setFilter] = useState<'all' | 'draft' | 'owner_signed' | 'sent' | 'signed' | 'expired'>('all')
+  const [ownerSignContract, setOwnerSignContract] = useState<ContractWithRoom | null>(null)
   const [builtinUploads, setBuiltinUploads] = useState<BuiltinUploadInfo[]>([])
   const [showBuiltinUploadManager, setShowBuiltinUploadManager] = useState(false)
 
@@ -74,17 +60,7 @@ export default function ContractsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // 마스터 계정 감지
-    setIsMaster(user.email === MASTER_EMAIL)
-
-    // 샘플 양식 로드
-    const { data: tplData } = await supabase
-      .from('contract_sample_templates')
-      .select('*')
-      .order('created_at', { ascending: true })
-    setSampleTemplates((tplData ?? []) as SampleTemplate[])
-
-    // 자동생성 양식 커스텀 업로드 로드
+    // 양식 커스텀 업로드 로드
     const { data: builtinData } = await supabase
       .from('contract_builtin_uploads')
       .select('*')
@@ -150,11 +126,12 @@ export default function ContractsPage() {
   const filtered = filter === 'all' ? contracts : contracts.filter(c => c.status === filter)
 
   const stats = {
-    all:    contracts.length,
-    draft:  contracts.filter(c => c.status === 'draft').length,
-    sent:   contracts.filter(c => c.status === 'sent').length,
-    signed: contracts.filter(c => c.status === 'signed').length,
-    expired:contracts.filter(c => c.status === 'expired').length,
+    all:          contracts.length,
+    draft:        contracts.filter(c => c.status === 'draft').length,
+    owner_signed: contracts.filter(c => c.status === 'owner_signed').length,
+    sent:         contracts.filter(c => c.status === 'sent').length,
+    signed:       contracts.filter(c => c.status === 'signed').length,
+    expired:      contracts.filter(c => c.status === 'expired').length,
   }
 
   /* ─── 발송 링크 복사 ─── */
@@ -227,13 +204,6 @@ export default function ContractsPage() {
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
             <LayoutTemplate size={15} /> 내 양식 관리
           </button>
-          {isMaster && (
-            <button onClick={() => setShowTemplateManager(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border"
-              style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
-              <Settings size={15} /> 샘플 양식
-            </button>
-          )}
           <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
             style={{ background: 'var(--color-primary)' }}>
@@ -243,12 +213,13 @@ export default function ContractsPage() {
       </div>
 
       {/* 상태 통계 */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-5 gap-3 mb-6">
         {[
-          { key: 'draft',  label: '초안',    val: stats.draft   },
-          { key: 'sent',   label: '발송됨',  val: stats.sent    },
-          { key: 'signed', label: '서명완료',val: stats.signed  },
-          { key: 'expired',label: '만료됨',  val: stats.expired },
+          { key: 'draft',        label: '초안',        val: stats.draft        },
+          { key: 'owner_signed', label: '임대인서명',  val: stats.owner_signed },
+          { key: 'sent',         label: '발송됨',      val: stats.sent         },
+          { key: 'signed',       label: '서명완료',    val: stats.signed       },
+          { key: 'expired',      label: '만료됨',      val: stats.expired      },
         ].map(s => {
           const meta = STATUS_META[s.key]
           return (
@@ -345,6 +316,14 @@ export default function ContractsPage() {
                           <Eye size={13} />
                         </button>
                         {c.status === 'draft' && (
+                          <button onClick={() => setOwnerSignContract(c)}
+                            className="p-1.5 rounded-lg text-xs"
+                            style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}
+                            title="임대인 서명">
+                            <PenTool size={13} />
+                          </button>
+                        )}
+                        {(c.status === 'draft' || c.status === 'owner_signed') && (
                           <div className="relative group/send">
                             <button
                               className="p-1.5 rounded-lg text-xs"
@@ -399,7 +378,6 @@ export default function ContractsPage() {
       {showCreate && (
         <CreateContractModal
           rooms={rooms}
-          sampleTemplates={sampleTemplates}
           builtinUploads={builtinUploads}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); showToast('success', '계약서가 작성되었습니다.') }}
@@ -415,15 +393,17 @@ export default function ContractsPage() {
         />
       )}
 
-      {/* 양식 관리 모달 (마스터 계정 전용) */}
-      {showTemplateManager && (
-        <TemplateManagerModal
-          onClose={() => { setShowTemplateManager(false); load() }}
-          onToast={showToast}
+      {/* 임대인 서명 모달 */}
+      {ownerSignContract && (
+        <OwnerSignModal
+          contract={ownerSignContract}
+          onClose={() => setOwnerSignContract(null)}
+          onSigned={() => { setOwnerSignContract(null); load(); showToast('success', '임대인 서명이 완료되었습니다.') }}
+          onError={msg => showToast('error', msg)}
         />
       )}
 
-      {/* 내 양식 관리 모달 (모든 사용자) */}
+      {/* 내 양식 관리 모달 */}
       {showBuiltinUploadManager && (
         <BuiltinUploadManagerModal
           onClose={() => { setShowBuiltinUploadManager(false); load() }}
@@ -446,10 +426,9 @@ interface BuiltinUploadInfo {
 
 /* ─── 계약서 작성 모달 ─── */
 function CreateContractModal({
-  rooms, sampleTemplates, builtinUploads, onClose, onCreated, onError,
+  rooms, builtinUploads, onClose, onCreated, onError,
 }: {
   rooms: Room[]
-  sampleTemplates: SampleTemplate[]
   builtinUploads: BuiltinUploadInfo[]
   onClose: () => void
   onCreated: () => void
@@ -473,9 +452,8 @@ function CreateContractModal({
   const [convertingPdf, setConvertingPdf] = useState(false)
   const [originalPdfName, setOriginalPdfName] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [templateTab, setTemplateTab] = useState<'sample' | 'builtin' | 'upload'>('sample')
-  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>(null)
-  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null)
+  const [templateTab, setTemplateTab] = useState<'builtin' | 'upload'>('builtin')
+  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>('basic-lease')
   const [generatingTemplate, setGeneratingTemplate] = useState(false)
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -539,20 +517,10 @@ function CreateContractModal({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
 
-    // 샘플 양식 선택 시 URL 직접 사용
+    // 기본 양식 선택 시 — 커스텀 업로드가 있으면 그 URL 사용, 없으면 Canvas 이미지 생성
     let sampleTemplateUrl:  string | null = null
     let sampleTemplateName: string | null = null
     let sampleTemplateMime: string | null = null
-    if (templateTab === 'sample' && selectedSampleId) {
-      const sel = sampleTemplates.find(t => t.id === selectedSampleId)
-      if (sel) {
-        sampleTemplateUrl  = sel.template_url
-        sampleTemplateName = sel.template_name
-        sampleTemplateMime = sel.template_mime
-      }
-    }
-
-    // 기본 양식 선택 시 — 커스텀 업로드가 있으면 그 URL 사용, 없으면 Canvas 이미지 생성
     let finalTemplateFile = templateFile
     let finalOriginalName = originalPdfName
     if (templateTab === 'builtin' && selectedBuiltIn && !templateFile) {
@@ -716,21 +684,8 @@ function CreateContractModal({
 
             {/* 탭 */}
             <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: 'var(--color-background)' }}>
-              {sampleTemplates.length > 0 && (
-                <button type="button"
-                  onClick={() => { setTemplateTab('sample'); setSelectedBuiltIn(null); setTemplateFile(null); setOriginalPdfName(null) }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all"
-                  style={{
-                    background: templateTab === 'sample' ? 'var(--color-surface)' : 'transparent',
-                    color: templateTab === 'sample' ? 'var(--color-primary)' : 'var(--color-muted)',
-                    boxShadow: templateTab === 'sample' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  }}>
-                  <ImageIcon size={13} />
-                  샘플 양식
-                </button>
-              )}
               <button type="button"
-                onClick={() => { setTemplateTab('builtin'); setSelectedSampleId(null); setTemplateFile(null); setOriginalPdfName(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                onClick={() => { setTemplateTab('builtin'); setTemplateFile(null); setOriginalPdfName(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all"
                 style={{
                   background: templateTab === 'builtin' ? 'var(--color-surface)' : 'transparent',
@@ -741,7 +696,7 @@ function CreateContractModal({
                 계약서 양식
               </button>
               <button type="button"
-                onClick={() => { setTemplateTab('upload'); setSelectedBuiltIn(null); setSelectedSampleId(null) }}
+                onClick={() => { setTemplateTab('upload'); setSelectedBuiltIn(null) }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all"
                 style={{
                   background: templateTab === 'upload' ? 'var(--color-surface)' : 'transparent',
@@ -752,51 +707,6 @@ function CreateContractModal({
                 직접 업로드
               </button>
             </div>
-
-            {/* 샘플 양식 탭 */}
-            {templateTab === 'sample' && (
-              <div className="space-y-2">
-                {sampleTemplates.map(tpl => (
-                  <button key={tpl.id} type="button"
-                    onClick={() => setSelectedSampleId(tpl.id === selectedSampleId ? null : tpl.id)}
-                    className="w-full text-left px-4 py-3 rounded-xl border-2 transition-all"
-                    style={{
-                      borderColor: selectedSampleId === tpl.id ? 'var(--color-primary)' : 'var(--color-border)',
-                      background: selectedSampleId === tpl.id ? 'rgba(29,53,87,0.04)' : 'var(--color-background)',
-                    }}>
-                    <div className="flex items-center gap-3">
-                      {tpl.template_mime?.startsWith('image/') ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={tpl.template_url} alt={tpl.name}
-                          className="w-12 h-16 rounded border object-cover shrink-0"
-                          style={{ borderColor: 'var(--color-border)' }} />
-                      ) : (
-                        <div className="w-12 h-16 rounded border flex items-center justify-center shrink-0"
-                             style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
-                          <FileText size={20} style={{ color: 'var(--color-muted)' }} />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold" style={{ color: selectedSampleId === tpl.id ? 'var(--color-primary)' : 'var(--color-text)' }}>
-                          {tpl.name}
-                        </div>
-                        {tpl.description && (
-                          <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>
-                            {tpl.description}
-                          </div>
-                        )}
-                      </div>
-                      {selectedSampleId === tpl.id && (
-                        <CheckCircle2 size={18} style={{ color: 'var(--color-primary)' }} className="shrink-0" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-                <p className="text-[11px]" style={{ color: 'var(--color-muted)' }}>
-                  등록된 양식이 임차인 서명 페이지에 그대로 표시됩니다.
-                </p>
-              </div>
-            )}
 
             {/* 계약서 양식 탭 */}
             {templateTab === 'builtin' && (
@@ -1021,16 +931,68 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
             ))}
           </dl>
 
-          {/* 서명 이미지 */}
-          {contract.signature_data_url && (
-            <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-              <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>전자서명</p>
-              <div className="rounded-lg overflow-hidden border p-2" style={{ borderColor: 'var(--color-border)', background: 'white' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={contract.signature_data_url} alt="서명" className="max-h-24 mx-auto" />
+          {/* ── 전자서명 증거 ── */}
+          <div className="mt-5 pt-4 border-t space-y-4" style={{ borderColor: 'var(--color-border)' }}>
+            <p className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>전자서명 증거</p>
+
+            {/* 임대인 서명 */}
+            <div className="rounded-lg p-3" style={{ background: 'var(--color-background)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                     style={{ background: contract.owner_signature_url ? 'var(--color-success-bg)' : 'var(--color-muted-bg)',
+                              color: contract.owner_signature_url ? 'var(--color-success)' : 'var(--color-muted)' }}>
+                  {contract.owner_signature_url ? '✓' : '—'}
+                </div>
+                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>임대인 (갑)</span>
+                {!contract.owner_signature_url && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>미서명</span>}
               </div>
+              {contract.owner_signature_url && (
+                <div className="flex items-center gap-3">
+                  <div className="rounded border p-1.5 shrink-0" style={{ borderColor: 'var(--color-border)', background: 'white' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={contract.owner_signature_url} alt="임대인 서명" className="max-h-16" />
+                  </div>
+                  <div className="text-[11px] space-y-0.5" style={{ color: 'var(--color-muted)' }}>
+                    <div>서명일: {contract.owner_signed_at ? formatDate(contract.owner_signed_at) : '—'}</div>
+                    {contract.owner_signer_ip && <div>IP: {contract.owner_signer_ip}</div>}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* 임차인 서명 */}
+            <div className="rounded-lg p-3" style={{ background: 'var(--color-background)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                     style={{ background: contract.signature_data_url ? 'var(--color-success-bg)' : 'var(--color-muted-bg)',
+                              color: contract.signature_data_url ? 'var(--color-success)' : 'var(--color-muted)' }}>
+                  {contract.signature_data_url ? '✓' : '—'}
+                </div>
+                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>임차인 (을)</span>
+                {!contract.signature_data_url && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>미서명</span>}
+              </div>
+              {contract.signature_data_url && (
+                <div className="flex items-center gap-3">
+                  <div className="rounded border p-1.5 shrink-0" style={{ borderColor: 'var(--color-border)', background: 'white' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={contract.signature_data_url} alt="임차인 서명" className="max-h-16" />
+                  </div>
+                  <div className="text-[11px] space-y-0.5" style={{ color: 'var(--color-muted)' }}>
+                    <div>서명일: {contract.signed_at ? formatDate(contract.signed_at) : '—'}</div>
+                    {contract.signer_ip && <div>IP: {contract.signer_ip}</div>}
+                    {contract.content_hash && <div className="break-all">해시: {contract.content_hash.slice(0, 20)}...</div>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 콘텐츠 해시 전체 */}
+            {contract.content_hash && (
+              <div className="text-[10px] p-2 rounded font-mono break-all" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>
+                SHA-256: {contract.content_hash}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
@@ -1038,6 +1000,177 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
             className="w-full py-2.5 rounded-lg text-sm font-medium border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
             닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── 임대인 서명 모달 ─── */
+function OwnerSignModal({ contract, onClose, onSigned, onError }: {
+  contract: ContractWithRoom
+  onClose: () => void
+  onSigned: () => void
+  onError: (msg: string) => void
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [drawing, setDrawing] = useState(false)
+  const [hasSig, setHasSig] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Canvas 초기화
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = Math.round(rect.width * dpr)
+    canvas.height = Math.round(rect.height * dpr)
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(dpr, dpr)
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, rect.width, rect.height)
+  }, [])
+
+  const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect()
+    if ('touches' in e) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    const canvas = canvasRef.current; if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    const pos = getPos(e, canvas)
+    ctx.beginPath(); ctx.moveTo(pos.x, pos.y)
+    setDrawing(true); setHasSig(true)
+  }
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    if (!drawing) return
+    const canvas = canvasRef.current; if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    const pos = getPos(e, canvas)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.strokeStyle = '#1d3557'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'
+    ctx.stroke()
+  }
+
+  const endDraw = () => setDrawing(false)
+
+  const clearSig = () => {
+    const canvas = canvasRef.current; if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    const rect = canvas.getBoundingClientRect()
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, rect.width, rect.height)
+    setHasSig(false)
+  }
+
+  const handleSign = async () => {
+    if (!hasSig) return
+    setSaving(true)
+    try {
+      const canvas = canvasRef.current!
+      const dataUrl = canvas.toDataURL('image/png')
+
+      const res = await fetch('/api/contracts/owner-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractId: contract.id, signature: dataUrl }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || '서명 저장 실패')
+      onSigned()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '서명 저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.5)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden"
+           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.25)' }}>
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
+            <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              임대인 전자서명
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+              {contract.room?.name} · {contract.tenant_name}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
+        </div>
+
+        {/* 계약 요약 */}
+        <div className="px-6 py-4 space-y-2" style={{ background: 'var(--color-background)' }}>
+          <div className="flex gap-3 text-sm">
+            <span className="font-medium w-20 shrink-0" style={{ color: 'var(--color-muted)' }}>입주사</span>
+            <span style={{ color: 'var(--color-text)' }}>{contract.tenant_name || '—'}</span>
+          </div>
+          <div className="flex gap-3 text-sm">
+            <span className="font-medium w-20 shrink-0" style={{ color: 'var(--color-muted)' }}>계약기간</span>
+            <span style={{ color: 'var(--color-text)' }}>
+              {contract.lease_start && contract.lease_end
+                ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}`
+                : '—'}
+            </span>
+          </div>
+          <div className="flex gap-3 text-sm">
+            <span className="font-medium w-20 shrink-0" style={{ color: 'var(--color-muted)' }}>월 임대료</span>
+            <span style={{ color: 'var(--color-text)' }}>
+              {contract.monthly_rent ? `${contract.monthly_rent.toLocaleString()}원` : '—'}
+            </span>
+          </div>
+        </div>
+
+        {/* 서명 패드 */}
+        <div className="px-6 py-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
+              아래에 서명해주세요
+            </span>
+            <button onClick={clearSig} className="flex items-center gap-1 text-xs"
+                    style={{ color: 'var(--color-muted)' }}>
+              <RotateCcw size={12} /> 초기화
+            </button>
+          </div>
+          <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--color-border)' }}>
+            <canvas
+              ref={canvasRef}
+              className="w-full touch-none"
+              style={{ cursor: 'crosshair', display: 'block', background: 'white', height: 160 }}
+              onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+              onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+            />
+          </div>
+          <p className="text-[11px] mt-2" style={{ color: 'var(--color-muted)' }}>
+            서명 시 위 계약 내용에 임대인으로서 동의하는 것으로 간주됩니다.
+          </p>
+        </div>
+
+        {/* 버튼 */}
+        <div className="px-6 py-4 border-t flex gap-2" style={{ borderColor: 'var(--color-border)' }}>
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+            취소
+          </button>
+          <button onClick={handleSign} disabled={!hasSig || saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--color-primary)' }}>
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            <PenTool size={14} /> 서명 완료
           </button>
         </div>
       </div>
@@ -1058,327 +1191,6 @@ function CField({ label, value, onChange, type = 'text' }: {
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}
         onFocus={e => e.target.style.borderColor = 'var(--color-accent-dark)'}
         onBlur={e => e.target.style.borderColor = 'var(--color-border)'} />
-    </div>
-  )
-}
-
-/* ─── 양식 관리 모달 (마스터 계정 전용) ─── */
-function TemplateManagerModal({
-  onClose, onToast,
-}: {
-  onClose: () => void
-  onToast: (type: 'success' | 'error', msg: string) => void
-}) {
-  const supabase = createClient()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [templates, setTemplates] = useState<SampleTemplate[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [newName, setNewName]     = useState('')
-  const [newDesc, setNewDesc]     = useState('')
-  const [convertingPdf, setConvertingPdf] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [pendingOrigName, setPendingOrigName] = useState<string | null>(null)
-  const [editingId, setEditingId]   = useState<string | null>(null)
-  const [editName, setEditName]     = useState('')
-  const [editDesc, setEditDesc]     = useState('')
-  const [editSaving, setEditSaving] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('contract_sample_templates')
-      .select('*')
-      .order('created_at', { ascending: true })
-    setTemplates((data ?? []) as SampleTemplate[])
-    setLoading(false)
-  }, [supabase])
-
-  useEffect(() => { load() }, [load])
-
-  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
-    if (!allowed.includes(f.type)) { onToast('error', 'PDF 또는 이미지 파일만 가능합니다.'); return }
-    if (f.size > 50 * 1024 * 1024) { onToast('error', '50MB 이하 파일만 가능합니다.'); return }
-
-    if (f.type === 'application/pdf') {
-      setConvertingPdf(true)
-      setPendingOrigName(f.name)
-      try {
-        const { convertPdfToPngBlob } = await import('@/lib/pdf-to-image')
-        const { blob } = await convertPdfToPngBlob(f)
-        const baseName = f.name.replace(/\.pdf$/i, '')
-        setPendingFile(new File([blob], `${baseName}.png`, { type: 'image/png' }))
-        if (!newName) setNewName(baseName)
-      } catch {
-        onToast('error', 'PDF 변환 실패')
-        setPendingOrigName(null)
-      } finally {
-        setConvertingPdf(false)
-      }
-      return
-    }
-
-    setPendingOrigName(null)
-    setPendingFile(f)
-    if (!newName) setNewName(f.name.replace(/\.\w+$/, ''))
-  }
-
-  const handleUpload = async () => {
-    if (!pendingFile) { onToast('error', '파일을 먼저 선택해주세요.'); return }
-    if (!newName.trim()) { onToast('error', '양식 이름을 입력해주세요.'); return }
-    if (templates.length >= 5) { onToast('error', '양식은 최대 5개까지 등록 가능합니다.'); return }
-
-    setUploading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setUploading(false); onToast('error', '로그인 필요'); return }
-
-    const ext  = pendingFile.name.split('.').pop() || 'bin'
-    const path = `samples/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`
-    const { error: upErr } = await supabase.storage
-      .from('contract-templates')
-      .upload(path, pendingFile, { contentType: pendingFile.type, cacheControl: '3600', upsert: false })
-    if (upErr) { setUploading(false); onToast('error', `업로드 실패: ${upErr.message}`); return }
-
-    const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
-
-    const { error: dbErr } = await supabase.from('contract_sample_templates').insert({
-      owner_id:      user.id,
-      name:          newName.trim(),
-      description:   newDesc.trim() || null,
-      template_url:  pub.publicUrl,
-      template_name: pendingOrigName ?? pendingFile.name,
-      template_mime: pendingFile.type,
-    })
-
-    if (dbErr) { setUploading(false); onToast('error', dbErr.message); return }
-
-    setUploading(false)
-    setPendingFile(null)
-    setPendingOrigName(null)
-    setNewName('')
-    setNewDesc('')
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    onToast('success', '양식이 등록되었습니다.')
-    load()
-  }
-
-  const handleDelete = async (tpl: SampleTemplate) => {
-    if (!confirm(`"${tpl.name}" 양식을 삭제하시겠습니까?`)) return
-    // storage에서 파일 삭제
-    const urlParts = tpl.template_url.split('/contract-templates/')
-    if (urlParts.length > 1) {
-      await supabase.storage.from('contract-templates').remove([urlParts[1]])
-    }
-    await supabase.from('contract_sample_templates').delete().eq('id', tpl.id)
-    onToast('success', '삭제되었습니다.')
-    load()
-  }
-
-  const startEdit = (tpl: SampleTemplate) => {
-    setEditingId(tpl.id)
-    setEditName(tpl.name)
-    setEditDesc(tpl.description ?? '')
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditName('')
-    setEditDesc('')
-  }
-
-  const handleEditSave = async () => {
-    if (!editingId || !editName.trim()) return
-    setEditSaving(true)
-    const { error } = await supabase
-      .from('contract_sample_templates')
-      .update({ name: editName.trim(), description: editDesc.trim() || null })
-      .eq('id', editingId)
-    setEditSaving(false)
-    if (error) { onToast('error', error.message); return }
-    onToast('success', '양식이 수정되었습니다.')
-    cancelEdit()
-    load()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-         style={{ background: 'rgba(0,0,0,0.4)' }}
-         onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-2xl rounded-2xl overflow-hidden"
-           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
-          <div>
-            <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-              계약서 양식 관리
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
-              여기서 등록한 양식은 계약서 작성 시 &quot;샘플 양식&quot; 탭에 표시됩니다.
-            </p>
-          </div>
-          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
-        </div>
-
-        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-5">
-          {/* 등록된 양식 목록 */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={20} className="animate-spin" style={{ color: 'var(--color-muted)' }} />
-            </div>
-          ) : templates.length === 0 ? (
-            <div className="text-center py-6 rounded-xl border border-dashed" style={{ borderColor: 'var(--color-border)' }}>
-              <FileText size={32} className="mx-auto mb-2" style={{ color: 'var(--color-muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--color-muted)' }}>등록된 양식이 없습니다.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-xs font-semibold" style={{ color: 'var(--color-muted)' }}>
-                등록된 양식 ({templates.length}/5)
-              </div>
-              {templates.map(tpl => (
-                <div key={tpl.id} className="rounded-xl border overflow-hidden"
-                     style={{ borderColor: editingId === tpl.id ? 'var(--color-primary)' : 'var(--color-border)', background: 'var(--color-background)' }}>
-                  <div className="flex items-center gap-3 p-3">
-                    {tpl.template_mime?.startsWith('image/') ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={tpl.template_url} alt={tpl.name}
-                        className="w-14 h-20 rounded border object-cover shrink-0"
-                        style={{ borderColor: 'var(--color-border)' }} />
-                    ) : (
-                      <div className="w-14 h-20 rounded border flex items-center justify-center shrink-0"
-                           style={{ borderColor: 'var(--color-border)', background: 'var(--color-muted-bg)' }}>
-                        <FileText size={22} style={{ color: 'var(--color-muted)' }} />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{tpl.name}</div>
-                      {tpl.description && (
-                        <div className="text-[11px] mt-0.5" style={{ color: 'var(--color-muted)' }}>{tpl.description}</div>
-                      )}
-                      <div className="text-[10px] mt-1" style={{ color: 'var(--color-muted)' }}>
-                        {tpl.template_name} · {formatDate(tpl.created_at)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => startEdit(tpl)}
-                        className="p-2 rounded-lg"
-                        style={{ color: 'var(--color-primary)', background: 'rgba(29,53,87,0.06)' }}
-                        title="수정">
-                        <Pencil size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(tpl)}
-                        className="p-2 rounded-lg"
-                        style={{ color: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
-                        title="삭제">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  {/* 인라인 수정 폼 */}
-                  {editingId === tpl.id && (
-                    <div className="px-3 pb-3 pt-1 border-t space-y-2" style={{ borderColor: 'var(--color-border)' }}>
-                      <div>
-                        <label className="block text-[11px] font-medium mb-0.5" style={{ color: 'var(--color-muted)' }}>양식 이름</label>
-                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
-                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }} />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium mb-0.5" style={{ color: 'var(--color-muted)' }}>설명</label>
-                        <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)}
-                          placeholder="설명 (선택)"
-                          className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
-                          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }} />
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={cancelEdit}
-                          className="flex-1 py-2 rounded-lg text-xs font-medium border"
-                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
-                          취소
-                        </button>
-                        <button onClick={handleEditSave} disabled={editSaving || !editName.trim()}
-                          className="flex-1 py-2 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1 disabled:opacity-50"
-                          style={{ background: 'var(--color-primary)' }}>
-                          {editSaving && <Loader2 size={12} className="animate-spin" />}
-                          저장
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 새 양식 등록 */}
-          {templates.length < 5 && (
-            <div className="border-t pt-5" style={{ borderColor: 'var(--color-border)' }}>
-              <div className="text-xs font-semibold mb-3" style={{ color: 'var(--color-muted)' }}>
-                새 양식 등록
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>양식 이름 *</label>
-                  <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                    placeholder="예: 임대차계약서 표준양식"
-                    className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
-                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>설명 (선택)</label>
-                  <input type="text" value={newDesc} onChange={e => setNewDesc(e.target.value)}
-                    placeholder="예: 공유오피스 전용좌석 계약서"
-                    className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
-                    style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }} />
-                </div>
-                <div>
-                  <input ref={fileInputRef} type="file"
-                    accept="application/pdf,image/jpeg,image/png,image/webp"
-                    onChange={onPickFile} className="hidden" />
-                  {convertingPdf ? (
-                    <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
-                         style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
-                      <Loader2 size={14} className="animate-spin" /> PDF 변환 중...
-                    </div>
-                  ) : !pendingFile ? (
-                    <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm"
-                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}>
-                      <Upload size={14} /> 파일 선택 (PDF / 이미지)
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm"
-                         style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)' }}>
-                      <FileText size={14} style={{ color: 'var(--color-accent-dark)' }} />
-                      <span className="flex-1 truncate" style={{ color: 'var(--color-text)' }}>
-                        {pendingOrigName ?? pendingFile.name}
-                      </span>
-                      <button type="button" onClick={() => { setPendingFile(null); setPendingOrigName(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                        style={{ color: 'var(--color-muted)' }}><X size={14} /></button>
-                    </div>
-                  )}
-                </div>
-                <button onClick={handleUpload} disabled={uploading || !pendingFile || !newName.trim()}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                  style={{ background: 'var(--color-primary)' }}>
-                  {uploading && <Loader2 size={14} className="animate-spin" />}
-                  양식 등록
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-          <button onClick={onClose}
-            className="w-full py-2.5 rounded-lg text-sm font-medium border"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
-            닫기
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
