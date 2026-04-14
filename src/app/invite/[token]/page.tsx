@@ -305,7 +305,7 @@ export default function InvitePage() {
                 <tbody>
                   {[
                     { label: '상호 (성명)', value: (snap?.owner_name as string) || '대우오피스 / 이동윤' },
-                    { label: '사업자번호', value: (snap?.owner_business_no as string) || '179-46-01451' },
+                    { label: '사업자번호', value: (snap?.owner_business_no as string) || '127-44-85045' },
                     { label: '연락처', value: (snap?.owner_phone as string) || '010-8885-4844' },
                   ].filter(({ value }) => !!value).map(({ label, value }) => (
                     <tr key={label}>
