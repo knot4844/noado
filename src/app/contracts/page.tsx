@@ -8,7 +8,7 @@ import {
   Plus, FileText, Send, CheckCircle2, AlertCircle,
   Loader2, X, Clock, RefreshCw, Download, Eye,
   Pencil, Trash2, Upload, LayoutTemplate, Link2, Settings,
-  Image as ImageIcon,
+  Image as ImageIcon, MessageSquare,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { BUILT_IN_TEMPLATES, generateTemplateImage } from '@/lib/contract-templates'
@@ -175,13 +175,14 @@ export default function ContractsPage() {
     load()
   }
 
-  /* ─── 계약 발송 + 알림톡 ─── */
-  const sendContract = async (id: string) => {
+  /* ─── 계약 발송 + 알림톡/SMS ─── */
+  const sendContract = async (id: string, sendMethod: 'kakao' | 'sms' = 'kakao') => {
     const c = contracts.find(c => c.id === id)
     const hasPhone = !!(c?.tenant_phone)
+    const methodLabel = sendMethod === 'sms' ? '문자(SMS)' : '카카오톡'
     const msg = hasPhone
-      ? `계약서를 발송하고 ${c?.tenant_name ?? '세입자'}에게 서명 링크 알림톡을 전송하시겠습니까?`
-      : '계약서를 발송하시겠습니까? (연락처 없음 — 알림톡 미발송)'
+      ? `계약서를 발송하고 ${c?.tenant_name ?? '세입자'}에게 ${methodLabel}로 서명 링크를 전송하시겠습니까?`
+      : `계약서를 발송하시겠습니까? (연락처 없음 — ${methodLabel} 미발송)`
     if (!confirm(msg)) return
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -190,7 +191,7 @@ export default function ContractsPage() {
     const res  = await fetch('/api/contracts/send', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body:    JSON.stringify({ contractId: id }),
+      body:    JSON.stringify({ contractId: id, sendMethod }),
     })
     const data = await res.json()
     if (!res.ok) return showToast('error', data.error ?? '발송 실패')
@@ -344,12 +345,31 @@ export default function ContractsPage() {
                           <Eye size={13} />
                         </button>
                         {c.status === 'draft' && (
-                          <button onClick={() => sendContract(c.id)}
-                            className="p-1.5 rounded-lg text-xs"
-                            style={{ color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.15)' }}
-                            title="발송">
-                            <Send size={13} />
-                          </button>
+                          <div className="relative group/send">
+                            <button
+                              className="p-1.5 rounded-lg text-xs"
+                              style={{ color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.15)' }}
+                              title="발송">
+                              <Send size={13} />
+                            </button>
+                            <div className="absolute left-0 bottom-full w-28 pb-1 z-50 hidden group-hover/send:block">
+                              <div className="rounded-lg shadow-xl border py-1"
+                                   style={{ background: '#ffffff', borderColor: 'var(--color-border)' }}>
+                                <button onClick={() => sendContract(c.id, 'kakao')}
+                                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 font-medium hover:bg-black/5"
+                                  style={{ color: 'var(--color-text)' }}>
+                                  <MessageSquare size={12} className="text-yellow-500" />
+                                  카카오톡
+                                </button>
+                                <button onClick={() => sendContract(c.id, 'sms')}
+                                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 font-medium hover:bg-black/5"
+                                  style={{ color: 'var(--color-text)' }}>
+                                  <Send size={12} className="text-green-500" />
+                                  문자(SMS)
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         )}
                         {c.sign_token && (
                           <button onClick={() => copySignLink(c)}
