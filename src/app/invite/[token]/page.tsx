@@ -220,7 +220,7 @@ export default function InvitePage() {
           body { background: white !important; }
           .no-print { display: none !important; }
           .print-area { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
-          .print-area img { max-height: 92vh; width: auto; max-width: 100%; }
+          .print-area img { width: 100%; height: auto; }
           .sign-section { page-break-inside: avoid; }
         }
       `}</style>
