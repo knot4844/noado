@@ -948,15 +948,18 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   const r    = contract.room
 
   const rows = [
-    { label: '입주사',    value: contract.tenant_name ?? '—' },
-    { label: '소재지',    value: snap?.address ?? '—' },
-    { label: '보증금',    value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
-    { label: '월세',      value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
-    { label: '계약기간',  value: contract.lease_start && contract.lease_end ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}` : '—' },
-    { label: '특약사항',  value: snap?.special_terms ?? '없음' },
+    { label: '입주사',      value: snap?.tenant_name ?? contract.tenant_name ?? '—' },
+    { label: '연락처',      value: snap?.tenant_phone ?? contract.tenant_phone ?? '—' },
+    { label: '주소',        value: snap?.tenant_address ?? snap?.address ?? '—' },
+    { label: '사업자번호',  value: snap?.tenant_business_no ?? '—' },
+    { label: '업종',        value: snap?.tenant_biz_type ?? '—' },
+    { label: '보증금',      value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
+    { label: '월세',        value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
+    { label: '계약기간',    value: contract.lease_start && contract.lease_end ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}` : '—' },
+    { label: '특약사항',    value: snap?.special_terms ?? '없음' },
     { label: '콘텐츠 해시', value: contract.content_hash ? contract.content_hash.slice(0, 16) + '...' : '—' },
-    { label: '서명일',    value: contract.signed_at ? formatDate(contract.signed_at) : '미서명' },
-    { label: '서명 IP',   value: contract.signer_ip ?? '—' },
+    { label: '서명일',      value: contract.signed_at ? formatDate(contract.signed_at) : '미서명' },
+    { label: '서명 IP',     value: contract.signer_ip ?? '—' },
   ]
 
   return (

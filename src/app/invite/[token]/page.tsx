@@ -275,14 +275,16 @@ export default function InvitePage() {
         {/* 계약 정보 */}
         <dl className="space-y-3 mb-6">
           {[
-            { label: '임차인',    value: tenantForm.name || contract?.tenant_name || '—' },
-            { label: '연락처',    value: tenantForm.phone || contract?.tenant_phone || '—' },
-            { label: '소재지',    value: (snap?.address as string) ?? '—' },
-            { label: '보증금',    value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
-            { label: '월 임대료', value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
-            { label: '계약 시작', value: contract?.lease_start ? formatDate(contract.lease_start) : '—' },
-            { label: '계약 만료', value: contract?.lease_end   ? formatDate(contract.lease_end)   : '—' },
-          ].map(({ label, value }) => (
+            { label: '임차인',      value: (snap?.tenant_name as string) || tenantForm.name || contract?.tenant_name || '—' },
+            { label: '연락처',      value: (snap?.tenant_phone as string) || tenantForm.phone || contract?.tenant_phone || '—' },
+            { label: '주소',        value: (snap?.tenant_address as string) || tenantForm.address || '—' },
+            { label: '사업자번호',  value: (snap?.tenant_business_no as string) || tenantForm.business_no || '—' },
+            { label: '업종',        value: (snap?.tenant_biz_type as string) || tenantForm.biz_type || '—' },
+            { label: '보증금',      value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
+            { label: '월 임대료',   value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
+            { label: '계약 시작',   value: contract?.lease_start ? formatDate(contract.lease_start) : '—' },
+            { label: '계약 만료',   value: contract?.lease_end   ? formatDate(contract.lease_end)   : '—' },
+          ].filter(({ value }) => value !== '—').map(({ label, value }) => (
             <div key={label} className="flex gap-3">
               <dt className="text-sm font-medium w-24 shrink-0" style={{ color: '#555' }}>{label}</dt>
               <dd className="text-sm" style={{ color: '#111' }}>{value}</dd>
