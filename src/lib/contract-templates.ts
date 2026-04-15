@@ -27,9 +27,15 @@ export interface TemplateInfo {
 export const BUILT_IN_TEMPLATES: TemplateInfo[] = [
   {
     id:    'basic-lease',
-    name:  '임대차계약서 (기본)',
-    desc:  '상가건물임대차보호법 적용, 12개 조항 포함 강화 계약서',
+    name:  '임대차계약서 (전자계약용)',
+    desc:  '상가건물임대차보호법 적용, 전자서명용 2페이지 계약서',
     color: '#1d3557',
+  },
+  {
+    id:    'paper-lease',
+    name:  '임대차계약서 (서면용)',
+    desc:  '프린트 후 대면 서명용, 서명란 포함 2페이지 계약서',
+    color: '#4a4e69',
   },
 ]
 
@@ -67,6 +73,9 @@ export async function generateTemplateImage(
   switch (templateId) {
     case 'basic-lease':
       usedHeight = drawCommercialLease(ctx, W, maxH, data)
+      break
+    case 'paper-lease':
+      usedHeight = drawPaperContract(ctx, W, maxH, data)
       break
     case 'shared-office':
       drawSharedOffice(ctx, W, maxH, data)
@@ -554,19 +563,19 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.lineTo(W - mx, 145)
   ctx.stroke()
 
-  const labelW = 210
+  const labelW = 200
   const valueW = W - mx * 2 - labelW
-  const rowH = 58
+  const rowH = 50
   const opts = { labelBg: '#eee5e9', color: clr }
 
   // ── 임대차 목적물의 표시 ──
-  let y = 170
+  let y = 165
   ctx.fillStyle = clr
-  ctx.font = 'bold 30px "Pretendard", sans-serif'
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
   ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
-  y += 42
+  y += 38
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 장항동 902번지 대우비즈니스센터 서관', opts)
   y += rowH
@@ -575,24 +584,24 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '건물 용도', '제2종 근린생활시설 (사무소)', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 용도', '소호사무실', opts)
-  y += rowH + 20
+  y += rowH + 16
 
   // ── 계약 당사자 ──
   ctx.fillStyle = clr
-  ctx.font = 'bold 30px "Pretendard", sans-serif'
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
   ctx.fillText('▪ 계약 당사자', mx, y)
-  y += 42
+  y += 38
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대인 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임차인 (을)', d.tenant_name || '(서명 시 입력)', opts)
-  y += rowH + 20
+  y += rowH + 16
 
   // ── 임대차 조건 ──
   ctx.fillStyle = clr
-  ctx.font = 'bold 30px "Pretendard", sans-serif'
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
   ctx.fillText('▪ 임대차 조건', mx, y)
-  y += 42
+  y += 38
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대차기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
   y += rowH
@@ -603,7 +612,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', '별도 (임대료의 10%)', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
-  y += rowH + 25
+  y += rowH + 20
 
   // ── 계약 조항 ──
   ctx.strokeStyle = '#ccc'
@@ -612,7 +621,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.moveTo(mx, y)
   ctx.lineTo(W - mx, y)
   ctx.stroke()
-  y += 20
+  y += 16
 
   const clauses: { title: string; items: string[] }[] = [
     { title: '제 1 조 (임대차기간 및 갱신)', items: [
@@ -675,36 +684,33 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.textAlign = 'left'
   for (const clause of clauses) {
     ctx.fillStyle = clr
-    ctx.font = 'bold 26px "Pretendard", sans-serif'
+    ctx.font = 'bold 24px "Pretendard", sans-serif'
     ctx.fillText(clause.title, mx, y)
-    y += 34
+    y += 30
     ctx.fillStyle = '#333'
-    ctx.font = '22px "Pretendard", sans-serif'
+    ctx.font = '20px "Pretendard", sans-serif'
     for (const item of clause.items) {
-      y = drawWrappedText(ctx, item, mx + 14, y, W - mx * 2 - 28, 30)
-      y += 4
+      y = drawWrappedText(ctx, item, mx + 14, y, W - mx * 2 - 28, 28)
+      y += 2
     }
-    y += 12
+    y += 10
   }
 
   // ── 특약사항 ──
   if (d.special_terms) {
     ctx.fillStyle = clr
-    ctx.font = 'bold 30px "Pretendard", sans-serif'
+    ctx.font = 'bold 28px "Pretendard", sans-serif'
     ctx.fillText('▪ 특약 사항', mx, y)
-    y += 42
+    y += 38
     ctx.fillStyle = '#333'
-    ctx.font = '24px "Pretendard", sans-serif'
-    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 36)
-    y += 20
+    ctx.font = '22px "Pretendard", sans-serif'
+    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 32)
+    y += 16
   }
 
-  // ── 2페이지 최소 높이 보장 (서명란이 2페이지에 오도록) ──
-  // 서명란+날짜 = 약 350px 필요 → 2페이지 끝(PAGE_H*2) - 350 = 최대 시작 위치
-  const signSectionMinY = PAGE_H + 60
-  const signSectionMaxY = PAGE_H * 2 - 380
-  if (y < signSectionMinY) y = signSectionMinY
-  if (y > signSectionMaxY) y = signSectionMaxY
+  // ── 2페이지 내 맞춤: 날짜+서명 텍스트 = 약 200px ──
+  const maxY = PAGE_H * 2 - 220
+  if (y > maxY) y = maxY
 
   // ── 날짜 + 확인 문구 ──
   y += 20
@@ -714,61 +720,257 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.moveTo(mx, y)
   ctx.lineTo(W - mx, y)
   ctx.stroke()
-  y += 30
+  y += 28
 
   ctx.fillStyle = '#333'
-  ctx.font = '26px "Pretendard", sans-serif'
+  ctx.font = '24px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
-  y += 50
-  ctx.font = '28px "Pretendard", sans-serif'
+  y += 40
+  ctx.font = '26px "Pretendard", sans-serif'
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
-  y += 60
+  y += 50
 
-  // ── 서명란 (2열) ──
+  ctx.textAlign = 'left'
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText('임 대 인 (갑):  대우오피스 / 이동윤                    (서명 또는 날인)', mx, y)
+  y += 40
+  ctx.fillText(`임 차 인 (을):  ${d.tenant_name || ''}                                      (서명 또는 날인)`, mx, y)
+  y += 30
+
+  ctx.fillStyle = '#888'
+  ctx.font = '16px "Pretendard", sans-serif'
+  ctx.fillText('※ 아래 전자서명란에 서명해주세요.', mx, y)
+  y += 20
+
+  return y
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. 임대차계약서 (서면용) — 프린트 후 대면 서명
+   ═══════════════════════════════════════════════════════════════ */
+function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
+  const mx = 70
+  const clr = '#1d3557'
+  const PAGE_H = 1697
+
+  // ── 제목 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 54px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('상  가  임  대  차  계  약  서', W / 2, 70)
+
+  ctx.fillStyle = '#666'
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText('( 상가건물 임대차보호법 적용 )', W / 2, 115)
+
+  ctx.strokeStyle = clr
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(mx, 145)
+  ctx.lineTo(W - mx, 145)
+  ctx.stroke()
+
+  const labelW = 200
+  const valueW = W - mx * 2 - labelW
+  const rowH = 54
+  const opts = { labelBg: '#f0f4f8', color: clr }
+
+  // ── 임대차 목적물 ──
+  let y = 165
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 장항동 902번지 대우비즈니스센터 서관', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 호실', d.room_name || '—', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '건물 용도', '제2종 근린생활시설 (사무소)', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 용도', '소호사무실', opts)
+  y += rowH + 16
+
+  // ── 계약 당사자 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.fillText('▪ 계약 당사자', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대인 (갑)', '대우오피스 / 이동윤', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임차인 (을)', d.tenant_name || '(                    )', opts)
+  y += rowH + 16
+
+  // ── 임대차 조건 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.fillText('▪ 임대차 조건', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대차기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 보증금', `금 ${formatMoney(d.deposit)}원정`, opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', '별도 (임대료의 10%)', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
+  y += rowH + 20
+
+  // ── 계약 조항 ──
+  ctx.strokeStyle = '#ccc'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(mx, y)
+  ctx.lineTo(W - mx, y)
+  ctx.stroke()
+  y += 16
+
+  const clauses: { title: string; items: string[] }[] = [
+    { title: '제 1 조 (임대차기간 및 갱신)', items: [
+      '① 본 계약의 임대차기간은 상기 기간으로 한다.',
+      '② 만료 6개월~1개월 전까지 갱신 거절 통보 없으면 동일 조건으로 갱신된 것으로 본다.',
+      '③ 임차인은 임대인의 서면 동의 없이 임차권 양도·전대할 수 없다.',
+    ]},
+    { title: '제 2 조 (임대 보증금)', items: [
+      '① 임차인은 계약 체결과 동시에 보증금 전액을 지급한다.',
+      '② 보증금은 임대료 미납, 원상복구비용 등 손해를 담보하며, 충당 요구할 수 없다.',
+      '③ 보증금은 무이자이며, 명도 후 14일 이내 반환한다.',
+    ]},
+    { title: '제 3 조 (임대료 납부)', items: [
+      '① 임차인은 매월 임대료+부가세를 납부 기일까지 지정 계좌로 선납한다.',
+      '② 미납 시 연 20%의 지연손해금을 가산한다.',
+      '③ 전기료 등 실비(주차, 인터넷 등)는 임대료에 포함되지 않으며 별도 청구한다.',
+    ]},
+    { title: '제 4 조 (연체 및 강제 조치) ★', items: [
+      '① 1기 연체 시 서면 최고, 2기 이상 연체 시 최고 없이 즉시 해지·명도 요구 가능.',
+      '② 명도 지연 시 월 임대료 2배 손해배상. 동산 유치권·압류 가능.',
+    ]},
+    { title: '제 5 조 (임대료 인상)', items: [
+      '① 상가건물임대차보호법 제11조에 따라 연 5% 초과 인상 불가. 만료 3개월 전 서면 협의.',
+    ]},
+    { title: '제 6 조 (시설·원상복구)', items: [
+      '① 서면 동의 없이 시설 변경 불가. 종료 시 원상복구 후 반환.',
+    ]},
+    { title: '제 7 조 (임차인의 의무)', items: [
+      '① 선량한 관리자 주의로 사용. 용도 외 사용·전대 불가. 퇴실 30일 전 서면 통보.',
+    ]},
+    { title: '제 8 조 (면책)', items: [
+      '① 천재지변·화재·도난·정전 등 불가항력 손해에 대해 임대인은 책임지지 않는다.',
+    ]},
+    { title: '제 9 조 (해지)', items: [
+      '① 조항 위반·연체 시 해지 가능. 2기 이상 연체 시 즉시 해지.',
+      '② 임차인 사정 중도 해지 시 잔여기간 임대료 10%를 위약금으로 지급.',
+    ]},
+    { title: '제 10 조 (공증·명도·준거법)', items: [
+      '① 임대인 요청 시 공증에 협조 (비용 임차인 부담).',
+      '② 기간 만료·해지 시 자진 명도. 미정 사항은 상가건물임대차보호법·민법에 따른다.',
+      '③ 관할 법원은 임대인 소재지. 본 계약서는 2통 작성, 각 1통 보관.',
+    ]},
+  ]
+
+  ctx.textAlign = 'left'
+  for (const clause of clauses) {
+    ctx.fillStyle = clr
+    ctx.font = 'bold 22px "Pretendard", sans-serif'
+    ctx.fillText(clause.title, mx, y)
+    y += 28
+    ctx.fillStyle = '#333'
+    ctx.font = '19px "Pretendard", sans-serif'
+    for (const item of clause.items) {
+      y = drawWrappedText(ctx, item, mx + 12, y, W - mx * 2 - 24, 26)
+      y += 2
+    }
+    y += 8
+  }
+
+  // ── 특약사항 ──
+  if (d.special_terms) {
+    ctx.fillStyle = clr
+    ctx.font = 'bold 26px "Pretendard", sans-serif'
+    ctx.fillText('▪ 특약 사항', mx, y)
+    y += 36
+    ctx.fillStyle = '#333'
+    ctx.font = '20px "Pretendard", sans-serif'
+    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 30)
+    y += 16
+  }
+
+  // ── 서명란이 2페이지 하단에 오도록 ──
+  const sigNeed = 360  // 날짜+확인+서명박스
+  const signMinY = PAGE_H + 40
+  const signMaxY = PAGE_H * 2 - sigNeed
+  if (y < signMinY) y = signMinY
+  if (y > signMaxY) y = signMaxY
+
+  // ── 날짜 + 확인 문구 ──
+  y += 16
+  ctx.strokeStyle = clr
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(mx, y)
+  ctx.lineTo(W - mx, y)
+  ctx.stroke()
+  y += 28
+
+  ctx.fillStyle = '#333'
+  ctx.font = '24px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
+  y += 40
+  ctx.font = '26px "Pretendard", sans-serif'
+  ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
+  y += 50
+
+  // ── 서명란 (2열 큰 박스) ──
   const colW = (W - mx * 2 - 40) / 2
-  const sigBoxH = 180
+  const sigBoxH = 200
   const leftX = mx
   const rightX = mx + colW + 40
 
   // 임대인 (갑)
   drawBox(ctx, leftX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
-  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.font = 'bold 26px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('임 대 인 (갑)', leftX + colW / 2, y + 28)
+  ctx.fillText('임 대 인 (갑)', leftX + colW / 2, y + 30)
 
   ctx.fillStyle = '#333'
   ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText('대우오피스 / 이동윤', leftX + colW / 2, y + 60)
+  ctx.fillText('대우오피스 / 이동윤', leftX + colW / 2, y + 66)
 
-  ctx.fillStyle = '#999'
+  ctx.fillStyle = '#bbb'
   ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 24)
+  ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 28)
 
   // 임차인 (을)
   drawBox(ctx, rightX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
-  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.font = 'bold 26px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('임 차 인 (을)', rightX + colW / 2, y + 28)
+  ctx.fillText('임 차 인 (을)', rightX + colW / 2, y + 30)
 
   ctx.fillStyle = '#333'
   ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText(d.tenant_name || '(                    )', rightX + colW / 2, y + 60)
+  ctx.fillText(d.tenant_name || '(                    )', rightX + colW / 2, y + 66)
 
-  ctx.fillStyle = '#999'
+  ctx.fillStyle = '#bbb'
   ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('(서명 또는 날인)', rightX + colW / 2, y + sigBoxH - 24)
+  ctx.fillText('(서명 또는 날인)', rightX + colW / 2, y + sigBoxH - 28)
 
-  y += sigBoxH + 20
+  y += sigBoxH + 16
 
-  // ── 페이지 하단 안내 ──
   ctx.fillStyle = '#aaa'
-  ctx.font = '16px "Pretendard", sans-serif'
+  ctx.font = '14px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('본 계약서는 노아도(noado.kr) 임대관리 시스템을 통해 작성되었습니다.', W / 2, y)
-  y += 20
+  y += 16
 
   return y
 }

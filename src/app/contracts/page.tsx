@@ -1215,9 +1215,9 @@ function CField({ label, value, onChange, type = 'text' }: {
 
 /* ─── 내 양식 관리 모달 (자동생성 3개 양식에 커스텀 파일 업로드) ─── */
 const BUILTIN_TEMPLATE_DEFS: { key: string; name: string; desc: string; color: string; uploadOnly?: boolean }[] = [
-  { key: 'basic-lease', name: '임대차계약서 (기본)', desc: '상가건물임대차보호법 적용, 12개 조항 포함 강화 계약서', color: '#1d3557' },
-  { key: 'slot-2',      name: '계약서 양식 2',       desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
-  { key: 'slot-3',      name: '계약서 양식 3',       desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
+  { key: 'basic-lease',  name: '임대차계약서 (전자계약용)', desc: '전자서명용 2페이지 계약서 — 카톡/문자로 서명 링크 발송', color: '#1d3557' },
+  { key: 'paper-lease',  name: '임대차계약서 (서면용)',     desc: '프린트 후 대면 서명용 — 서명란 포함 2페이지', color: '#4a4e69' },
+  { key: 'slot-3',       name: '계약서 양식 3',             desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
 ]
 
 function BuiltinUploadManagerModal({
