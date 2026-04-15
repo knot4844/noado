@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '계약서를 찾을 수 없습니다.' }, { status: 404 })
   }
 
-  if (contract.status !== 'draft') {
-    return NextResponse.json({ error: '초안 상태의 계약서만 발송할 수 있습니다.' }, { status: 400 })
+  if (contract.status !== 'draft' && contract.status !== 'owner_signed') {
+    return NextResponse.json({ error: '초안 또는 임대인서명 상태의 계약서만 발송할 수 있습니다.' }, { status: 400 })
   }
 
   if (!contract.sign_token) {
