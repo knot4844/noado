@@ -192,7 +192,7 @@ export interface Payment {
 }
 
 // ── 전자계약 ───────────────────────────────────────────────
-export type ContractStatus = 'draft' | 'sent' | 'signed' | 'expired'
+export type ContractStatus = 'draft' | 'owner_signed' | 'sent' | 'signed' | 'expired'
 
 export interface Contract {
   id:                    string
@@ -214,6 +214,10 @@ export interface Contract {
   signer_ip:             string | null
   signed_at:             string | null
   signature_data_url:    string | null
+  // 임대인 서명
+  owner_signed_at:       string | null
+  owner_signature_url:   string | null
+  owner_signer_ip:       string | null
   contract_snapshot:     Record<string, string | number> | null
   template_url:          string | null
   template_name:         string | null

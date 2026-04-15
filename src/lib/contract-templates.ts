@@ -114,16 +114,16 @@ function drawTableRow(ctx: CanvasRenderingContext2D, x: number, y: number, label
   // label cell
   drawBox(ctx, x, y, labelW, h, { fill: labelBg, stroke: '#ccc' })
   ctx.fillStyle = color
-  ctx.font = 'bold 22px "Pretendard", sans-serif'
+  ctx.font = 'bold 26px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, x + labelW / 2, y + h / 2)
   // value cell
   drawBox(ctx, x + labelW, y, valueW, h, { stroke: '#ccc' })
   ctx.fillStyle = '#222'
-  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.font = '26px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
-  ctx.fillText(value, x + labelW + 16, y + h / 2)
+  ctx.fillText(value, x + labelW + 18, y + h / 2)
 }
 
 function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number): number {
@@ -530,40 +530,43 @@ function drawShortTerm(ctx: CanvasRenderingContext2D, W: number, _H: number, d: 
    4. 상가임대차계약서 (상가건물임대차보호법 적용)
    ═══════════════════════════════════════════════════════════════ */
 function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
-  const mx = 80
+  const mx = 70
   const clr = '#4a4e69'
+
+  // ── A4 비율 참고: W=1200 → 페이지 높이 ≈ 1697 (1:√2) ──
+  const PAGE_H = 1697
 
   // ── 제목 ──
   ctx.fillStyle = clr
-  ctx.font = 'bold 42px "Pretendard", sans-serif'
+  ctx.font = 'bold 54px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('상  가  임  대  차  계  약  서', W / 2, 60)
+  ctx.fillText('상  가  임  대  차  계  약  서', W / 2, 70)
 
   ctx.fillStyle = '#666'
-  ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('( 상가건물 임대차보호법 적용 )', W / 2, 100)
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText('( 상가건물 임대차보호법 적용 )', W / 2, 115)
 
   ctx.strokeStyle = clr
   ctx.lineWidth = 3
   ctx.beginPath()
-  ctx.moveTo(mx, 125)
-  ctx.lineTo(W - mx, 125)
+  ctx.moveTo(mx, 145)
+  ctx.lineTo(W - mx, 145)
   ctx.stroke()
 
-  const labelW = 180
+  const labelW = 210
   const valueW = W - mx * 2 - labelW
-  const rowH = 48
+  const rowH = 58
   const opts = { labelBg: '#eee5e9', color: clr }
 
   // ── 임대차 목적물의 표시 ──
-  let y = 150
+  let y = 170
   ctx.fillStyle = clr
-  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.font = 'bold 30px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
   ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
-  y += 40
+  y += 42
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 장항동 902번지 대우비즈니스센터 서관', opts)
   y += rowH
@@ -576,9 +579,9 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
 
   // ── 계약 당사자 ──
   ctx.fillStyle = clr
-  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.font = 'bold 30px "Pretendard", sans-serif'
   ctx.fillText('▪ 계약 당사자', mx, y)
-  y += 40
+  y += 42
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대인 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
@@ -587,9 +590,9 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
 
   // ── 임대차 조건 ──
   ctx.fillStyle = clr
-  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.font = 'bold 30px "Pretendard", sans-serif'
   ctx.fillText('▪ 임대차 조건', mx, y)
-  y += 40
+  y += 42
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대차기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
   y += rowH
@@ -600,7 +603,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', '별도 (임대료의 10%)', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
-  y += rowH + 30
+  y += rowH + 25
 
   // ── 계약 조항 ──
   ctx.strokeStyle = '#ccc'
@@ -671,29 +674,36 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.textAlign = 'left'
   for (const clause of clauses) {
     ctx.fillStyle = clr
-    ctx.font = 'bold 22px "Pretendard", sans-serif'
+    ctx.font = 'bold 26px "Pretendard", sans-serif'
     ctx.fillText(clause.title, mx, y)
-    y += 32
+    y += 34
     ctx.fillStyle = '#333'
-    ctx.font = '18px "Pretendard", sans-serif'
+    ctx.font = '22px "Pretendard", sans-serif'
     for (const item of clause.items) {
-      y = drawWrappedText(ctx, item, mx + 10, y, W - mx * 2 - 20, 26)
+      y = drawWrappedText(ctx, item, mx + 14, y, W - mx * 2 - 28, 30)
       y += 4
     }
-    y += 14
+    y += 12
   }
 
   // ── 특약사항 ──
   if (d.special_terms) {
     ctx.fillStyle = clr
-    ctx.font = 'bold 24px "Pretendard", sans-serif'
+    ctx.font = 'bold 30px "Pretendard", sans-serif'
     ctx.fillText('▪ 특약 사항', mx, y)
-    y += 40
+    y += 42
     ctx.fillStyle = '#333'
-    ctx.font = '20px "Pretendard", sans-serif'
-    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 30)
+    ctx.font = '24px "Pretendard", sans-serif'
+    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 36)
     y += 20
   }
+
+  // ── 2페이지 최소 높이 보장 (서명란이 2페이지에 오도록) ──
+  // 서명란+날짜 = 약 350px 필요 → 2페이지 끝(PAGE_H*2) - 350 = 최대 시작 위치
+  const signSectionMinY = PAGE_H + 60
+  const signSectionMaxY = PAGE_H * 2 - 380
+  if (y < signSectionMinY) y = signSectionMinY
+  if (y > signSectionMaxY) y = signSectionMaxY
 
   // ── 날짜 + 확인 문구 ──
   y += 20
@@ -706,12 +716,58 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   y += 30
 
   ctx.fillStyle = '#333'
-  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.font = '26px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
-  y += 40
+  y += 50
+  ctx.font = '28px "Pretendard", sans-serif'
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
-  y += 30
+  y += 60
+
+  // ── 서명란 (2열) ──
+  const colW = (W - mx * 2 - 40) / 2
+  const sigBoxH = 180
+  const leftX = mx
+  const rightX = mx + colW + 40
+
+  // 임대인 (갑)
+  drawBox(ctx, leftX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
+  ctx.fillStyle = clr
+  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('임 대 인 (갑)', leftX + colW / 2, y + 28)
+
+  ctx.fillStyle = '#333'
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText('대우오피스 / 이동윤', leftX + colW / 2, y + 60)
+
+  ctx.fillStyle = '#999'
+  ctx.font = '18px "Pretendard", sans-serif'
+  ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 24)
+
+  // 임차인 (을)
+  drawBox(ctx, rightX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
+  ctx.fillStyle = clr
+  ctx.font = 'bold 24px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('임 차 인 (을)', rightX + colW / 2, y + 28)
+
+  ctx.fillStyle = '#333'
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText(d.tenant_name || '(                    )', rightX + colW / 2, y + 60)
+
+  ctx.fillStyle = '#999'
+  ctx.font = '18px "Pretendard", sans-serif'
+  ctx.fillText('(서명 또는 날인)', rightX + colW / 2, y + sigBoxH - 24)
+
+  y += sigBoxH + 20
+
+  // ── 페이지 하단 안내 ──
+  ctx.fillStyle = '#aaa'
+  ctx.font = '16px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('본 계약서는 노아도(noado.kr) 임대관리 시스템을 통해 작성되었습니다.', W / 2, y)
+  y += 20
 
   return y
 }

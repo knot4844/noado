@@ -8,7 +8,8 @@ import {
   Plus, FileText, Send, CheckCircle2, AlertCircle,
   Loader2, X, Clock, RefreshCw, Download, Eye,
   Pencil, Trash2, Upload, LayoutTemplate, Link2,
-  MessageSquare, PenTool, RotateCcw,
+  MessageSquare, PenTool, RotateCcw, ScanLine, Printer,
+  Camera, ArrowRight, ArrowLeft, ImageIcon,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { BUILT_IN_TEMPLATES, generateTemplateImage } from '@/lib/contract-templates'
@@ -54,6 +55,7 @@ export default function ContractsPage() {
   const [ownerSignContract, setOwnerSignContract] = useState<ContractWithRoom | null>(null)
   const [builtinUploads, setBuiltinUploads] = useState<BuiltinUploadInfo[]>([])
   const [showBuiltinUploadManager, setShowBuiltinUploadManager] = useState(false)
+  const [showScanUpload, setShowScanUpload] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -203,6 +205,11 @@ export default function ContractsPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
             <LayoutTemplate size={15} /> 내 양식 관리
+          </button>
+          <button onClick={() => setShowScanUpload(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border"
+            style={{ borderColor: 'var(--color-accent-dark)', color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.1)' }}>
+            <ScanLine size={15} /> 스캔 업로드
           </button>
           <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
@@ -408,6 +415,17 @@ export default function ContractsPage() {
         <BuiltinUploadManagerModal
           onClose={() => { setShowBuiltinUploadManager(false); load() }}
           onToast={showToast}
+        />
+      )}
+
+      {/* 스캔 업로드 모달 */}
+      {showScanUpload && (
+        <ScanUploadModal
+          rooms={rooms}
+          builtinUploads={builtinUploads}
+          onClose={() => setShowScanUpload(false)}
+          onCreated={() => { setShowScanUpload(false); load(); showToast('success', '수기 계약서가 등록되었습니다.') }}
+          onError={msg => showToast('error', msg)}
         />
       )}
     </div>
@@ -1476,6 +1494,474 @@ function BuiltinUploadManagerModal({
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
             닫기
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── 스캔 업로드 모달 (수기 계약서 → 스캔 → 업로드) ─── */
+function ScanUploadModal({
+  rooms, builtinUploads, onClose, onCreated, onError,
+}: {
+  rooms: Room[]
+  builtinUploads: BuiltinUploadInfo[]
+  onClose: () => void
+  onCreated: () => void
+  onError: (msg: string) => void
+}) {
+  const supabase = createClient()
+  const scanInputRef = useRef<HTMLInputElement>(null)
+
+  /* 스텝: 1=계약정보+양식프린트, 2=스캔업로드 */
+  const [step, setStep] = useState<1 | 2>(1)
+
+  const [form, setForm] = useState({
+    room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '',
+    address: '', monthly_rent: '', deposit: '',
+    lease_start: '', lease_end: '', special_terms: '',
+  })
+  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>('basic-lease')
+  const [generatingTemplate, setGeneratingTemplate] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  /* 스캔 파일 */
+  const [scanFiles, setScanFiles] = useState<File[]>([])
+  const [scanPreviews, setScanPreviews] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [convertingPdf, setConvertingPdf] = useState(false)
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const handleRoomSelect = (roomId: string) => {
+    const r = rooms.find(r => r.id === roomId) as Room & Record<string, unknown> | undefined
+    if (!r) return
+    setForm(prev => ({
+      ...prev,
+      room_id: roomId,
+      tenant_name:  (r.tenant_name as string)  ?? '',
+      tenant_phone: (r.tenant_phone as string) ?? '',
+      tenant_email: (r.tenant_email as string) ?? '',
+      monthly_rent: String(r.monthly_rent ?? ''),
+      deposit:      String(r.deposit ?? ''),
+      lease_start:  (r.lease_start as string) ?? '',
+      lease_end:    (r.lease_end as string)   ?? '',
+    }))
+  }
+
+  /* 양식 생성 + 프린트 */
+  const handleGenerateAndPrint = async () => {
+    if (!form.room_id) return onError('호실을 선택해주세요.')
+    if (!form.tenant_name) return onError('입주사 이름을 입력해주세요.')
+
+    // 커스텀 업로드가 있으면 그 URL 사용
+    const customUpload = selectedBuiltIn ? builtinUploads.find(u => u.template_key === selectedBuiltIn) : null
+    if (customUpload) {
+      setPreviewUrl(customUpload.template_url)
+      printImage(customUpload.template_url)
+      return
+    }
+
+    if (!selectedBuiltIn) return onError('양식을 선택해주세요.')
+    const def = BUILTIN_TEMPLATE_DEFS.find(d => d.key === selectedBuiltIn)
+    if (def?.uploadOnly) return onError('이 양식은 "내 양식 관리"에서 파일을 업로드해야 사용할 수 있습니다.')
+
+    setGeneratingTemplate(true)
+    try {
+      const selectedRoom = rooms.find(r => r.id === form.room_id)
+      const tplData: TemplateData = {
+        tenant_name: form.tenant_name, tenant_phone: form.tenant_phone,
+        address: form.address, monthly_rent: form.monthly_rent,
+        deposit: form.deposit, lease_start: form.lease_start,
+        lease_end: form.lease_end, special_terms: form.special_terms,
+        room_name: selectedRoom?.name ?? '',
+      }
+      const blob = await generateTemplateImage(selectedBuiltIn, tplData)
+      const url = URL.createObjectURL(blob)
+      setPreviewUrl(url)
+      printImage(url)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '양식 생성 실패')
+    } finally {
+      setGeneratingTemplate(false)
+    }
+  }
+
+  const printImage = (url: string) => {
+    const w = window.open('', '_blank')
+    if (!w) return onError('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.')
+    w.document.write(`<!DOCTYPE html><html><head><title>계약서 인쇄</title><style>
+      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; } }
+      body { margin: 0; display: flex; justify-content: center; }
+      img { max-width: 100%; height: auto; }
+    </style></head><body>
+      <img src="${url}" onload="setTimeout(()=>{window.print();},300)" />
+    </body></html>`)
+    w.document.close()
+  }
+
+  /* 스캔 파일 선택 */
+  const onPickScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+
+    for (const f of Array.from(files)) {
+      if (!allowed.includes(f.type)) {
+        onError('PDF 또는 이미지(JPG/PNG/WEBP) 파일만 업로드 가능합니다.')
+        continue
+      }
+      if (f.size > 50 * 1024 * 1024) {
+        onError('파일 크기는 50MB 이하여야 합니다.')
+        continue
+      }
+
+      if (f.type === 'application/pdf') {
+        setConvertingPdf(true)
+        try {
+          const { convertPdfToPngBlob } = await import('@/lib/pdf-to-image')
+          const { blob } = await convertPdfToPngBlob(f)
+          const pngFile = new File([blob], f.name.replace(/\.pdf$/i, '.png'), { type: 'image/png' })
+          setScanFiles(prev => [...prev, pngFile])
+          setScanPreviews(prev => [...prev, URL.createObjectURL(pngFile)])
+        } catch {
+          onError('PDF → 이미지 변환 실패')
+        } finally {
+          setConvertingPdf(false)
+        }
+      } else {
+        setScanFiles(prev => [...prev, f])
+        setScanPreviews(prev => [...prev, URL.createObjectURL(f)])
+      }
+    }
+    if (scanInputRef.current) scanInputRef.current.value = ''
+  }
+
+  const removeScan = (idx: number) => {
+    URL.revokeObjectURL(scanPreviews[idx])
+    setScanFiles(prev => prev.filter((_, i) => i !== idx))
+    setScanPreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  /* 저장 */
+  const handleSave = async () => {
+    if (!form.room_id) return onError('호실을 선택해주세요.')
+    if (!form.tenant_name) return onError('입주사 이름을 입력해주세요.')
+    if (scanFiles.length === 0) return onError('스캔한 계약서 이미지를 업로드해주세요.')
+
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
+
+    try {
+      // 스캔 파일들을 하나로 합치거나 첫 번째만 사용 (메인 template_url)
+      // 여러 장이면 첫 번째를 template_url로, 나머지는 snapshot에 기록
+      const uploadedUrls: string[] = []
+      for (const f of scanFiles) {
+        const ext = f.name.split('.').pop() || 'png'
+        const path = `${user.id}/scan-${Date.now()}-${crypto.randomUUID()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('contract-templates')
+          .upload(path, f, { contentType: f.type, cacheControl: '3600', upsert: false })
+        if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
+        const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
+        uploadedUrls.push(pub.publicUrl)
+      }
+
+      // 스냅샷 + 해시
+      const snapshot = {
+        ...form,
+        scan_type: 'manual_scan',
+        scan_urls: uploadedUrls,
+        template_url: uploadedUrls[0],
+        created_at: new Date().toISOString(),
+        owner_id: user.id,
+      }
+      const hashStr = JSON.stringify(snapshot)
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashStr))
+      const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+      const { error } = await supabase.from('contracts').insert({
+        owner_id: user.id,
+        room_id: form.room_id,
+        tenant_name: form.tenant_name,
+        tenant_phone: form.tenant_phone || null,
+        tenant_email: form.tenant_email || null,
+        address: form.address || null,
+        monthly_rent: Number(form.monthly_rent) || 0,
+        deposit: Number(form.deposit) || 0,
+        lease_start: form.lease_start || null,
+        lease_end: form.lease_end || null,
+        special_terms: form.special_terms || null,
+        status: 'signed',
+        signed_at: new Date().toISOString(),
+        content_hash: hashHex,
+        contract_snapshot: snapshot,
+        template_url: uploadedUrls[0],
+        template_name: `수기계약서_${form.tenant_name}_스캔`,
+        template_mime: 'image/png',
+      })
+      if (error) throw new Error(error.message)
+
+      onCreated()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // cleanup
+  useEffect(() => {
+    return () => {
+      scanPreviews.forEach(u => URL.revokeObjectURL(u))
+      if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.4)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-2xl rounded-2xl overflow-hidden"
+           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
+
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
+            <h2 className="text-base font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
+              <ScanLine size={18} /> 수기 계약서 스캔 업로드
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+              계약서를 인쇄하고, 대면 서명 후 스캔하여 등록합니다.
+            </p>
+          </div>
+          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
+        </div>
+
+        {/* 스텝 인디케이터 */}
+        <div className="flex items-center gap-3 px-6 py-3" style={{ background: 'var(--color-background)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                 style={{ background: step >= 1 ? 'var(--color-primary)' : 'var(--color-muted-bg)', color: step >= 1 ? 'white' : 'var(--color-muted)' }}>1</div>
+            <span className="text-xs font-medium" style={{ color: step === 1 ? 'var(--color-primary)' : 'var(--color-muted)' }}>계약 정보 · 인쇄</span>
+          </div>
+          <ArrowRight size={14} style={{ color: 'var(--color-muted)' }} />
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                 style={{ background: step >= 2 ? 'var(--color-primary)' : 'var(--color-muted-bg)', color: step >= 2 ? 'white' : 'var(--color-muted)' }}>2</div>
+            <span className="text-xs font-medium" style={{ color: step === 2 ? 'var(--color-primary)' : 'var(--color-muted)' }}>스캔 업로드 · 저장</span>
+          </div>
+        </div>
+
+        {/* 본문 */}
+        <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
+
+          {/* ─── STEP 1: 계약 정보 + 양식 선택 + 인쇄 ─── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              {/* 호실 선택 */}
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>호실 선택 *</label>
+                <select value={form.room_id} onChange={e => handleRoomSelect(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+                  <option value="">호실을 선택하세요</option>
+                  {[...rooms].sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true })).map(r => (
+                    <option key={r.id} value={r.id}>{r.name} {(r as Room & Record<string, unknown>).tenant_name ? `(${(r as Room & Record<string, unknown>).tenant_name})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <CField label="입주사 이름 *" value={form.tenant_name} onChange={set('tenant_name')} />
+                <CField label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} type="tel" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <CField label="이메일" value={form.tenant_email} onChange={set('tenant_email')} type="email" />
+                <CField label="소재지/호실주소" value={form.address} onChange={set('address')} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <CField label="월세 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
+                <CField label="보증금 (원)" value={form.deposit} onChange={set('deposit')} type="number" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <CField label="계약 시작일" value={form.lease_start} onChange={set('lease_start')} type="date" />
+                <CField label="계약 만료일" value={form.lease_end} onChange={set('lease_end')} type="date" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>특약사항</label>
+                <textarea value={form.special_terms} onChange={set('special_terms')} rows={3}
+                  placeholder="계약 특약사항을 입력하세요..."
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none resize-none"
+                  style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }} />
+              </div>
+
+              {/* 양식 선택 */}
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>인쇄할 계약서 양식</label>
+                <div className="space-y-2">
+                  {BUILTIN_TEMPLATE_DEFS.map(def => {
+                    const hasCustom = builtinUploads.some(u => u.template_key === def.key)
+                    const isUploadOnly = def.uploadOnly && !hasCustom
+                    return (
+                      <button key={def.key} type="button"
+                        onClick={() => { if (!isUploadOnly) setSelectedBuiltIn(def.key === selectedBuiltIn ? null : def.key) }}
+                        className="w-full text-left px-3 py-2.5 rounded-lg border transition-all"
+                        style={{
+                          borderColor: selectedBuiltIn === def.key ? def.color : 'var(--color-border)',
+                          background: selectedBuiltIn === def.key ? `${def.color}08` : 'var(--color-background)',
+                          opacity: isUploadOnly ? 0.5 : 1,
+                        }}>
+                        <div className="flex items-center gap-2">
+                          <FileText size={14} style={{ color: selectedBuiltIn === def.key ? def.color : 'var(--color-muted)' }} />
+                          <span className="text-xs font-semibold" style={{ color: selectedBuiltIn === def.key ? def.color : 'var(--color-text)' }}>{def.name}</span>
+                          {hasCustom && <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: `${def.color}20`, color: def.color }}>커스텀</span>}
+                          {isUploadOnly && <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>미등록</span>}
+                          {selectedBuiltIn === def.key && <CheckCircle2 size={14} style={{ color: def.color }} className="ml-auto" />}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 미리보기 (생성된 경우) */}
+              {previewUrl && (
+                <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
+                  <div className="flex items-center justify-between px-3 py-2" style={{ background: 'var(--color-muted-bg)' }}>
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>양식 미리보기</span>
+                    <button onClick={() => printImage(previewUrl)} className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
+                      <Printer size={12} /> 다시 인쇄
+                    </button>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewUrl} alt="계약서 미리보기" className="w-full" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── STEP 2: 스캔 업로드 ─── */}
+          {step === 2 && (
+            <div className="space-y-4">
+              {/* 안내 */}
+              <div className="rounded-xl p-4" style={{ background: 'rgba(168,218,220,0.12)', border: '1px solid rgba(168,218,220,0.3)' }}>
+                <div className="flex items-start gap-3">
+                  <Camera size={20} style={{ color: 'var(--color-accent-dark)' }} className="shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>서명이 완료된 계약서를 업로드하세요</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
+                      인쇄한 계약서에 대면 서명을 받은 후, 스캔하거나 사진을 촬영하여 업로드합니다.<br />
+                      여러 페이지인 경우 여러 장을 업로드할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 계약 요약 */}
+              <div className="rounded-lg p-3 space-y-1.5" style={{ background: 'var(--color-background)' }}>
+                <div className="text-xs font-bold mb-2" style={{ color: 'var(--color-primary)' }}>계약 정보 요약</div>
+                {[
+                  { l: '호실', v: rooms.find(r => r.id === form.room_id)?.name },
+                  { l: '입주사', v: form.tenant_name },
+                  { l: '월세', v: form.monthly_rent ? `${Number(form.monthly_rent).toLocaleString()}원` : '' },
+                  { l: '계약기간', v: form.lease_start && form.lease_end ? `${form.lease_start} ~ ${form.lease_end}` : '' },
+                ].filter(r => r.v).map(r => (
+                  <div key={r.l} className="flex gap-2 text-xs">
+                    <span className="w-16 shrink-0 font-medium" style={{ color: 'var(--color-muted)' }}>{r.l}</span>
+                    <span style={{ color: 'var(--color-text)' }}>{r.v}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 파일 업로드 영역 */}
+              <div>
+                <input ref={scanInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                  multiple onChange={onPickScan} className="hidden" />
+
+                {convertingPdf && (
+                  <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border border-dashed text-sm mb-3"
+                       style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.12)', color: 'var(--color-accent-dark)' }}>
+                    <Loader2 size={14} className="animate-spin" /> PDF 변환 중...
+                  </div>
+                )}
+
+                {/* 업로드된 이미지 미리보기 */}
+                {scanPreviews.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    {scanPreviews.map((url, idx) => (
+                      <div key={idx} className="relative group rounded-lg overflow-hidden border" style={{ borderColor: 'var(--color-border)' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`스캔 ${idx + 1}`} className="w-full h-40 object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                          <button onClick={() => removeScan(idx)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full bg-white/90 shadow-lg"
+                            style={{ color: 'var(--color-danger)' }}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        <div className="absolute bottom-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white">
+                          {idx + 1}p
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button type="button" onClick={() => scanInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl border-2 border-dashed text-sm font-medium transition-all"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-background)' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-accent-dark)'; e.currentTarget.style.color = 'var(--color-accent-dark)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-muted)' }}>
+                  <ImageIcon size={18} />
+                  {scanFiles.length === 0 ? '스캔 이미지 선택 (클릭 또는 드래그)' : '이미지 추가'}
+                </button>
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--color-muted)' }}>
+                  JPG, PNG, WEBP, PDF 지원 · 최대 50MB · 여러 장 선택 가능
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 하단 버튼 */}
+        <div className="flex gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          {step === 1 ? (
+            <>
+              <button onClick={onClose}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>취소</button>
+              <button onClick={handleGenerateAndPrint} disabled={generatingTemplate}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{ background: 'var(--color-accent-dark)' }}>
+                {generatingTemplate ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                {generatingTemplate ? '양식 생성 중...' : '양식 생성 · 인쇄'}
+              </button>
+              <button onClick={() => { if (!form.room_id || !form.tenant_name) return onError('호실과 입주사를 입력해주세요.'); setStep(2) }}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2"
+                style={{ background: 'var(--color-primary)' }}>
+                다음 <ArrowRight size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setStep(1)}
+                className="py-2.5 px-4 rounded-lg text-sm font-medium border flex items-center gap-1"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
+                <ArrowLeft size={14} /> 이전
+              </button>
+              <div className="flex-1" />
+              <button onClick={handleSave} disabled={saving || scanFiles.length === 0}
+                className="py-2.5 px-6 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ background: 'var(--color-primary)' }}>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {saving ? '저장 중...' : `계약서 등록 (${scanFiles.length}장)`}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
