@@ -459,7 +459,7 @@ function CreateContractModal({
     tenant_name:  '',
     tenant_phone: '',
     tenant_email: '',
-    address:      '',
+    address:      '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스',
     monthly_rent: '',
     deposit:      '',
     lease_start:  '',
@@ -1518,7 +1518,7 @@ function ScanUploadModal({
 
   const [form, setForm] = useState({
     room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '',
-    address: '', monthly_rent: '', deposit: '',
+    address: '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', monthly_rent: '', deposit: '',
     lease_start: '', lease_end: '', special_terms: '',
   })
   const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>('basic-lease')

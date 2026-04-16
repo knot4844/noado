@@ -577,7 +577,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 장항동 902번지 대우비즈니스센터 서관', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 호실', d.room_name || '—', opts)
   y += rowH
@@ -786,7 +786,7 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 장항동 902번지 대우비즈니스센터 서관', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 호실', d.room_name || '—', opts)
   y += rowH
