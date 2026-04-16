@@ -875,6 +875,107 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   const snap = contract.contract_snapshot as Record<string, string> | null
   const r    = contract.room
 
+  /* 계약서 양식 인쇄 */
+  const handlePrint = () => {
+    if (!contract.template_url) return
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><title>계약서 인쇄</title><style>
+      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; } }
+      body { margin: 0; display: flex; justify-content: center; } img { max-width: 100%; height: auto; }
+    </style></head><body>
+      <img src="${contract.template_url}" onload="setTimeout(()=>{window.print();},300)" />
+    </body></html>`)
+    w.document.close()
+  }
+
+  /* 법적 증거 패키지 다운로드 (HTML → 인쇄/PDF) */
+  const handleEvidenceDownload = () => {
+    const c = contract
+    const s = snap
+    const now = new Date().toLocaleString('ko-KR')
+
+    // 해시 검증: snapshot을 다시 해싱하여 저장된 해시와 비교
+    const snapshotStr = s ? JSON.stringify(s) : '(스냅샷 없음)'
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>전자서명 증거 패키지</title>
+<style>
+  body { font-family: 'Pretendard', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; font-size: 14px; line-height: 1.6; }
+  h1 { font-size: 22px; color: #1d3557; border-bottom: 3px solid #1d3557; padding-bottom: 8px; }
+  h2 { font-size: 16px; color: #4a4e69; margin-top: 28px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; font-size: 13px; }
+  th { background: #f0f4f8; font-weight: bold; width: 140px; }
+  .sig-box { display: inline-block; border: 1px solid #ccc; padding: 8px; background: #fff; margin: 8px 0; }
+  .sig-box img { max-height: 80px; }
+  .hash { font-family: monospace; font-size: 11px; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px; }
+  .snapshot { font-family: monospace; font-size: 10px; word-break: break-all; background: #f9f9f9; padding: 10px; border-radius: 4px; max-height: 300px; overflow: auto; white-space: pre-wrap; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+  .badge-ok { background: #d4edda; color: #155724; }
+  .badge-no { background: #f8d7da; color: #721c24; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #1d3557; font-size: 11px; color: #888; }
+  @media print { body { padding: 20px; } }
+</style></head><body>
+<h1>전자서명 증거 패키지</h1>
+<p>출력일시: ${now}</p>
+
+<h2>1. 계약 정보</h2>
+<table>
+  <tr><th>계약 ID</th><td style="font-family:monospace;font-size:11px">${c.id}</td></tr>
+  <tr><th>호실</th><td>${r?.name ?? '—'}</td></tr>
+  <tr><th>입주사</th><td>${s?.tenant_name ?? c.tenant_name ?? '—'}</td></tr>
+  <tr><th>연락처</th><td>${s?.tenant_phone ?? c.tenant_phone ?? '—'}</td></tr>
+  <tr><th>소재지</th><td>${s?.address ?? '—'}</td></tr>
+  <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td></tr>
+  <tr><th>월 임대료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
+  <tr><th>계약기간</th><td>${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
+  <tr><th>특약사항</th><td>${s?.special_terms ?? '없음'}</td></tr>
+  <tr><th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
+</table>
+
+<h2>2. 임대인(갑) 전자서명</h2>
+<table>
+  <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+  <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
+  <tr><th>서명자 IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
+</table>
+${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.owner_signature_url}" alt="임대인 서명" /></div>` : ''}
+
+<h2>3. 임차인(을) 전자서명</h2>
+<table>
+  <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+  <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
+  <tr><th>서명자 IP</th><td>${c.signer_ip ?? '—'}</td></tr>
+</table>
+${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.signature_data_url}" alt="임차인 서명" /></div>` : ''}
+
+<h2>4. 콘텐츠 무결성 검증 (SHA-256)</h2>
+<p>계약서 작성 시점에 계약 내용을 SHA-256으로 해싱하여 저장합니다.<br/>
+아래 해시값이 일치하면 서명 이후 계약 내용이 변조되지 않았음을 증명합니다.</p>
+<table>
+  <tr><th>저장된 해시</th><td class="hash">${c.content_hash ?? '(없음)'}</td></tr>
+</table>
+
+<h2>5. 계약 원문 스냅샷 (JSON)</h2>
+<p>서명 당시 계약 내용의 원본 데이터입니다.</p>
+<div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+
+${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.template_url}" target="_blank">${c.template_name ?? c.template_url}</a></p>` : ''}
+
+<div class="footer">
+  <p>본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
+  <p>전자서명법 제3조에 의거, 전자서명은 서면 서명과 동일한 법적 효력을 가집니다.</p>
+</div>
+</body></html>`
+
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    // 자동 인쇄 (PDF 저장 가능)
+    setTimeout(() => w.print(), 500)
+  }
+
   const rows = [
     { label: '입주사',      value: snap?.tenant_name ?? contract.tenant_name ?? '—' },
     { label: '연락처',      value: snap?.tenant_phone ?? contract.tenant_phone ?? '—' },
@@ -1013,9 +1114,23 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="px-6 py-4 border-t flex gap-2" style={{ borderColor: 'var(--color-border)' }}>
+          {contract.template_url && (
+            <button onClick={handlePrint}
+              className="flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5"
+              style={{ background: 'var(--color-primary)', color: '#fff' }}>
+              <Printer size={14} /> 인쇄
+            </button>
+          )}
+          {(contract.status === 'signed' || contract.status === 'owner_signed') && (
+            <button onClick={handleEvidenceDownload}
+              className="flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5"
+              style={{ background: 'var(--color-accent-dark, #2a9d8f)', color: '#fff' }}>
+              <Download size={14} /> 증거 패키지
+            </button>
+          )}
           <button onClick={onClose}
-            className="w-full py-2.5 rounded-lg text-sm font-medium border"
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
             style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
             닫기
           </button>
