@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   // 계약 소유 확인
   const { data: contract, error: fetchErr } = await supabaseAdmin
     .from('contracts')
-    .select('id, owner_id, status')
+    .select('id, owner_id, status, contract_snapshot')
     .eq('id', contractId)
     .eq('owner_id', user.id)
     .single()
@@ -49,6 +49,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '초안 상태에서만 서명할 수 있습니다.' }, { status: 400 })
   }
 
+  // 콘텐츠 해시 생성 (서명 시점의 계약 내용 무결성 증명)
+  const { createHash } = await import('crypto')
+  const hashPayload = JSON.stringify({
+    contractId,
+    owner_id: user.id,
+    contract_snapshot: contract.contract_snapshot,
+    signer: 'owner',
+    ip: signerIp,
+  })
+  const contentHash = createHash('sha256').update(hashPayload).digest('hex')
+
   const signedAt = new Date().toISOString()
 
   const { error: updateErr } = await supabaseAdmin
@@ -58,6 +69,7 @@ export async function POST(request: NextRequest) {
       owner_signature_url: signature,
       owner_signed_at: signedAt,
       owner_signer_ip: signerIp,
+      content_hash: contentHash,
     })
     .eq('id', contractId)
 
