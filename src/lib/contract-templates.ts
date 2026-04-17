@@ -5,6 +5,8 @@
  * 임차인 서명 페이지에서 template_url로 표시됨
  */
 
+export type ContractVatType = 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE'
+
 export interface TemplateData {
   tenant_name:  string
   tenant_phone: string
@@ -15,6 +17,7 @@ export interface TemplateData {
   lease_end:    string
   special_terms: string
   room_name:    string
+  vat_type?:    ContractVatType  // 부가세 납부 여부 (세금계산서 발행이면 10% 별도 명시)
 }
 
 export interface TemplateInfo {
@@ -27,14 +30,14 @@ export interface TemplateInfo {
 export const BUILT_IN_TEMPLATES: TemplateInfo[] = [
   {
     id:    'basic-lease',
-    name:  '임대차계약서 (전자계약용)',
-    desc:  '상가건물임대차보호법 적용, 전자서명용 2페이지 계약서',
+    name:  '전자계약',
+    desc:  '카톡/문자 링크로 전자서명 — 2페이지 계약서',
     color: '#1d3557',
   },
   {
     id:    'paper-lease',
-    name:  '임대차계약서 (서면용)',
-    desc:  '프린트 후 대면 서명용, 서명란 포함 2페이지 계약서',
+    name:  '서면계약',
+    desc:  '프린트 후 대면 서명 — 전자서명 불필요',
     color: '#4a4e69',
   },
 ]
@@ -43,6 +46,27 @@ function formatMoney(val: string): string {
   const n = Number(val.replace(/,/g, ''))
   if (!n) return '0'
   return n.toLocaleString('ko-KR')
+}
+
+/** 월 임대료 + vat_type을 기준으로 부가세/합계 행 값 계산 */
+function computeVatRow(monthlyRentStr: string, vatType?: ContractVatType): {
+  vatLabel:   string         // "부가가치세" row에 표시할 값
+  totalLabel: string | null  // 합계 행 값 (VAT_INVOICE일 때만 존재)
+} {
+  const rent = Number((monthlyRentStr || '').replace(/,/g, '')) || 0
+  if (vatType === 'VAT_INVOICE') {
+    const vat   = Math.round(rent * 0.1)
+    const total = rent + vat
+    return {
+      vatLabel:   `금 ${vat.toLocaleString('ko-KR')}원 (임대료의 10%)`,
+      totalLabel: `금 ${total.toLocaleString('ko-KR')}원 (임대료 + 부가세)`,
+    }
+  }
+  // 세금계산서 미발행 (현금영수증 또는 해당없음)
+  return {
+    vatLabel:   vatType === 'CASH_RECEIPT' ? '해당 없음 (현금영수증 발행)' : '해당 없음',
+    totalLabel: null,
+  }
 }
 
 function formatDateKR(val: string): string {
@@ -609,8 +633,13 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', '별도 (임대료의 10%)', opts)
+  const vatRow = computeVatRow(d.monthly_rent, d.vat_type)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', vatRow.vatLabel, opts)
   y += rowH
+  if (vatRow.totalLabel) {
+    drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 총 납부액', vatRow.totalLabel, opts)
+    y += rowH
+  }
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
   y += rowH + 20
 
@@ -708,40 +737,40 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
     y += 16
   }
 
-  // ── 2페이지 내 맞춤: 날짜+서명 텍스트 = 약 200px ──
-  const maxY = PAGE_H * 2 - 220
+  // ── 2페이지 내 맞춤: 날짜+서명 텍스트 = 약 120px (절반 크기) ──
+  const maxY = PAGE_H * 2 - 140
   if (y > maxY) y = maxY
 
   // ── 날짜 + 확인 문구 ──
-  y += 20
+  y += 14
   ctx.strokeStyle = clr
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(mx, y)
   ctx.lineTo(W - mx, y)
   ctx.stroke()
-  y += 28
+  y += 20
 
   ctx.fillStyle = '#333'
-  ctx.font = '24px "Pretendard", sans-serif'
+  ctx.font = '20px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
-  y += 40
-  ctx.font = '26px "Pretendard", sans-serif'
+  y += 28
+  ctx.font = '22px "Pretendard", sans-serif'
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
-  y += 50
+  y += 32
 
   ctx.textAlign = 'left'
-  ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText('임 대 인 (갑):  대우오피스 / 이동윤                    (서명 또는 날인)', mx, y)
-  y += 40
-  ctx.fillText(`임 차 인 (을):  ${d.tenant_name || ''}                                      (서명 또는 날인)`, mx, y)
-  y += 30
+  ctx.font = '18px "Pretendard", sans-serif'
+  ctx.fillText('임 대 인 (갑):  대우오피스 / 이동윤          (서명 또는 날인)', mx, y)
+  y += 24
+  ctx.fillText(`임 차 인 (을):  ${d.tenant_name || ''}                        (서명 또는 날인)`, mx, y)
+  y += 18
 
   ctx.fillStyle = '#888'
-  ctx.font = '16px "Pretendard", sans-serif'
+  ctx.font = '14px "Pretendard", sans-serif'
   ctx.fillText('※ 아래 전자서명란에 서명해주세요.', mx, y)
-  y += 20
+  y += 14
 
   return y
 }
@@ -818,8 +847,13 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', '별도 (임대료의 10%)', opts)
+  const vatRow = computeVatRow(d.monthly_rent, d.vat_type)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', vatRow.vatLabel, opts)
   y += rowH
+  if (vatRow.totalLabel) {
+    drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 총 납부액', vatRow.totalLabel, opts)
+    y += rowH
+  }
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
   y += rowH + 20
 
@@ -902,69 +936,69 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
     y += 16
   }
 
-  // ── 서명란이 2페이지 하단에 오도록 ──
-  const sigNeed = 360  // 날짜+확인+서명박스
+  // ── 서명란이 2페이지 하단에 오도록 (절반 크기) ──
+  const sigNeed = 220  // 날짜+확인+서명박스(100px)
   const signMinY = PAGE_H + 40
   const signMaxY = PAGE_H * 2 - sigNeed
   if (y < signMinY) y = signMinY
   if (y > signMaxY) y = signMaxY
 
   // ── 날짜 + 확인 문구 ──
-  y += 16
+  y += 14
   ctx.strokeStyle = clr
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(mx, y)
   ctx.lineTo(W - mx, y)
   ctx.stroke()
-  y += 28
+  y += 22
 
   ctx.fillStyle = '#333'
-  ctx.font = '24px "Pretendard", sans-serif'
+  ctx.font = '20px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
-  y += 40
-  ctx.font = '26px "Pretendard", sans-serif'
+  y += 28
+  ctx.font = '22px "Pretendard", sans-serif'
   ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
-  y += 50
+  y += 30
 
-  // ── 서명란 (2열 큰 박스) ──
+  // ── 서명란 (2열 박스, 절반 크기) ──
   const colW = (W - mx * 2 - 40) / 2
-  const sigBoxH = 200
+  const sigBoxH = 100
   const leftX = mx
   const rightX = mx + colW + 40
 
   // 임대인 (갑)
   drawBox(ctx, leftX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
-  ctx.font = 'bold 26px "Pretendard", sans-serif'
+  ctx.font = 'bold 20px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('임 대 인 (갑)', leftX + colW / 2, y + 30)
+  ctx.fillText('임 대 인 (갑)', leftX + colW / 2, y + 20)
 
   ctx.fillStyle = '#333'
-  ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText('대우오피스 / 이동윤', leftX + colW / 2, y + 66)
+  ctx.font = '17px "Pretendard", sans-serif'
+  ctx.fillText('대우오피스 / 이동윤', leftX + colW / 2, y + 46)
 
   ctx.fillStyle = '#bbb'
-  ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 28)
+  ctx.font = '13px "Pretendard", sans-serif'
+  ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 14)
 
   // 임차인 (을)
   drawBox(ctx, rightX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
-  ctx.font = 'bold 26px "Pretendard", sans-serif'
+  ctx.font = 'bold 20px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('임 차 인 (을)', rightX + colW / 2, y + 30)
+  ctx.fillText('임 차 인 (을)', rightX + colW / 2, y + 20)
 
   ctx.fillStyle = '#333'
-  ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText(d.tenant_name || '(                    )', rightX + colW / 2, y + 66)
+  ctx.font = '17px "Pretendard", sans-serif'
+  ctx.fillText(d.tenant_name || '(                    )', rightX + colW / 2, y + 46)
 
   ctx.fillStyle = '#bbb'
-  ctx.font = '18px "Pretendard", sans-serif'
-  ctx.fillText('(서명 또는 날인)', rightX + colW / 2, y + sigBoxH - 28)
+  ctx.font = '13px "Pretendard", sans-serif'
+  ctx.fillText('(서명 또는 날인)', rightX + colW / 2, y + sigBoxH - 14)
 
-  y += sigBoxH + 16
+  y += sigBoxH + 14
 
   ctx.fillStyle = '#aaa'
   ctx.font = '14px "Pretendard", sans-serif'

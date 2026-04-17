@@ -33,6 +33,11 @@ interface ContractWithRoom extends Contract {
   room?: ContractRoom
 }
 
+/** 서면계약 여부 판별 — template_name에 "서면"이 포함되어 있으면 전자서명 프로세스 생략 */
+function isPaperContract(c: { template_name?: string | null }): boolean {
+  return !!c.template_name && c.template_name.includes('서면')
+}
+
 const STATUS_META: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
   draft:        { label: '초안',        bg: 'rgba(29,53,87,0.06)',     color: 'var(--color-muted)',        icon: <Pencil size={11} /> },
   owner_signed: { label: '임대인서명', bg: 'rgba(59,130,246,0.1)',    color: '#3b82f6',                   icon: <PenTool size={11} /> },
@@ -77,13 +82,13 @@ export default function ContractsPage() {
       supabase.from('rooms').select('id, name, status, owner_id, building, area').eq('owner_id', user.id),
       supabase
         .from('leases')
-        .select('room_id, tenant_id, monthly_rent, pledge_amount, lease_start, lease_end, status, tenants(name, phone, email)')
+        .select('room_id, tenant_id, monthly_rent, pledge_amount, lease_start, lease_end, vat_type, status, tenants(name, phone, email)')
         .eq('owner_id', user.id)
         .eq('status', 'ACTIVE'),
     ])
 
     // leases → room별 입주사 정보 매핑
-    const leaseByRoom: Record<string, { tenant_name: string; tenant_phone: string; tenant_email: string; monthly_rent: number; deposit: number; lease_start: string; lease_end: string }> = {}
+    const leaseByRoom: Record<string, { tenant_name: string; tenant_phone: string; tenant_email: string; monthly_rent: number; deposit: number; lease_start: string; lease_end: string; vat_type: string }> = {}
     for (const l of (leaseData || []) as Array<Record<string, unknown>>) {
       const t = l.tenants as Record<string, string> | null
       leaseByRoom[l.room_id as string] = {
@@ -94,6 +99,7 @@ export default function ContractsPage() {
         deposit: (l.pledge_amount as number) || 0,
         lease_start: (l.lease_start as string) || '',
         lease_end: (l.lease_end as string) || '',
+        vat_type: (l.vat_type as string) || 'NONE',
       }
     }
 
@@ -322,7 +328,7 @@ export default function ContractsPage() {
                           title="미리보기">
                           <Eye size={13} />
                         </button>
-                        {c.status === 'draft' && (
+                        {c.status === 'draft' && !isPaperContract(c) && (
                           <button onClick={() => setOwnerSignContract(c)}
                             className="p-1.5 rounded-lg text-xs"
                             style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}
@@ -330,7 +336,7 @@ export default function ContractsPage() {
                             <PenTool size={13} />
                           </button>
                         )}
-                        {(c.status === 'draft' || c.status === 'owner_signed') && (
+                        {(c.status === 'draft' || c.status === 'owner_signed') && !isPaperContract(c) && (
                           <div className="relative group/send">
                             <button
                               className="p-1.5 rounded-lg text-xs"
@@ -357,7 +363,7 @@ export default function ContractsPage() {
                             </div>
                           </div>
                         )}
-                        {c.sign_token && (
+                        {c.sign_token && !isPaperContract(c) && (
                           <button onClick={() => copySignLink(c)}
                             className="p-1.5 rounded-lg text-xs"
                             style={{ color: 'var(--color-primary)', background: 'rgba(29,53,87,0.08)' }}
@@ -465,6 +471,7 @@ function CreateContractModal({
     lease_start:  '',
     lease_end:    '',
     special_terms:'',
+    vat_type:     'NONE' as 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE',
   })
   const [templateFile, setTemplateFile] = useState<File | null>(null)
   const [convertingPdf, setConvertingPdf] = useState(false)
@@ -525,6 +532,7 @@ function CreateContractModal({
       deposit:      String(r.deposit ?? ''),
       lease_start:  (r.lease_start as string) ?? '',
       lease_end:    (r.lease_end as string)   ?? '',
+      vat_type:     ((r.vat_type as 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE') ?? 'NONE'),
     }))
   }
 
@@ -569,6 +577,7 @@ function CreateContractModal({
             lease_end:     form.lease_end,
             special_terms: form.special_terms,
             room_name:     selectedRoom?.name ?? '',
+            vat_type:      form.vat_type,
           }
           const blob = await generateTemplateImage(selectedBuiltIn, tplData)
           const tplInfo = BUILT_IN_TEMPLATES.find(t => t.id === selectedBuiltIn)
@@ -694,10 +703,23 @@ function CreateContractModal({
             <CField label="계약 시작일" value={form.lease_start} onChange={set('lease_start')} type="date" />
             <CField label="계약 만료일" value={form.lease_end} onChange={set('lease_end')} type="date" />
           </div>
-          {/* 계약서 양식 선택 */}
+          {/* 부가세 여부 */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>
+              부가세 처리 (입주사 세금계산서 발행여부)
+            </label>
+            <select value={form.vat_type} onChange={set('vat_type')}
+              className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+              <option value="NONE">미발행 (부가세 해당없음)</option>
+              <option value="VAT_INVOICE">세금계산서 발행 (임대료의 10% 별도 표기)</option>
+              <option value="CASH_RECEIPT">현금영수증 발행</option>
+            </select>
+          </div>
+          {/* 계약 방식 선택 */}
           <div>
             <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>
-              계약서 양식
+              계약 방식
             </label>
 
             {/* 탭 */}
@@ -711,7 +733,7 @@ function CreateContractModal({
                   boxShadow: templateTab === 'builtin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                 }}>
                 <LayoutTemplate size={13} />
-                계약서 양식
+                계약 방식
               </button>
               <button type="button"
                 onClick={() => { setTemplateTab('upload'); setSelectedBuiltIn(null) }}
@@ -1330,9 +1352,9 @@ function CField({ label, value, onChange, type = 'text' }: {
 
 /* ─── 내 양식 관리 모달 (자동생성 3개 양식에 커스텀 파일 업로드) ─── */
 const BUILTIN_TEMPLATE_DEFS: { key: string; name: string; desc: string; color: string; uploadOnly?: boolean }[] = [
-  { key: 'basic-lease',  name: '임대차계약서 (전자계약용)', desc: '전자서명용 2페이지 계약서 — 카톡/문자로 서명 링크 발송', color: '#1d3557' },
-  { key: 'paper-lease',  name: '임대차계약서 (서면용)',     desc: '프린트 후 대면 서명용 — 서명란 포함 2페이지', color: '#4a4e69' },
-  { key: 'slot-3',       name: '계약서 양식 3',             desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
+  { key: 'basic-lease',  name: '전자계약', desc: '카톡/문자 링크로 전자서명 — 2페이지 계약서', color: '#1d3557' },
+  { key: 'paper-lease',  name: '서면계약', desc: '프린트 후 대면 서명 — 전자서명 불필요', color: '#4a4e69' },
+  { key: 'slot-3',       name: '직접 업로드 양식', desc: '파일을 업로드하여 양식을 등록하세요', color: '#888', uploadOnly: true },
 ]
 
 function BuiltinUploadManagerModal({
@@ -1635,8 +1657,9 @@ function ScanUploadModal({
     room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '',
     address: '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', monthly_rent: '', deposit: '',
     lease_start: '', lease_end: '', special_terms: '',
+    vat_type: 'NONE' as 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE',
   })
-  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>('basic-lease')
+  const [selectedBuiltIn, setSelectedBuiltIn] = useState<string | null>('paper-lease')
   const [generatingTemplate, setGeneratingTemplate] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
@@ -1662,6 +1685,7 @@ function ScanUploadModal({
       deposit:      String(r.deposit ?? ''),
       lease_start:  (r.lease_start as string) ?? '',
       lease_end:    (r.lease_end as string)   ?? '',
+      vat_type:     ((r.vat_type as 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE') ?? 'NONE'),
     }))
   }
 
@@ -1691,6 +1715,7 @@ function ScanUploadModal({
         deposit: form.deposit, lease_start: form.lease_start,
         lease_end: form.lease_end, special_terms: form.special_terms,
         room_name: selectedRoom?.name ?? '',
+        vat_type: form.vat_type,
       }
       const blob = await generateTemplateImage(selectedBuiltIn, tplData)
       const url = URL.createObjectURL(blob)
