@@ -62,9 +62,16 @@ function computeVatRow(monthlyRentStr: string, vatType?: ContractVatType): {
       totalLabel: `금 ${total.toLocaleString('ko-KR')}원 (임대료 + 부가세)`,
     }
   }
-  // 세금계산서 미발행 (현금영수증 또는 해당없음)
+  // 현금영수증 발행
+  if (vatType === 'CASH_RECEIPT') {
+    return {
+      vatLabel:   '해당 없음 (현금영수증 발행)',
+      totalLabel: null,
+    }
+  }
+  // 세금 유형 없음 (NONE) — 공란 처리
   return {
-    vatLabel:   vatType === 'CASH_RECEIPT' ? '해당 없음 (현금영수증 발행)' : '해당 없음',
+    vatLabel:   '',
     totalLabel: null,
   }
 }
