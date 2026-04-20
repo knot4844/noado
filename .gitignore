@@ -40,3 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .mcp.json
+
+# supabase CLI working files
+supabase/.temp/
+
+# local scratch files
+call-summary.pdf
+scripts/list-tenant-phones.mjs
+scripts/send-apology-via-messages.mjs
