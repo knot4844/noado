@@ -852,7 +852,7 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '입주사 (을)', d.tenant_name || '(                    )', opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', d.tenant_birth ? formatDateKR(d.tenant_birth) : '(                    )', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', d.tenant_birth ? formatDateKR(d.tenant_birth) : '', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '(                    )', opts)
   y += rowH + 16
