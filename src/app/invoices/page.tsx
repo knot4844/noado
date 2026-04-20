@@ -320,7 +320,7 @@ export default function InvoicesPage() {
           작성일자: writeDate,
           공급가액: supplyValue,
           세액: vat,
-          비고: `${i.rooms?.name ?? ''} 임대료`,
+          비고: `${i.rooms?.name ?? ''} 이용료`,
           공급받는자_상호: i.rooms?.tenant_name ?? '',
         }
       })

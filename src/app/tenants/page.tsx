@@ -171,18 +171,18 @@ export default function TenantsPage() {
     }
   }
 
-  /* ─── 필터 ─────────────────────────────────────────────── */
+  /* ─── 필터 (수납 상태는 unpaidTotal 기준 — rooms.status 아님) ─── */
   const counts = {
     all:    items.length,
-    paid:   items.filter(i => i.room.status === 'PAID').length,
-    unpaid: items.filter(i => i.room.status === 'UNPAID').length,
+    paid:   items.filter(i => (i.unpaidTotal ?? 0) === 0).length,
+    unpaid: items.filter(i => (i.unpaidTotal ?? 0) > 0).length,
   }
 
   const filtered = items.filter(item => {
     const matchFilter =
       filter === 'all'    ? true :
-      filter === 'paid'   ? item.room.status === 'PAID' :
-                            item.room.status === 'UNPAID'
+      filter === 'paid'   ? (item.unpaidTotal ?? 0) === 0 :
+                            (item.unpaidTotal ?? 0) > 0
     const q = search.toLowerCase()
     const matchSearch = !q ||
       item.tenant.name.toLowerCase().includes(q) ||
@@ -368,7 +368,7 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
   isRequesting:     boolean
 }) {
   const { lease, tenant, room, invoices, unpaidTotal, prepayBalance } = item
-  const isPaid      = room.status === 'PAID'
+  const isPaid      = (unpaidTotal ?? 0) === 0
   const statusColor = isPaid ? 'var(--color-success)' : 'var(--color-danger)'
   const statusBg    = isPaid ? 'var(--color-success-bg)' : 'var(--color-danger-bg)'
   const statusLabel = isPaid ? '완납' : '미납'
@@ -431,10 +431,10 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
           </div>
         </div>
 
-        {/* 월세 / 예치금 */}
+        {/* 월 이용료 / 예치금 */}
         <div className="flex gap-4 mb-3">
           <div>
-            <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>월세</p>
+            <p className="text-xs mb-0.5" style={{ color: 'var(--color-muted)' }}>월 이용료</p>
             <p className="text-sm font-semibold tabular" style={{ color: 'var(--color-text)' }}>
               {formatKRW(lease.monthly_rent)}
             </p>
@@ -528,17 +528,17 @@ function LeaseCard({ item, onHistory, onEdit, onRequestPayment, isRequesting }: 
         </button>
         <div className="relative flex-1 group/pay" style={{ borderRight: '1px solid var(--color-border)' }}>
           <button
-            disabled={isRequesting || room.status === 'PAID'}
-            title={room.status === 'PAID' ? '이미 완납 상태입니다' : '납부 요청 발송'}
+            disabled={isRequesting || isPaid}
+            title={isPaid ? '이미 완납 상태입니다' : '납부 요청 발송'}
             className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors disabled:opacity-40"
             style={{
-              color: room.status === 'PAID' ? 'var(--color-muted)' : 'var(--color-success)',
+              color: isPaid ? 'var(--color-muted)' : 'var(--color-success)',
             }}>
             {isRequesting
               ? <><Loader2 size={12} className="animate-spin" /> 발송 중...</>
               : <><Send size={12} /> 납부 요청</>}
           </button>
-          {!isRequesting && room.status !== 'PAID' && (
+          {!isRequesting && !isPaid && (
             <div className="absolute left-1/2 -translate-x-1/2 bottom-full w-28 pb-1 hidden group-hover/pay:block z-50">
               <div className="rounded-lg shadow-lg border" style={{ background: '#ffffff', borderColor: 'var(--color-border)' }}>
                 <button
@@ -888,7 +888,7 @@ function AddLeaseModal({
     if (!form.name.trim())    return onError('입주사 이름을 입력해주세요.')
     if (!form.room_id)        return onError('호실을 선택해주세요.')
     if (!form.lease_start)    return onError('계약 시작일을 입력해주세요.')
-    if (!form.monthly_rent)   return onError('월세를 입력해주세요.')
+    if (!form.monthly_rent)   return onError('월 이용료를 입력해주세요.')
 
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -946,8 +946,8 @@ function AddLeaseModal({
     })
     if (leaseErr) { setSaving(false); return onError(leaseErr.message) }
 
-    // 3. 호실 상태 UNPAID
-    await supabase.from('rooms').update({ status: 'UNPAID' }).eq('id', form.room_id)
+    // 3. 호실 상태 입주중
+    await supabase.from('rooms').update({ status: 'OCCUPIED' }).eq('id', form.room_id)
 
     setSaving(false)
     onSaved()
@@ -992,7 +992,7 @@ function AddLeaseModal({
           </div>
           <Field label="이메일" value={form.email} onChange={setField('email')} placeholder="email@example.com" type="email" />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="월세 (원) *"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
+            <Field label="월 이용료 (원) *"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
             <Field label="예치금 (원)"  value={form.pledge_amount} onChange={setField('pledge_amount')} type="number" placeholder="1000000" />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1125,7 +1125,7 @@ function EditLeaseModal({
       lease_end: today,
     }).eq('id', lease.id)
     if (leaseErr) { setEvicting(false); return onError(leaseErr.message) }
-    await supabase.from('rooms').update({ status: 'VACANT' }).eq('id', room.id)
+    await supabase.from('rooms').update({ status: 'VACATED' }).eq('id', room.id)
     setEvicting(false)
     onEvicted()
   }
@@ -1142,8 +1142,8 @@ function EditLeaseModal({
     }).eq('id', lease.id)
     if (termErr) { setTransferring(false); return onError(termErr.message) }
 
-    // 2. 기존 호실 공실 처리
-    await supabase.from('rooms').update({ status: 'VACANT' }).eq('id', room.id)
+    // 2. 기존 호실 퇴실 처리
+    await supabase.from('rooms').update({ status: 'VACATED' }).eq('id', room.id)
 
     // 3. 새 lease 생성 (같은 tenant, 새 room)
     const { error: insErr } = await supabase.from('leases').insert({
@@ -1163,8 +1163,8 @@ function EditLeaseModal({
     })
     if (insErr) { setTransferring(false); return onError(insErr.message) }
 
-    // 4. 새 호실 상태 UNPAID로 전환
-    await supabase.from('rooms').update({ status: 'UNPAID' }).eq('id', transferRoomId)
+    // 4. 새 호실 상태 입주중으로 전환
+    await supabase.from('rooms').update({ status: 'OCCUPIED' }).eq('id', transferRoomId)
 
     setTransferring(false)
     onTransferred()
@@ -1242,7 +1242,7 @@ function EditLeaseModal({
             <Field label="이메일" value={form.tenant_email} onChange={setField('tenant_email')} type="email" placeholder="email@example.com" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="월세 (원)"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
+            <Field label="월 이용료 (원)"  value={form.monthly_rent}  onChange={setField('monthly_rent')}  type="number" placeholder="330000" />
             <Field label="예치금 (원)" value={form.pledge_amount} onChange={setField('pledge_amount')} type="number" placeholder="1000000" />
           </div>
           <div className="grid grid-cols-2 gap-3">

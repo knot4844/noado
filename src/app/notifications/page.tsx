@@ -18,14 +18,14 @@ const TEMPLATES = {
     label:   '미납 독촉',
     desc:    '납부 기한 초과 알림',
     preview: (tenantName: string, roomName: string, amount: string) =>
-      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월세 ${amount}원이 아직 납부되지 않았습니다.\n빠른 납부 부탁드립니다.\n\n문의: noado 관리자`,
+      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월 이용료 ${amount}원이 아직 납부되지 않았습니다.\n빠른 납부 부탁드립니다.\n\n문의: noado 관리자`,
   },
   PAYMENT_DONE: {
     key:     'PAYMENT_DONE',
     label:   '수납 완료',
     desc:    '입금 확인 완료 알림',
     preview: (tenantName: string, roomName: string, amount: string) =>
-      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월세 ${amount}원 수납이 확인되었습니다.\n감사합니다.`,
+      `[noado] 안녕하세요, ${tenantName}님.\n${roomName} 이번 달 월 이용료 ${amount}원 수납이 확인되었습니다.\n감사합니다.`,
   },
   DAILY_BRIEFING: {
     key:     'DAILY_BRIEFING',

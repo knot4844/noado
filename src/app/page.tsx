@@ -702,7 +702,7 @@ const FEATURES = [
   { icon: '💬', color: '#ffd18c', title: '카카오 알림톡 자동발송',
     desc: '청구서 생성 시 결제 링크 자동 발송, 납부기한 D-3 사전 안내, 미납 시 독촉, 완납 확인까지 전부 자동.' },
   { icon: '🏢', color: '#7eb8f7', title: '호실·입주사 통합 관리',
-    desc: '공실·입주·완납·미납 상태를 한눈에. 입주사별 계약기간, 월 임대료, 납부이력을 연도별로 조회 가능.' },
+    desc: '공실·입주·완납·미납 상태를 한눈에. 입주사별 계약기간, 월 이용료, 납부이력을 연도별로 조회 가능.' },
   { icon: '💳', color: '#86efac', title: '가상계좌 온라인 수납',
     desc: '입주사에게 전용 결제 링크를 보내면 본인 명의 가상계좌로 입금 가능. 입금 즉시 수납 완료 처리.' },
   { icon: '📊', color: '#f9a8d4', title: '수납 보고서 & 세무자료',
@@ -760,10 +760,10 @@ const TOUR_SLIDES = [
       matched: '5,092,000원',
       rate: '94%',
       items: [
-        { note: '강육희 3월임대료', room: '238호', amount: '280,000', status: 'AI 매칭' },
+        { note: '강육희 3월이용료', room: '238호', amount: '280,000', status: 'AI 매칭' },
         { note: '주식회사더부띠끄 3월', room: '237호', amount: '605,000', status: 'AI 매칭' },
         { note: '주식회사미래씨앤에스', room: '236호', amount: '330,000', status: 'AI 매칭' },
-        { note: '박상민-임대료03', room: '235호', amount: '275,000', status: 'AI 매칭' },
+        { note: '박상민-이용료03', room: '235호', amount: '275,000', status: 'AI 매칭' },
       ],
     },
   },
@@ -771,7 +771,7 @@ const TOUR_SLIDES = [
     id: 'tenants', label: '입주사 관리', icon: '👥',
     color: '#ffd18c',
     title: '12개월 납부 이력 한눈에',
-    desc: '16개 입주사의 계약 현황, 월세, 납부 도트를 실시간 조회합니다.',
+    desc: '16개 입주사의 계약 현황, 월 이용료, 납부 도트를 실시간 조회합니다.',
     mockup: {
       type: 'tenants' as const,
       count: 16,
@@ -1196,7 +1196,7 @@ function TourScreen({ slide }: { slide: any }) {
                 }}>완납</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#888' }}>월세 {t.rent}</span>
+                <span style={{ fontSize: '11px', color: '#888' }}>월 이용료 {t.rent}</span>
                 <div style={{ display: 'flex', gap: '3px' }}>
                   {Array.from({ length: Math.min(t.dots, 12) }).map((_, di) => (
                     <div key={di} style={{
@@ -1295,7 +1295,7 @@ function TourScreen({ slide }: { slide: any }) {
 
 const STEPS = [
   { step: '01', title: '호실 & 입주사 등록 (5분)',
-    desc: '건물명·호실번호·입주사명·월 임대료를 입력합니다. 기존 엑셀이 있으면 한 번에 가져올 수 있습니다.' },
+    desc: '건물명·호실번호·입주사명·월 이용료를 입력합니다. 기존 엑셀이 있으면 한 번에 가져올 수 있습니다.' },
   { step: '02', title: '은행 입금내역 업로드 (1분)',
     desc: '매월 은행 앱·인터넷뱅킹에서 내려받은 거래내역 엑셀 파일을 업로드합니다. 입주사명으로 자동 매칭 제안이 뜹니다.' },
   { step: '03', title: '검토 후 수납 확정 (1분)',

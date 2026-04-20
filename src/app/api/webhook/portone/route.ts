@@ -140,10 +140,7 @@ export async function POST(req: NextRequest) {
       paid_at:     now,
     }).eq('id', invoice.id)
 
-    /* ─── room 상태 업데이트 ─── */
-    if (paidAmount >= invoice.amount) {
-      await supabase.from('rooms').update({ status: 'PAID' }).eq('id', invoice.room_id)
-    }
+    /* rooms.status 는 수납 상태를 저장하지 않음 (invoices 가 진실원본) */
 
     console.log(`[Webhook] 수납완료: invoice=${invoice.id} amount=${paidAmount}`)
 

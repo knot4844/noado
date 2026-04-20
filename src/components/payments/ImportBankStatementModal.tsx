@@ -119,9 +119,9 @@ function parseBankExcel(rows: Record<string, string | number>[]): BankRow[] {
     return result;
 }
 
-// 임차인 이름 / 금액으로 호실 자동 매칭
+// 입주사 이름 / 금액으로 호실 자동 매칭
 function autoMatch(row: BankRow, rooms: Room[]): Room | null {
-    // 1. 임차인 이름 포함 여부
+    // 1. 입주사 이름 포함 여부
     for (const room of rooms) {
         const name = room.tenant?.name || '';
         const company = room.tenant?.companyName || '';

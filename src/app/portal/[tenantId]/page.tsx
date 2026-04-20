@@ -105,7 +105,7 @@ export default function TenantPortalPage() {
 
             const tenant = Array.isArray(leaseRow?.tenant) ? leaseRow?.tenant[0] : leaseRow?.tenant;
 
-            // 관리자(owner) 또는 본인 임차인이면 허용
+            // 관리자(owner) 또는 본인 입주사이면 허용
             const isOwner  = row.owner_id === sessionUser.id;
             const isTenant = tenant?.auth_id === sessionUser.id;
             if (!isOwner && !isTenant) { setAuthState("denied"); return; }

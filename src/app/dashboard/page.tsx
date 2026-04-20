@@ -87,11 +87,11 @@ function KpiCard({ icon, label, value, sub, trend, accent, onClick, progress }: 
 // ── 호실 상태 행 (leases 기반) ────────────────────────────
 function RoomRow({ room, lease }: { room: RoomBasic; lease?: LeaseBasic }) {
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
-    PAID:   { label: '납부완료', color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
-    UNPAID: { label: '미납',    color: 'var(--color-danger)',  bg: 'var(--color-danger-bg)'  },
-    VACANT: { label: '공실',    color: 'var(--color-muted)',   bg: 'var(--color-muted-bg)'   },
+    OCCUPIED: { label: '입주중', color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
+    VACATED:  { label: '퇴실',   color: 'var(--color-danger)',  bg: 'var(--color-danger-bg)'  },
+    VACANT:   { label: '공실',   color: 'var(--color-muted)',   bg: 'var(--color-muted-bg)'   },
   }
-  const displayStatus = lease ? room.status : 'VACANT'
+  const displayStatus = lease ? 'OCCUPIED' : (room.status ?? 'VACANT')
   const s = statusMap[displayStatus] ?? statusMap['VACANT']
 
   return (
@@ -107,9 +107,9 @@ function RoomRow({ room, lease }: { room: RoomBasic; lease?: LeaseBasic }) {
       <td className="py-2.5 px-3">
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
               style={{ background: s.bg, color: s.color }}>
-          {displayStatus === 'PAID'   && <CheckCircle2 size={10} />}
-          {displayStatus === 'UNPAID' && <AlertCircle  size={10} />}
-          {displayStatus === 'VACANT' && <Home         size={10} />}
+          {displayStatus === 'OCCUPIED' && <CheckCircle2 size={10} />}
+          {displayStatus === 'VACATED'  && <AlertCircle  size={10} />}
+          {displayStatus === 'VACANT'   && <Home         size={10} />}
           {s.label}
         </span>
       </td>
@@ -174,6 +174,9 @@ export default function DashboardPage() {
   const [briefing,       setBriefing]       = useState<string | null>(null)
   const [chartData,      setChartData]      = useState<{ month: string; expected: number; paid: number }[]>([])
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
+  // 이번 달 수납 상태별 room_id (invoices 기반)
+  const [paidRoomIds,   setPaidRoomIds]   = useState<Set<string>>(new Set())
+  const [unpaidRoomIds, setUnpaidRoomIds] = useState<Set<string>>(new Set())
 
   const today     = useMemo(() => new Date(), [])
   const thisYear  = today.getFullYear()
@@ -197,6 +200,21 @@ export default function DashboardPage() {
       .select('id, room_id, monthly_rent, lease_end, status, tenants(name)')
       .eq('owner_id', user.id)
       .eq('status', 'ACTIVE')
+
+    // 이번 달 청구서 기준 수납 상태 분류 (rooms.status 에서 읽지 않음)
+    const { data: thisMonthInvs } = await supabase
+      .from('invoices').select('room_id, status')
+      .eq('owner_id', user.id)
+      .eq('year', thisYear)
+      .eq('month', thisMonth)
+    const paidSet   = new Set<string>()
+    const unpaidSet = new Set<string>()
+    for (const inv of (thisMonthInvs ?? [])) {
+      if (inv.status === 'paid') paidSet.add(inv.room_id)
+      else unpaidSet.add(inv.room_id)
+    }
+    setPaidRoomIds(paidSet)
+    setUnpaidRoomIds(unpaidSet)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setLeases((leaseList ?? []) as any as LeaseBasic[])
 
@@ -252,7 +270,7 @@ export default function DashboardPage() {
       setRecentPayments((pmts as any[]).map((p) => {
         const inv  = Array.isArray(p.invoices) ? p.invoices[0] : p.invoices
         const room = Array.isArray(inv?.rooms)  ? inv.rooms[0]  : inv?.rooms
-        // note 형식: "입주사명 YYYY년 M월 월세"
+        // note 형식: "입주사명 YYYY년 M월 월 이용료"
         const tenantName = (p.note as string | null)?.split(' ')[0] ?? undefined
         return {
           id:          p.id      as string,
@@ -277,16 +295,17 @@ export default function DashboardPage() {
 
   useEffect(() => { setTimeout(() => fetchData(), 0) }, [fetchData])
 
-  // ── KPI 계산 (leases 기준) ──
-  // leases에 연결된 room_id Set
+  // ── KPI 계산 (leases + invoices 기준) ──
+  // leases 에 연결된 room_id Set = 입주중
   const occupiedRoomIds = new Set(leases.map(l => l.room_id))
 
-  const paidRooms   = rooms.filter(r => occupiedRoomIds.has(r.id) && r.status === 'PAID')
-  const unpaidRooms = rooms.filter(r => occupiedRoomIds.has(r.id) && r.status === 'UNPAID')
+  // 수납 상태는 invoices (이번 달) 기준 — rooms.status 사용 안 함
+  const paidRooms   = rooms.filter(r => occupiedRoomIds.has(r.id) && paidRoomIds.has(r.id))
+  const unpaidRooms = rooms.filter(r => occupiedRoomIds.has(r.id) && unpaidRoomIds.has(r.id))
   const vacantRooms = rooms.filter(r => !occupiedRoomIds.has(r.id))
   const occupiedRooms = rooms.filter(r => occupiedRoomIds.has(r.id))
 
-  // 월세 합계는 leases.monthly_rent 기준
+  // 월 이용료 합계는 leases.monthly_rent 기준
   const totalBilled    = leases.reduce((s, l) => s + (l.monthly_rent ?? 0), 0)
   const totalCollected = leases
     .filter(l => paidRooms.some(r => r.id === l.room_id))
@@ -516,7 +535,7 @@ export default function DashboardPage() {
                   {[
                     { label: '호실',  cls: '' },
                     { label: '입주사', cls: '' },
-                    { label: '월세',  cls: 'hidden sm:table-cell' },
+                    { label: '월 이용료',  cls: 'hidden sm:table-cell' },
                     { label: '상태',  cls: '' },
                     { label: '',      cls: 'hidden sm:table-cell' },
                   ].map(h => (

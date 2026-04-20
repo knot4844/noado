@@ -58,7 +58,7 @@ export default function TenantLoginPage() {
                     <div className="h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 -rotate-6">
                         <span className="text-white font-black text-xl">N</span>
                     </div>
-                    <h1 className="text-2xl font-extrabold text-neutral-900">임차인 로그인</h1>
+                    <h1 className="text-2xl font-extrabold text-neutral-900">입주사 로그인</h1>
                     <p className="text-neutral-500 mt-1 text-sm">계약서 및 납부 내역을 확인하세요.</p>
                 </div>
 

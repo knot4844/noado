@@ -1,6 +1,6 @@
 /**
  * GET /api/admin/users
- * 마스터 어드민: 전체 임대인 목록 조회
+ * 마스터 어드민: 전체 운영사 목록 조회
  * - auth.users + businesses + 호실/청구서 집계
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -40,13 +40,13 @@ export async function GET(req: NextRequest) {
 
   /* 조합 */
   const bizMap = new Map((businesses ?? []).map(b => [b.owner_id, b]))
-  const roomMap = new Map<string, { total: number; vacant: number; unpaid: number }>()
+  // rooms.status 는 이제 입주/퇴실/공실만 의미. 미납 수는 invoices 에서 집계
+  const roomMap = new Map<string, { total: number; vacant: number }>()
   ;(rooms ?? []).forEach(r => {
-    if (!roomMap.has(r.owner_id)) roomMap.set(r.owner_id, { total: 0, vacant: 0, unpaid: 0 })
+    if (!roomMap.has(r.owner_id)) roomMap.set(r.owner_id, { total: 0, vacant: 0 })
     const m = roomMap.get(r.owner_id)!
     m.total++
     if (r.status === 'VACANT')  m.vacant++
-    if (r.status === 'UNPAID')  m.unpaid++
   })
 
   const invoiceMap = new Map<string, { total: number; unpaid: number }>()
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 
   const result = landlords.map(u => {
     const biz       = bizMap.get(u.id)
-    const rm        = roomMap.get(u.id)   ?? { total: 0, vacant: 0, unpaid: 0 }
+    const rm        = roomMap.get(u.id)   ?? { total: 0, vacant: 0 }
     const inv       = invoiceMap.get(u.id) ?? { total: 0, unpaid: 0 }
     const bannedUntil = (u as unknown as { banned_until?: string }).banned_until
     const isBanned  = !!bannedUntil && new Date(bannedUntil) > new Date()

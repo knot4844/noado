@@ -1,6 +1,6 @@
 /**
  * POST /api/admin/users/[userId]/manage
- * 마스터 어드민: 임대인 계정 관리
+ * 마스터 어드민: 운영사 계정 관리
  * body: { action: 'suspend' | 'activate' | 'delete' }
  */
 import { NextRequest, NextResponse } from 'next/server'

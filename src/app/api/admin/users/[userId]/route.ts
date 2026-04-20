@@ -1,6 +1,6 @@
 /**
  * GET /api/admin/users/[userId]
- * 마스터 어드민: 특정 임대인의 전체 데이터 조회
+ * 마스터 어드민: 특정 운영사의 전체 데이터 조회
  * - 호실, 청구서, 결제로그, 계약, 알림톡 로그
  */
 import { NextRequest, NextResponse } from 'next/server'

@@ -808,32 +808,12 @@ export default function PaymentsPage() {
   }
 
   /* ══════════════════════════════════
-     호실 현황 동기화 (invoices → rooms)
+     호실 현황 동기화 — 더 이상 수납 상태를 rooms 에 반영하지 않음.
+     rooms.status 는 입주/퇴실/공실(OCCUPIED/VACATED/VACANT) 만 표현하고,
+     수납 상태는 invoices 에서 직접 집계한다.
   ══════════════════════════════════ */
-  const syncRoomsInternal = async (userId: string) => {
-    const [year, month] = yearMonth.split('-').map(Number)
-
-    const { data: paidInvs } = await supabase
-      .from('invoices').select('room_id')
-      .eq('owner_id', userId).eq('status', 'paid')
-      .eq('year', year).eq('month', month)
-
-    const paidRoomIds = [...new Set((paidInvs || []).map((i: { room_id: string }) => i.room_id))]
-
-    const { data: unpaidInvs } = await supabase
-      .from('invoices').select('room_id')
-      .eq('owner_id', userId).in('status', ['ready', 'overdue'])
-      .eq('year', year).eq('month', month)
-
-    const unpaidRoomIds = [...new Set((unpaidInvs || []).map((i: { room_id: string }) => i.room_id))]
-      .filter(id => !paidRoomIds.includes(id))
-
-    if (paidRoomIds.length > 0) {
-      await supabase.from('rooms').update({ status: 'PAID' }).in('id', paidRoomIds).eq('owner_id', userId)
-    }
-    if (unpaidRoomIds.length > 0) {
-      await supabase.from('rooms').update({ status: 'OCCUPIED' }).in('id', unpaidRoomIds).eq('owner_id', userId)
-    }
+  const syncRoomsInternal = async (_userId: string) => {
+    // no-op (수납 상태는 invoices 가 진실원본)
   }
 
   const syncRooms = async () => {
@@ -919,12 +899,12 @@ export default function PaymentsPage() {
       paid_at:     new Date().toISOString(),
     }).eq('id', inv.id)
     if (error) return showToast('error', error.message)
-    await supabase.from('rooms').update({ status: 'PAID' }).eq('id', inv.room_id)
+    // rooms.status 는 더 이상 수납 상태를 반영하지 않음 (invoices 가 진실원본)
     showToast('success', '수납 처리되었습니다.')
     load()
   }
 
-  /* ─── 임차인 전화번호 조회 헬퍼 ─── */
+  /* ─── 입주사 전화번호 조회 헬퍼 ─── */
   const getTenantPhone = async (roomId: string): Promise<string | null> => {
     const lease = allLeases.find(l => l.room_id === roomId)
     if (!lease?.tenant?.id) return null
@@ -1018,7 +998,7 @@ export default function PaymentsPage() {
       showToast('error', '이미 모든 청구서가 생성되어 있습니다.'); setImporting(false); return
     }
 
-    // 해당 월 기준 계약 중인 leases 조회 (임대료·연락처·tenant_id)
+    // 해당 월 기준 계약 중인 leases 조회 (이용료·연락처·tenant_id)
     const billingDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
     const { data: leasesForBilling } = await supabase
       .from('leases')

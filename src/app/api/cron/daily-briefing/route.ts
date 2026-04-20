@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const year  = now.getFullYear()
   const month = now.getMonth() + 1
 
-  /* ─── 모든 임대인의 이달 현황 집계 ─── */
+  /* ─── 모든 운영사의 이달 현황 집계 ─── */
   const { data: owners } = await supabase
     .from('rooms')
     .select('owner_id')
@@ -30,24 +30,28 @@ export async function GET(req: NextRequest) {
   for (const ownerId of ownerIds) {
     const [{ data: rooms }, { data: invoices }] = await Promise.all([
       supabase.from('rooms').select('id, status').eq('owner_id', ownerId),
-      supabase.from('invoices').select('status, amount, paid_amount')
+      supabase.from('invoices').select('room_id, status, amount, paid_amount')
         .eq('owner_id', ownerId).eq('year', year).eq('month', month),
     ])
 
-    const totalRooms  = (rooms || []).length
-    const paidRooms   = (rooms || []).filter(r => r.status === 'PAID').length
-    const unpaidRooms = (rooms || []).filter(r => r.status === 'UNPAID').length
-    const vacantRooms = (rooms || []).filter(r => r.status === 'VACANT').length
+    const totalRooms    = (rooms || []).length
+    const vacantRooms   = (rooms || []).filter(r => r.status === 'VACANT').length
+    const occupiedCount = (rooms || []).filter(r => r.status === 'OCCUPIED').length
+    // 수납 상태는 invoices 기준
+    const paidRoomIds   = new Set((invoices || []).filter(i => i.status === 'paid').map(i => i.room_id))
+    const unpaidRoomIds = new Set((invoices || []).filter(i => i.status !== 'paid').map(i => i.room_id))
+    const paidRooms   = paidRoomIds.size
+    const unpaidRooms = unpaidRoomIds.size
 
     const totalAmount = (invoices || []).reduce((s, i) => s + (i.amount || 0), 0)
     const paidAmount  = (invoices || []).reduce((s, i) => s + (i.paid_amount || 0), 0)
     const unpaidAmount= totalAmount - paidAmount
 
-    const occupancyRate = totalRooms > 0 ? Math.round((paidRooms + unpaidRooms) / totalRooms * 100) : 0
+    const occupancyRate = totalRooms > 0 ? Math.round(occupiedCount / totalRooms * 100) : 0
 
     /* ─── AI 브리핑 생성 ─── */
     let briefing = `📊 오늘의 수납 현황 요약\n\n`
-    briefing += `• 입주율: ${occupancyRate}% (${paidRooms + unpaidRooms}/${totalRooms}세대)\n`
+    briefing += `• 입주율: ${occupancyRate}% (${occupiedCount}/${totalRooms}세대)\n`
     briefing += `• 이번달 수납액: ${paidAmount.toLocaleString()}원 / ${totalAmount.toLocaleString()}원\n`
     briefing += `• 미납: ${unpaidRooms}세대 (${unpaidAmount.toLocaleString()}원)\n`
 

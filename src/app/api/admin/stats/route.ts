@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const { admin } = ctx
 
   try {
-    /* ── 1. 임대인 수 (TENANT 역할 제외) ── */
+    /* ── 1. 운영사 수 (TENANT 역할 제외) ── */
     const { data: authData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
     const landlords = (authData?.users ?? []).filter(u => {
       const role = u.user_metadata?.role ?? 'LANDLORD'
@@ -29,18 +29,23 @@ export async function GET(req: NextRequest) {
     /* ── 3. 호실 현황 ── */
     const { data: rooms } = await admin
       .from('rooms')
-      .select('status, monthly_rent')
+      .select('status')
 
     const roomList      = rooms ?? []
     const totalRooms    = roomList.length
-    const occupiedRooms = roomList.filter(r => r.status !== 'VACANT').length
-    const unpaidRooms   = roomList.filter(r => r.status === 'UNPAID').length
+    const occupiedRooms = roomList.filter(r => r.status === 'OCCUPIED').length
     const vacantRooms   = roomList.filter(r => r.status === 'VACANT').length
+    // 미납은 invoices 기준으로 집계
+    const { count: unpaidRooms } = await admin
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['ready', 'overdue'])
 
-    /* ── 4. 실제 MRR (입주 호실의 월세 합산) ── */
-    const monthlyRecurringRevenue = roomList
-      .filter(r => r.status !== 'VACANT')
-      .reduce((sum, r) => sum + (r.monthly_rent ?? 0), 0)
+    /* ── 4. 실제 MRR (ACTIVE leases.monthly_rent 합산) ── */
+    const { data: activeLeases } = await admin
+      .from('leases').select('monthly_rent').eq('status', 'ACTIVE')
+    const monthlyRecurringRevenue = (activeLeases ?? [])
+      .reduce((sum, l) => sum + (l.monthly_rent ?? 0), 0)
 
     /* ── 5. 이번달 수납 현황 ── */
     const now       = new Date()
@@ -73,7 +78,7 @@ export async function GET(req: NextRequest) {
         occupiedRooms,
         vacantRooms,
         unpaidRooms,
-        totalTenants:            occupiedRooms,    // 입주 호실 = 임차인 수
+        totalTenants:            occupiedRooms,    // 입주 호실 = 입주사 수
         monthlyRecurringRevenue,
         thisMonthTotal,
         thisMonthPaid,

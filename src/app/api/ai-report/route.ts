@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
         const prompt = `
             당신은 부동산 임대업 SaaS 'noado'의 AI 비서입니다.
-            최고경영자(건물주/임대인)에게 전달할 오늘의 '일일 브리핑(Daily Briefing)'을 작성해주세요.
+            최고경영자(건물주/운영사)에게 전달할 오늘의 '일일 브리핑(Daily Briefing)'을 작성해주세요.
 
             다음과 같은 건물 현황 통계가 주어집니다:
             ${JSON.stringify(stats, null, 2)}

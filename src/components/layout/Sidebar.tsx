@@ -9,18 +9,34 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-const NAV_ITEMS = [
-  { href: '/dashboard',      label: '대시보드',    icon: LayoutDashboard },
-  { href: '/units',          label: '호실 현황',   icon: Building2 },
-  { href: '/tenants',        label: '입주사 관리', icon: Users },
-  { href: '/payments',       label: '수납 매칭',   icon: CreditCard },
-  { href: '/pricing',       label: '이용료 결제', icon: Wallet },
-  { href: '/billing',        label: '정기 청구',     icon: CalendarClock },
-  { href: '/invoices',       label: '세금계산서',  icon: ScrollText },
-  { href: '/contracts',      label: '전자계약',    icon: FileText },
-  { href: '/notifications',  label: '알림톡',      icon: Bell },
-  { href: '/reports',        label: '보고서',      icon: BarChart3 },
-  { href: '/export',         label: '세무 내보내기', icon: Receipt },
+// ─────────────────────────────────────────────────────────────
+// 섹션별 네비게이션 — KG이니시스 요구: 공유오피스 운영 ↔ 노아도 서비스 구독 분리
+// ─────────────────────────────────────────────────────────────
+const NAV_SECTIONS: Array<{
+  title: string
+  items: { href: string; label: string; icon: typeof LayoutDashboard }[]
+}> = [
+  {
+    title: '공유오피스 운영',
+    items: [
+      { href: '/dashboard',      label: '대시보드',       icon: LayoutDashboard },
+      { href: '/units',          label: '공간 현황',       icon: Building2 },
+      { href: '/tenants',        label: '입주사 관리',     icon: Users },
+      { href: '/payments',       label: '수납 매칭',       icon: CreditCard },
+      { href: '/billing',        label: '정기 청구',       icon: CalendarClock },
+      { href: '/invoices',       label: '세금계산서',      icon: ScrollText },
+      { href: '/contracts',      label: '공간 이용 계약',   icon: FileText },
+      { href: '/notifications',  label: '알림톡',          icon: Bell },
+      { href: '/reports',        label: '보고서',          icon: BarChart3 },
+      { href: '/export',         label: '세무 내보내기',   icon: Receipt },
+    ],
+  },
+  {
+    title: '노아도 서비스',
+    items: [
+      { href: '/pricing',        label: '이용권 구독',     icon: Wallet },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -70,36 +86,47 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         )}
       </div>
 
-      {/* 네비게이션 */}
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
-              style={{
-                color:      active ? 'var(--color-sidebar-active)' : 'var(--color-sidebar-text)',
-                background: active ? 'rgba(168,218,220,0.2)'       : 'transparent',
-                fontWeight: active ? '600' : '400',
-              }}
-              onMouseEnter={e => {
-                if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--color-sidebar-hover)'
-              }}
-              onMouseLeave={e => {
-                if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'
-              }}
-            >
-              <item.icon
-                size={18}
-                style={{ color: active ? 'var(--color-accent)' : 'var(--color-sidebar-text)' }}
-              />
-              {item.label}
-            </Link>
-          )
-        })}
+      {/* 네비게이션 (섹션 분리) */}
+      <nav className="flex-1 px-3 py-4 flex flex-col gap-4 overflow-y-auto">
+        {NAV_SECTIONS.map((section, idx) => (
+          <div key={section.title} className="flex flex-col gap-0.5">
+            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider"
+               style={{ color: 'var(--color-sidebar-text)', opacity: 0.55 }}>
+              {section.title}
+            </p>
+            {section.items.map(item => {
+              const active = isActive(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onClose}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
+                  style={{
+                    color:      active ? 'var(--color-sidebar-active)' : 'var(--color-sidebar-text)',
+                    background: active ? 'rgba(168,218,220,0.2)'       : 'transparent',
+                    fontWeight: active ? '600' : '400',
+                  }}
+                  onMouseEnter={e => {
+                    if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--color-sidebar-hover)'
+                  }}
+                  onMouseLeave={e => {
+                    if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'
+                  }}
+                >
+                  <item.icon
+                    size={18}
+                    style={{ color: active ? 'var(--color-accent)' : 'var(--color-sidebar-text)' }}
+                  />
+                  {item.label}
+                </Link>
+              )
+            })}
+            {idx < NAV_SECTIONS.length - 1 && (
+              <div className="h-px mt-3 mx-3" style={{ background: 'var(--color-sidebar-border)' }} />
+            )}
+          </div>
+        ))}
       </nav>
 
       {/* 하단 */}

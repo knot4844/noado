@@ -131,7 +131,7 @@ export default function ExportPage() {
               부가세 신고용 엑셀
             </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
-              호실 · 임차인명 · 청구월 · 청구금액 · 입금액 · 입금일 · 가상계좌번호
+              호실 · 입주사명 · 청구월 · 청구금액 · 입금액 · 입금일 · 가상계좌번호
             </p>
           </div>
         </div>

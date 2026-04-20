@@ -4,7 +4,7 @@ import { sendKakaoAlimtalk } from '@/lib/alimtalk'
 
 /**
  * POST /api/admin/users/[userId]/send-alimtalk
- * 마스터 어드민이 특정 임대인의 호실에 알림톡 발송
+ * 마스터 어드민이 특정 운영사의 호실에 알림톡 발송
  * body: { roomIds: string[], type: 'UNPAID_REMINDER' | 'PAYMENT_CONFIRM' }
  */
 export async function POST(
@@ -27,7 +27,7 @@ export async function POST(
 
     const admin = makeAdminClient()
 
-    // 해당 임대인(userId) 소유 호실만 대상으로 조회 (보안)
+    // 해당 운영사(userId) 소유 호실만 대상으로 조회 (보안)
     const { data: rooms, error: roomError } = await admin
       .from('rooms')
       .select('id, name, tenant_name, tenant_contact, unpaid_amount, unpaid_months, status')
@@ -51,14 +51,14 @@ export async function POST(
       if (type === 'UNPAID_REMINDER') {
         templateCode = 'KA01TP260302200441583wMOcyLIy71M'
         variables = {
-          '#{세입자}': room.tenant_name || '임차인',
+          '#{세입자}': room.tenant_name || '입주사',
           '#{호실}':   room.name,
           '#{금액}':   (room.unpaid_amount || 0).toLocaleString(),
         }
       } else {
         templateCode = 'KA01TP2603022005171505KORmx0Qpva'
         variables = {
-          '#{세입자}': room.tenant_name || '임차인',
+          '#{세입자}': room.tenant_name || '입주사',
           '#{호실}':   room.name,
         }
       }

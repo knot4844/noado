@@ -1,5 +1,9 @@
 // ── 호실 ──────────────────────────────────────────────
-export type RoomStatus = 'PAID' | 'UNPAID' | 'VACANT'
+// OCCUPIED = 입주 중 (ACTIVE 계약 있음)
+// VACATED  = 퇴실 (과거 계약만 있음)
+// VACANT   = 공실 (계약 이력 없음)
+// 납부 상태는 invoices/payments 에서 집계해야 함 (여기 저장 안 함).
+export type RoomStatus = 'OCCUPIED' | 'VACATED' | 'VACANT'
 
 export interface Room {
   id:         string
@@ -116,7 +120,7 @@ export interface BillingItem {
 // ── 예치금·선납·예약금 ─────────────────────────────────────
 export type DepositType = 'PLEDGE' | 'PREPAY' | 'RESERVE'
 // PLEDGE  = 예치금 (입주 시)
-// PREPAY  = 선납 (월세 선불)
+// PREPAY  = 선납 (월 이용료 선불)
 // RESERVE = 예약금 (계약 전)
 
 export interface Deposit {
@@ -160,7 +164,7 @@ export interface Invoice {
   tenant_id:    string | null   // 청구 시점 입주사
   year:         number
   month:        number
-  base_amount:  number          // 기본 임대료 (lease.monthly_rent)
+  base_amount:  number          // 기본 이용료 (lease.monthly_rent)
   extra_amount: number          // 추가 실비 합계
   amount:       number          // 총 청구액 (base + extra)
   paid_amount:  number
@@ -214,7 +218,7 @@ export interface Contract {
   signer_ip:             string | null
   signed_at:             string | null
   signature_data_url:    string | null
-  // 임대인 서명
+  // 운영사 서명
   owner_signed_at:       string | null
   owner_signature_url:   string | null
   owner_signer_ip:       string | null

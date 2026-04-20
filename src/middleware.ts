@@ -62,11 +62,11 @@ export async function middleware(request: NextRequest) {
     pathname === '/master-admin/login' || // 마스터 어드민 로그인 페이지
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/') ||
-    pathname.startsWith('/portal/') ||   // 임차인 포털 (토큰 기반 접근)
+    pathname.startsWith('/portal/') ||   // 입주사 포털 (토큰 기반 접근)
     pathname.startsWith('/invite/') ||   // 초대 링크
     pathname.startsWith('/pay/')         // 세입자 결제 페이지
 
-  // 임대인 전용 경로 (임차인 role 접근 차단)
+  // 운영사 전용 경로 (입주사 role 접근 차단)
   const isLandlordPath =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/units') ||
@@ -77,7 +77,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/notifications') ||
     pathname.startsWith('/reports') ||
     pathname.startsWith('/settings') ||
-    pathname.startsWith('/seed-demo') ||
     pathname.startsWith('/master-admin')
 
   // 비로그인 → 보호된 경로 접근 시 로그인으로
@@ -102,7 +101,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 임차인이 임대인 경로 접근 시 포털로
+  // 입주사이 운영사 경로 접근 시 포털로
   if (user && isLandlordPath) {
     const role = user.user_metadata?.role || 'LANDLORD'
     if (role === 'TENANT') {

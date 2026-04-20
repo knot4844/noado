@@ -139,7 +139,7 @@ export function AddPaymentModal({ onClose }: AddPaymentModalProps) {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                        {/* 임차인명 */}
+                        {/* 입주사명 */}
                         <div>
                             <label className="block text-xs font-semibold text-neutral-600 mb-1.5">입주사명 *</label>
                             <input

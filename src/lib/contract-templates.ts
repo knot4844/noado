@@ -2,7 +2,7 @@
  * 기본 제공 전자계약서 양식 템플릿
  *
  * Canvas로 계약서 이미지를 생성하여 PNG Blob으로 반환
- * 임차인 서명 페이지에서 template_url로 표시됨
+ * 입주사 서명 페이지에서 template_url로 표시됨
  */
 
 export type ContractVatType = 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE'
@@ -48,7 +48,7 @@ function formatMoney(val: string): string {
   return n.toLocaleString('ko-KR')
 }
 
-/** 월 임대료 + vat_type을 기준으로 부가세/합계 행 값 계산 */
+/** 월 이용료 + vat_type을 기준으로 부가세/합계 행 값 계산 */
 function computeVatRow(monthlyRentStr: string, vatType?: ContractVatType): {
   vatLabel:   string         // "부가가치세" row에 표시할 값
   totalLabel: string | null  // 합계 행 값 (VAT_INVOICE일 때만 존재)
@@ -58,8 +58,8 @@ function computeVatRow(monthlyRentStr: string, vatType?: ContractVatType): {
     const vat   = Math.round(rent * 0.1)
     const total = rent + vat
     return {
-      vatLabel:   `금 ${vat.toLocaleString('ko-KR')}원 (임대료의 10%)`,
-      totalLabel: `금 ${total.toLocaleString('ko-KR')}원 (임대료 + 부가세)`,
+      vatLabel:   `금 ${vat.toLocaleString('ko-KR')}원 (이용료의 10%)`,
+      totalLabel: `금 ${total.toLocaleString('ko-KR')}원 (이용료 + 부가세)`,
     }
   }
   // 현금영수증 발행
@@ -190,7 +190,7 @@ function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number,
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   1. 임대차계약서 (기본)
+   1. 공간 이용 계약서 (기본)
    ═══════════════════════════════════════════════════════════════ */
 function drawBasicLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
   const mx = 80 // margin x
@@ -215,7 +215,7 @@ function drawBasicLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d:
   ctx.font = '20px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  const preamble = `임대인(이하 "갑")과 임차인(이하 "을")은 아래 부동산에 대하여 다음과 같이 임대차계약을 체결한다.`
+  const preamble = `운영사(이하 "갑")과 입주사(이하 "을")은 아래 부동산에 대하여 다음과 같이 공간 이용 계약을 체결한다.`
   drawWrappedText(ctx, preamble, mx, 135, W - mx * 2, 32)
 
   // ── 부동산 표시 ──
@@ -242,15 +242,15 @@ function drawBasicLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d:
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '보 증 금', `금 ${formatMoney(d.deposit)}원`)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원 (매월 납부)`)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 이용료', `금 ${formatMoney(d.monthly_rent)}원 (매월 납부)`)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '계약기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`)
   y += rowH + 20
 
-  // ── 임차인 정보 ──
+  // ── 입주사 정보 ──
   ctx.fillStyle = '#1d3557'
   ctx.font = 'bold 26px "Pretendard", sans-serif'
-  ctx.fillText('제3조 [임차인 정보]', mx, y)
+  ctx.fillText('제3조 [입주사 정보]', mx, y)
   y += 45
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '성명/상호', d.tenant_name || '—')
@@ -267,10 +267,10 @@ function drawBasicLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d:
   ctx.fillStyle = '#333'
   ctx.font = '20px "Pretendard", sans-serif'
   const clauses = [
-    '1. 임차인은 매월 약정일까지 임대료를 납부하여야 한다.',
-    '2. 임차인은 임대인의 동의 없이 목적물을 전대하거나 용도를 변경할 수 없다.',
+    '1. 입주사은 매월 약정일까지 이용료를 납부하여야 한다.',
+    '2. 입주사은 운영사의 동의 없이 목적물을 전대하거나 용도를 변경할 수 없다.',
     '3. 계약기간 만료 1개월 전까지 갱신 여부를 통지하여야 한다.',
-    '4. 임차인은 퇴실 시 원상복구 후 반환하여야 한다.',
+    '4. 입주사은 퇴실 시 원상복구 후 반환하여야 한다.',
     '5. 보증금은 계약 종료 후 원상복구 확인 뒤 반환한다.',
   ]
   for (const c of clauses) {
@@ -567,7 +567,7 @@ function drawShortTerm(ctx: CanvasRenderingContext2D, W: number, _H: number, d: 
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   4. 상가임대차계약서 (상가건물임대차보호법 적용)
+   4. 상가 공간 이용 계약서 (상가건물임대차보호법 적용)
    ═══════════════════════════════════════════════════════════════ */
 function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
   const mx = 70
@@ -599,13 +599,13 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   const rowH = 50
   const opts = { labelBg: '#eee5e9', color: clr }
 
-  // ── 임대차 목적물의 표시 ──
+  // ── 이용 목적물의 표시 ──
   let y = 165
   ctx.fillStyle = clr
   ctx.font = 'bold 28px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
+  ctx.fillText('▪ 이용 목적물의 표시', mx, y)
   y += 38
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', opts)
@@ -623,22 +623,22 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.fillText('▪ 계약 당사자', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대인 (갑)', '대우오피스 / 이동윤', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '운영사 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임차인 (을)', d.tenant_name || '(서명 시 입력)', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '입주사 (을)', d.tenant_name || '(서명 시 입력)', opts)
   y += rowH + 16
 
-  // ── 임대차 조건 ──
+  // ── 이용 조건 ──
   ctx.fillStyle = clr
   ctx.font = 'bold 28px "Pretendard", sans-serif'
-  ctx.fillText('▪ 임대차 조건', mx, y)
+  ctx.fillText('▪ 이용 조건', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대차기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용 기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 보증금', `금 ${formatMoney(d.deposit)}원정`, opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 이용료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
   y += rowH
   const vatRow = computeVatRow(d.monthly_rent, d.vat_type)
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', vatRow.vatLabel, opts)
@@ -660,59 +660,59 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   y += 16
 
   const clauses: { title: string; items: string[] }[] = [
-    { title: '제 1 조 (임대차기간 및 갱신)', items: [
-      '① 본 계약의 임대차기간은 상기 임대차 조건에 기재된 기간으로 한다.',
-      '② 임대차기간 만료 6개월 전부터 1개월 전까지 쌍방이 갱신 거절 또는 조건 변경을 서면 통보하지 않는 경우, 동일한 조건으로 갱신된 것으로 본다.',
-      '③ 임차인은 계약기간 중 임대인의 사전 서면 동의 없이 임차권을 양도하거나 임대 목적물을 전대할 수 없다.',
+    { title: '제 1 조 (이용 기간 및 갱신)', items: [
+      '① 본 계약의 이용 기간은 상기 이용 조건에 기재된 기간으로 한다.',
+      '② 이용 기간 만료 6개월 전부터 1개월 전까지 쌍방이 갱신 거절 또는 조건 변경을 서면 통보하지 않는 경우, 동일한 조건으로 갱신된 것으로 본다.',
+      '③ 입주사은 계약기간 중 운영사의 사전 서면 동의 없이 임차권을 양도하거나 임대 목적물을 전대할 수 없다.',
     ]},
     { title: '제 2 조 (임대 보증금)', items: [
-      '① 임차인은 본 계약 체결과 동시에 보증금 전액을 임대인에게 지급한다.',
-      '② 보증금은 임대료 미납, 관리비 미납, 원상복구비용 등 손해를 담보한다.',
+      '① 입주사은 본 계약 체결과 동시에 보증금 전액을 운영사에게 지급한다.',
+      '② 보증금은 이용료 미납, 관리비 미납, 원상복구비용 등 손해를 담보한다.',
       '③ 보증금은 무이자이며, 계약 종료 후 명도 및 정산 완료 후 14일 이내에 반환한다.',
-      '④ 임차인은 보증금을 임대료에 충당 요구할 수 없다.',
+      '④ 입주사은 보증금을 이용료에 충당 요구할 수 없다.',
     ]},
-    { title: '제 3 조 (임대료 납부)', items: [
-      '① 임차인은 매월 임대료 및 부가가치세를 납부 기일까지 임대인의 지정 계좌로 선납한다.',
-      '② 부가가치세는 임대료에 포함되지 않으며 별도로 납부한다.',
+    { title: '제 3 조 (이용료 납부)', items: [
+      '① 입주사은 매월 이용료 및 부가가치세를 납부 기일까지 운영사의 지정 계좌로 선납한다.',
+      '② 부가가치세는 이용료에 포함되지 않으며 별도로 납부한다.',
       '③ 납부 기일까지 미납 시 연 20%의 지연손해금을 가산하여 납부하여야 한다.',
-      '④ 전기료 등 실비(주차, 인터넷 등)는 임대료에 포함되지 않으며, 사용량에 따라 별도 청구한다.',
+      '④ 전기료 등 실비(주차, 인터넷 등)는 이용료에 포함되지 않으며, 사용량에 따라 별도 청구한다.',
     ]},
-    { title: '제 4 조 (임대료 연체 및 강제 조치) ★', items: [
-      '① 1기(1개월) 연체 시 임대인은 즉시 서면으로 이행을 최고할 수 있다.',
+    { title: '제 4 조 (이용료 연체 및 강제 조치) ★', items: [
+      '① 1기(1개월) 연체 시 운영사은 즉시 서면으로 이행을 최고할 수 있다.',
       '② 2기(2개월) 이상 연체 시 최고 없이 즉시 계약 해지 및 명도 요구 가능.',
-      '③ 명도 지연 시 월 임대료의 2배에 해당하는 손해배상액을 지급한다.',
-      '④ 연체 시 임차인의 동산에 대하여 유치권 행사 또는 압류 가능.',
+      '③ 명도 지연 시 월 이용료의 2배에 해당하는 손해배상액을 지급한다.',
+      '④ 연체 시 입주사의 동산에 대하여 유치권 행사 또는 압류 가능.',
     ]},
-    { title: '제 5 조 (임대료 인상)', items: [
-      '① 임대료는 상가건물임대차보호법 제11조에 따라 연 5%를 초과하여 인상할 수 없다.',
+    { title: '제 5 조 (이용료 인상)', items: [
+      '① 이용료는 상가건물임대차보호법 제11조에 따라 연 5%를 초과하여 인상할 수 없다.',
       '② 인상 시 만료 3개월 전까지 서면 통보 및 협의한다.',
     ]},
     { title: '제 6 조 (시설 설치 및 원상복구)', items: [
-      '① 임대인의 사전 서면 동의 없이 시설물을 신설·변경·부착할 수 없다.',
+      '① 운영사의 사전 서면 동의 없이 시설물을 신설·변경·부착할 수 없다.',
       '② 계약 종료 시 임대 목적물을 입주 당시 상태로 원상복구하여야 한다.',
     ]},
-    { title: '제 7 조 (임차인의 의무)', items: [
+    { title: '제 7 조 (입주사의 의무)', items: [
       '① 임대 목적물을 선량한 관리자의 주의로 사용·관리한다.',
       '② 계약상 용도 이외의 목적으로 사용하거나 전대·양도할 수 없다.',
-      '③ 퇴실 30일 전까지 임대인에게 서면으로 퇴실 의사를 통보한다.',
+      '③ 퇴실 30일 전까지 운영사에게 서면으로 퇴실 의사를 통보한다.',
     ]},
-    { title: '제 8 조 (임대인의 면책)', items: [
+    { title: '제 8 조 (운영사의 면책)', items: [
       '① 천재지변, 화재, 도난, 정전 등 불가항력 사유로 인한 손해에 대하여 책임을 지지 아니한다.',
     ]},
     { title: '제 9 조 (계약의 해지)', items: [
-      '① 임차인이 각 조항을 위반하거나 임대료를 연체한 경우 계약 해지 가능.',
+      '① 입주사이 각 조항을 위반하거나 이용료를 연체한 경우 계약 해지 가능.',
       '② 2기 이상 연체 시 최고 없이 즉시 해지 가능. (상가건물임대차보호법 제10조의8)',
-      '③ 임차인 사정으로 중도 해지 시 잔여기간 임대료의 10%를 위약금으로 지급.',
+      '③ 입주사 사정으로 중도 해지 시 잔여기간 이용료의 10%를 위약금으로 지급.',
     ]},
     { title: '제 10 조 (공증 협조 의무)', items: [
-      '① 임차인은 임대인의 요청 시 본 계약서에 대한 공증 작성에 협조한다. 비용은 임차인 부담.',
+      '① 입주사은 운영사의 요청 시 본 계약서에 대한 공증 작성에 협조한다. 비용은 입주사 부담.',
     ]},
     { title: '제 11 조 (자진 명도 확약)', items: [
-      '① 임대차기간 만료 후 갱신 미체결, 2기 이상 연체 해지, 중대 위반 해지 시 자진 명도한다.',
+      '① 이용 기간 만료 후 갱신 미체결, 2기 이상 연체 해지, 중대 위반 해지 시 자진 명도한다.',
     ]},
     { title: '제 12 조 (기타 사항 및 준거법)', items: [
       '① 본 계약에서 정하지 않은 사항은 상가건물임대차보호법, 민법 등에 따른다.',
-      '② 분쟁의 관할 법원은 임대인 소재지를 관할하는 법원으로 한다.',
+      '② 분쟁의 관할 법원은 운영사 소재지를 관할하는 법원으로 한다.',
       '③ 본 계약서는 2통을 작성하여 쌍방이 서명·날인 후 각 1통씩 보관한다.',
     ]},
   ]
@@ -783,7 +783,7 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   5. 임대차계약서 (서면용) — 프린트 후 대면 서명
+   5. 공간 이용 계약서 (서면용) — 프린트 후 대면 서명
    ═══════════════════════════════════════════════════════════════ */
 function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
   const mx = 70
@@ -813,13 +813,13 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   const rowH = 54
   const opts = { labelBg: '#f0f4f8', color: clr }
 
-  // ── 임대차 목적물 ──
+  // ── 이용 목적물 ──
   let y = 165
   ctx.fillStyle = clr
   ctx.font = 'bold 28px "Pretendard", sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('▪ 임대차 목적물의 표시', mx, y)
+  ctx.fillText('▪ 이용 목적물의 표시', mx, y)
   y += 38
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', opts)
@@ -837,22 +837,22 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   ctx.fillText('▪ 계약 당사자', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대인 (갑)', '대우오피스 / 이동윤', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '운영사 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임차인 (을)', d.tenant_name || '(                    )', opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '입주사 (을)', d.tenant_name || '(                    )', opts)
   y += rowH + 16
 
-  // ── 임대차 조건 ──
+  // ── 이용 조건 ──
   ctx.fillStyle = clr
   ctx.font = 'bold 28px "Pretendard", sans-serif'
-  ctx.fillText('▪ 임대차 조건', mx, y)
+  ctx.fillText('▪ 이용 조건', mx, y)
   y += 38
 
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대차기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용 기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '임대 보증금', `금 ${formatMoney(d.deposit)}원정`, opts)
   y += rowH
-  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 임대료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 이용료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
   y += rowH
   const vatRow = computeVatRow(d.monthly_rent, d.vat_type)
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', vatRow.vatLabel, opts)
@@ -874,45 +874,45 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   y += 16
 
   const clauses: { title: string; items: string[] }[] = [
-    { title: '제 1 조 (임대차기간 및 갱신)', items: [
-      '① 본 계약의 임대차기간은 상기 기간으로 한다.',
+    { title: '제 1 조 (이용 기간 및 갱신)', items: [
+      '① 본 계약의 이용 기간은 상기 기간으로 한다.',
       '② 만료 6개월~1개월 전까지 갱신 거절 통보 없으면 동일 조건으로 갱신된 것으로 본다.',
-      '③ 임차인은 임대인의 서면 동의 없이 임차권 양도·전대할 수 없다.',
+      '③ 입주사은 운영사의 서면 동의 없이 임차권 양도·전대할 수 없다.',
     ]},
     { title: '제 2 조 (임대 보증금)', items: [
-      '① 임차인은 계약 체결과 동시에 보증금 전액을 지급한다.',
-      '② 보증금은 임대료 미납, 원상복구비용 등 손해를 담보하며, 충당 요구할 수 없다.',
+      '① 입주사은 계약 체결과 동시에 보증금 전액을 지급한다.',
+      '② 보증금은 이용료 미납, 원상복구비용 등 손해를 담보하며, 충당 요구할 수 없다.',
       '③ 보증금은 무이자이며, 명도 후 14일 이내 반환한다.',
     ]},
-    { title: '제 3 조 (임대료 납부)', items: [
-      '① 임차인은 매월 임대료+부가세를 납부 기일까지 지정 계좌로 선납한다.',
+    { title: '제 3 조 (이용료 납부)', items: [
+      '① 입주사은 매월 이용료+부가세를 납부 기일까지 지정 계좌로 선납한다.',
       '② 미납 시 연 20%의 지연손해금을 가산한다.',
-      '③ 전기료 등 실비(주차, 인터넷 등)는 임대료에 포함되지 않으며 별도 청구한다.',
+      '③ 전기료 등 실비(주차, 인터넷 등)는 이용료에 포함되지 않으며 별도 청구한다.',
     ]},
     { title: '제 4 조 (연체 및 강제 조치) ★', items: [
       '① 1기 연체 시 서면 최고, 2기 이상 연체 시 최고 없이 즉시 해지·명도 요구 가능.',
-      '② 명도 지연 시 월 임대료 2배 손해배상. 동산 유치권·압류 가능.',
+      '② 명도 지연 시 월 이용료 2배 손해배상. 동산 유치권·압류 가능.',
     ]},
-    { title: '제 5 조 (임대료 인상)', items: [
+    { title: '제 5 조 (이용료 인상)', items: [
       '① 상가건물임대차보호법 제11조에 따라 연 5% 초과 인상 불가. 만료 3개월 전 서면 협의.',
     ]},
     { title: '제 6 조 (시설·원상복구)', items: [
       '① 서면 동의 없이 시설 변경 불가. 종료 시 원상복구 후 반환.',
     ]},
-    { title: '제 7 조 (임차인의 의무)', items: [
+    { title: '제 7 조 (입주사의 의무)', items: [
       '① 선량한 관리자 주의로 사용. 용도 외 사용·전대 불가. 퇴실 30일 전 서면 통보.',
     ]},
     { title: '제 8 조 (면책)', items: [
-      '① 천재지변·화재·도난·정전 등 불가항력 손해에 대해 임대인은 책임지지 않는다.',
+      '① 천재지변·화재·도난·정전 등 불가항력 손해에 대해 운영사은 책임지지 않는다.',
     ]},
     { title: '제 9 조 (해지)', items: [
       '① 조항 위반·연체 시 해지 가능. 2기 이상 연체 시 즉시 해지.',
-      '② 임차인 사정 중도 해지 시 잔여기간 임대료 10%를 위약금으로 지급.',
+      '② 입주사 사정 중도 해지 시 잔여기간 이용료 10%를 위약금으로 지급.',
     ]},
     { title: '제 10 조 (공증·명도·준거법)', items: [
-      '① 임대인 요청 시 공증에 협조 (비용 임차인 부담).',
+      '① 운영사 요청 시 공증에 협조 (비용 입주사 부담).',
       '② 기간 만료·해지 시 자진 명도. 미정 사항은 상가건물임대차보호법·민법에 따른다.',
-      '③ 관할 법원은 임대인 소재지. 본 계약서는 2통 작성, 각 1통 보관.',
+      '③ 관할 법원은 운영사 소재지. 본 계약서는 2통 작성, 각 1통 보관.',
     ]},
   ]
 
@@ -975,7 +975,7 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   const leftX = mx
   const rightX = mx + colW + 40
 
-  // 임대인 (갑)
+  // 운영사 (갑)
   drawBox(ctx, leftX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
   ctx.font = 'bold 20px "Pretendard", sans-serif'
@@ -990,7 +990,7 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   ctx.font = '13px "Pretendard", sans-serif'
   ctx.fillText('(서명 또는 날인)', leftX + colW / 2, y + sigBoxH - 14)
 
-  // 임차인 (을)
+  // 입주사 (을)
   drawBox(ctx, rightX, y, colW, sigBoxH, { stroke: clr, lineWidth: 2 })
   ctx.fillStyle = clr
   ctx.font = 'bold 20px "Pretendard", sans-serif'

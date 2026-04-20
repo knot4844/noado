@@ -1,6 +1,6 @@
 /**
  * POST /api/contracts/owner-sign
- * 임대인 전자서명 처리
+ * 운영사 전자서명 처리
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
 
-  console.log(`[owner-sign] 임대인 서명 완료: contractId=${contractId}, ip=${signerIp}`)
+  console.log(`[owner-sign] 운영사 서명 완료: contractId=${contractId}, ip=${signerIp}`)
 
   return NextResponse.json({
     ok: true,

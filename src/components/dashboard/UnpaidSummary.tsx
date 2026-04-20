@@ -23,13 +23,13 @@ export function UnpaidSummary() {
 
     // Base amount: 실제 누적 미납금액 (이미 unpaidMonths × monthlyRent로 계산된 값)
     const baseUnpaidAmount = unpaidRooms.reduce((sum, room) => sum + (room.unpaidAmount || 0), 0);
-    // 기간별 예측용: 월세 총합 (미납자 기준)
+    // 기간별 예측용: 월 이용료 총합 (미납자 기준)
     const baseMonthlyRent = unpaidRooms.reduce((sum, room) => sum + (room.paymentInfo?.monthlyRent || 0), 0);
     const baseCount = unpaidRooms.length;
 
     // 기간별 계산:
     // - MONTHLY: 현재 실제 누적 미납금 그대로 표시
-    // - 그 외: 미납자들의 월세 합계 × 기간 (미래 예측치)
+    // - 그 외: 미납자들의 월 이용료 합계 × 기간 (미래 예측치)
     const multipliers: Record<Period, number> = {
         MONTHLY: 1,
         QUARTERLY: 3,
@@ -40,7 +40,7 @@ export function UnpaidSummary() {
     const multiplier = multipliers[period];
     const displayAmount = period === "MONTHLY"
         ? baseUnpaidAmount                  // 당월: 실제 누적 미납금
-        : baseMonthlyRent * multiplier;     // 그 외: 월세 기준 기간 예측 (이중 계산 방지)
+        : baseMonthlyRent * multiplier;     // 그 외: 월 이용료 기준 기간 예측 (이중 계산 방지)
     const displayCount = baseCount;
 
     return (

@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     return {
       '호실':       room?.name                   ?? '',
-      '임차인명':   room?.tenant_name             ?? '',
+      '입주사명':   room?.tenant_name             ?? '',
       '청구월':     `${inv.year}-${String(inv.month).padStart(2, '0')}`,
       '청구금액':   inv.amount,
       '입금액':     inv.paid_amount,
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
   const totalPaid   = rows.reduce((s, r) => s + (r['입금액']   as number), 0)
   rows.push({
     '호실':         '합계',
-    '임차인명':     '',
+    '입주사명':     '',
     '청구월':       '',
     '청구금액':     totalAmount,
     '입금액':       totalPaid,
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
   // 컬럼 너비 설정
   ws['!cols'] = [
     { wch: 12 }, // 호실
-    { wch: 14 }, // 임차인명
+    { wch: 14 }, // 입주사명
     { wch: 10 }, // 청구월
     { wch: 14 }, // 청구금액
     { wch: 14 }, // 입금액

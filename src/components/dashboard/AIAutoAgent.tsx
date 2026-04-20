@@ -40,7 +40,7 @@ export default function AIAutoAgent() {
                     foundIssues.push({
                         roomId: room.id,
                         roomName: room.name,
-                        tenantName: room.tenant?.companyName || room.tenant?.name || '임차인',
+                        tenantName: room.tenant?.companyName || room.tenant?.name || '입주사',
                         issueType: 'UNPAID',
                         details: `${room.unpaidMonths}개월 미납 (총 ${(room.unpaidAmount).toLocaleString()}원)`
                     });
@@ -57,7 +57,7 @@ export default function AIAutoAgent() {
                         foundIssues.push({
                             roomId: room.id,
                             roomName: room.name,
-                            tenantName: room.tenant?.companyName || room.tenant?.name || '임차인',
+                            tenantName: room.tenant?.companyName || room.tenant?.name || '입주사',
                             issueType: 'EXPIRING',
                             details: `계약 만료 일자: ${room.leaseEnd}`
                         });
@@ -146,7 +146,7 @@ export default function AIAutoAgent() {
                                     AI 연체/만기 자동화 비서
                                 </h2>
                                 <p className="text-blue-100 text-sm mt-1">
-                                    Supabase 데이터를 분석하여, 각 임차인에게 최적화된 맞춤형 알림톡 멘트를 생성합니다.
+                                    Supabase 데이터를 분석하여, 각 입주사에게 최적화된 맞춤형 알림톡 멘트를 생성합니다.
                                 </p>
                             </div>
                             <button onClick={() => setIsOpen(false)} className="text-blue-100 hover:text-white transition-colors p-1 bg-black/10 hover:bg-black/20 rounded-full">

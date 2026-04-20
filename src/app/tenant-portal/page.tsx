@@ -25,7 +25,7 @@ export default function TenantPortalPage() {
 
         const fetchTenantData = async () => {
             try {
-                // tenants.auth_id → leases → rooms 경유로 임차인 계약 정보 조회
+                // tenants.auth_id → leases → rooms 경유로 입주사 계약 정보 조회
                 const { data: tenantRow } = await supabase
                     .from('tenants')
                     .select('id')
@@ -106,7 +106,7 @@ export default function TenantPortalPage() {
                         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
                             <Building2 size={18} className="text-white" />
                         </div>
-                        <span className="font-extrabold text-xl tracking-tight text-neutral-900">noado <span className="text-blue-600">임차인</span></span>
+                        <span className="font-extrabold text-xl tracking-tight text-neutral-900">noado <span className="text-blue-600">입주사</span></span>
                     </div>
                     <button onClick={() => { signOut(); router.push('/login'); }} className="flex items-center gap-2 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors">
                         <LogOut size={16} /> <span className="hidden sm:inline">로그아웃</span>
@@ -137,7 +137,7 @@ export default function TenantPortalPage() {
                                 <p className="text-lg font-bold text-neutral-900 mt-0.5">{roomInfo?.businessName} {roomInfo?.name}</p>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-neutral-500">임대 조건 (보증금 / 월세)</p>
+                                <p className="text-sm font-medium text-neutral-500">임대 조건 (보증금 / 월 이용료)</p>
                                 <p className="text-lg font-bold text-neutral-900 mt-0.5">
                                     {(roomInfo?.deposit || 0).toLocaleString()}원 / {(roomInfo?.monthly_rent || 0).toLocaleString()}원
                                 </p>
@@ -167,8 +167,8 @@ export default function TenantPortalPage() {
                         <AlertCircle className="text-rose-600" size={20} />
                     </div>
                     <div>
-                        <h3 className="text-rose-800 font-bold text-lg">이번 달 임대료 납부 안내</h3>
-                        <p className="text-rose-700/80 text-sm mt-1">임대료 <span className="font-bold">{(roomInfo?.monthly_rent || 0).toLocaleString()}원</span>을 지정된 계좌로 입금해 주세요.</p>
+                        <h3 className="text-rose-800 font-bold text-lg">이번 달 이용료 납부 안내</h3>
+                        <p className="text-rose-700/80 text-sm mt-1">이용료 <span className="font-bold">{(roomInfo?.monthly_rent || 0).toLocaleString()}원</span>을 지정된 계좌로 입금해 주세요.</p>
                         <div className="mt-3 bg-white/60 p-3 rounded-lg border border-rose-200/50 inline-block">
                             <p className="text-sm font-medium text-neutral-600">입금 계좌: <span className="font-bold text-neutral-900"></span></p>
                         </div>

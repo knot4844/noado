@@ -166,7 +166,7 @@ export default function LoginPage() {
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
             수납 확인, 알림톡 발송, 전자계약까지<br />
-            소규모 임대인을 위한 올인원 솔루션
+            소규모 운영사을 위한 올인원 솔루션
           </p>
         </div>
 

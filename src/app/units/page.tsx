@@ -27,9 +27,9 @@ const CONTRACT_TYPE_LABEL: Record<ContractType, string> = {
 /* ─── 상태 배지 ─── */
 function StatusBadge({ status }: { status: RoomStatus }) {
   const map: Record<RoomStatus, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-    PAID:   { label: '납부완료', color: 'var(--color-success)', bg: 'var(--color-success-bg)', icon: <CheckCircle2 size={11} /> },
-    UNPAID: { label: '미납',    color: 'var(--color-danger)',  bg: 'var(--color-danger-bg)',  icon: <AlertCircle  size={11} /> },
-    VACANT: { label: '공실',    color: 'var(--color-muted)',   bg: 'var(--color-muted-bg)',   icon: <Home         size={11} /> },
+    OCCUPIED: { label: '입주중', color: 'var(--color-success)', bg: 'var(--color-success-bg)', icon: <CheckCircle2 size={11} /> },
+    VACATED:  { label: '퇴실',   color: 'var(--color-danger)',  bg: 'var(--color-danger-bg)',  icon: <AlertCircle  size={11} /> },
+    VACANT:   { label: '공실',   color: 'var(--color-muted)',   bg: 'var(--color-muted-bg)',   icon: <Home         size={11} /> },
   }
   const s = map[status]
   return (
@@ -58,8 +58,8 @@ type ImportRow = {
 
 function parseStatus(val: string): RoomStatus {
   const v = String(val ?? '').trim()
-  if (/납부완료|paid/i.test(v))  return 'PAID'
-  if (/미납|unpaid/i.test(v))    return 'UNPAID'
+  if (/입주중|납부완료|paid|occupied/i.test(v))  return 'OCCUPIED'
+  if (/퇴실|미납|unpaid|vacated/i.test(v))       return 'VACATED'
   return 'VACANT'
 }
 
@@ -308,7 +308,7 @@ function TenantHistoryModal({ room, onClose }: { room: Room; onClose: () => void
   async function handleEvict(lease: LeaseWithTenant) {
     if (!confirm(`${lease.tenant?.name ?? '입주사'}님을 오늘 날짜로 퇴실 처리하시겠습니까?`)) return
     await supabase.from('leases').update({ status: 'TERMINATED', lease_end: today }).eq('id', lease.id)
-    await supabase.from('rooms').update({ status: 'VACANT' }).eq('id', room.id)
+    await supabase.from('rooms').update({ status: 'VACATED' }).eq('id', room.id)
     loadLeases()
   }
 
@@ -365,8 +365,8 @@ function TenantHistoryModal({ room, onClose }: { room: Room; onClose: () => void
     })
     if (leaseErr) { setError(leaseErr.message); setSaving(false); return }
 
-    // 호실 상태 업데이트
-    await supabase.from('rooms').update({ status: 'UNPAID' }).eq('id', room.id)
+    // 호실 상태 업데이트 (입주중)
+    await supabase.from('rooms').update({ status: 'OCCUPIED' }).eq('id', room.id)
 
     setSaving(false)
     setShowForm(false)
@@ -501,7 +501,7 @@ function TenantHistoryModal({ room, onClose }: { room: Room; onClose: () => void
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs mb-1" style={{ color: 'var(--color-muted)' }}>월세 (원)</label>
+                      <label className="block text-xs mb-1" style={{ color: 'var(--color-muted)' }}>월 이용료 (원)</label>
                       <input value={form.monthly_rent} onChange={setF('monthly_rent')}
                         type="number" className="w-full px-3 py-2 rounded-lg border text-sm outline-none" style={inputSty} />
                     </div>
@@ -693,7 +693,7 @@ function RoomModal({
           </div>
 
           <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-            입주사 정보(월세, 예치금, 계약 기간 등)는 호실 저장 후
+            입주사 정보(월 이용료, 예치금, 계약 기간 등)는 호실 저장 후
             <strong style={{ color: 'var(--color-primary)' }}> 입주사 이력</strong> 버튼에서 등록하세요.
           </p>
         </div>
@@ -754,10 +754,10 @@ function UnitsContent() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
   const counts = {
-    ALL:    rooms.length,
-    PAID:   rooms.filter(r => r.status === 'PAID').length,
-    UNPAID: rooms.filter(r => r.status === 'UNPAID').length,
-    VACANT: rooms.filter(r => r.status === 'VACANT').length,
+    ALL:      rooms.length,
+    OCCUPIED: rooms.filter(r => r.status === 'OCCUPIED').length,
+    VACATED:  rooms.filter(r => r.status === 'VACATED').length,
+    VACANT:   rooms.filter(r => r.status === 'VACANT').length,
   }
 
   const filtered = rooms.filter(r => {
@@ -805,10 +805,10 @@ function UnitsContent() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-            호실 현황
+            공간 현황
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-muted)' }}>
-            전체 {rooms.length}개 호실 · 공실 {counts.VACANT}개 · 미납 {counts.UNPAID}개
+            전체 {rooms.length}개 공간 · 입주중 {counts.OCCUPIED}개 · 공실 {counts.VACANT}개
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -828,7 +828,7 @@ function UnitsContent() {
       {/* 필터 + 검색 */}
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-muted-bg)' }}>
-          {(['ALL', 'PAID', 'UNPAID', 'VACANT'] as FilterStatus[]).map(s => (
+          {(['ALL', 'OCCUPIED', 'VACATED', 'VACANT'] as FilterStatus[]).map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
               style={{
@@ -836,7 +836,7 @@ function UnitsContent() {
                 color:      filter === s ? 'var(--color-primary)' : 'var(--color-muted)',
                 boxShadow:  filter === s ? 'var(--shadow-soft)' : 'none',
               }}>
-              {s === 'ALL' ? '전체' : s === 'PAID' ? '납부완료' : s === 'UNPAID' ? '미납' : '공실'}{' '}
+              {s === 'ALL' ? '전체' : s === 'OCCUPIED' ? '입주중' : s === 'VACATED' ? '퇴실' : '공실'}{' '}
               {counts[s]}
             </button>
           ))}
@@ -869,7 +869,7 @@ function UnitsContent() {
                   { label: '호실',   cls: '' },
                   { label: '입주사', cls: '' },
                   { label: '연락처', cls: 'hidden md:table-cell' },
-                  { label: '월세',   cls: 'hidden sm:table-cell' },
+                  { label: '월 이용료',   cls: 'hidden sm:table-cell' },
                   { label: '예치금', cls: 'hidden lg:table-cell' },
                   { label: '계약만료', cls: 'hidden lg:table-cell' },
                   { label: '상태',   cls: '' },
@@ -926,14 +926,7 @@ function UnitsContent() {
                           <Pencil size={12} />
                           <span className="hidden sm:inline">수정</span>
                         </button>
-                        {room.status === 'UNPAID' && (
-                          <button onClick={() => handleReminder(room)}
-                            className="p-1.5 rounded-lg"
-                            style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}
-                            title="독촉 알림톡">
-                            <MessageSquare size={12} />
-                          </button>
-                        )}
+                        {/* 독촉 알림톡은 /payments 페이지에서 미납 청구서 기준으로 발송 */}
                         <button onClick={() => setTenantHistRoom(room)}
                           className="p-1.5 rounded-lg"
                           style={{ background: 'rgba(29,53,87,0.08)', color: 'var(--color-primary)' }}

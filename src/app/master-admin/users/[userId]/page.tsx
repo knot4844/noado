@@ -22,8 +22,8 @@ const TABS = [
 type TabKey = typeof TABS[number]['key']
 
 /* ─── 색상 유틸 ─── */
-const roomColor  = (s: string) => s === 'PAID' ? { c: '#34d399', bg: '#064e3b' } : s === 'VACANT' ? { c: '#94a3b8', bg: '#1e293b' } : { c: '#f87171', bg: '#450a0a' }
-const roomLabel  = (s: string) => s === 'PAID' ? '완납' : s === 'VACANT' ? '공실' : '미납'
+const roomColor  = (s: string) => s === 'OCCUPIED' ? { c: '#34d399', bg: '#064e3b' } : s === 'VACANT' ? { c: '#94a3b8', bg: '#1e293b' } : { c: '#f87171', bg: '#450a0a' }
+const roomLabel  = (s: string) => s === 'OCCUPIED' ? '입주중' : s === 'VACANT' ? '공실' : '퇴실'
 const invColor   = (s: string) => s === 'paid' ? { c: '#34d399', bg: '#064e3b' } : s === 'overdue' ? { c: '#f87171', bg: '#450a0a' } : { c: '#94a3b8', bg: '#1e293b' }
 const invLabel   = (s: string) => s === 'paid' ? '완납' : s === 'overdue' ? '연체' : '미납'
 const ctColor    = (s: string) => s === 'signed' ? { c: '#34d399', bg: '#064e3b' } : s === 'sent' ? { c: '#60a5fa', bg: '#1e3a5f' } : s === 'expired' ? { c: '#f87171', bg: '#450a0a' } : { c: '#94a3b8', bg: '#1e293b' }
@@ -98,7 +98,7 @@ export default function UserDetailPage() {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '14px' }}>
       <Loader2 size={34} color="#60a5fa" style={{ animation: 'spin 1s linear infinite' }} />
-      <p style={{ color: '#94a3b8', fontSize: '13px' }}>임대인 데이터 로딩 중…</p>
+      <p style={{ color: '#94a3b8', fontSize: '13px' }}>운영사 데이터 로딩 중…</p>
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
     </div>
   )
@@ -243,7 +243,7 @@ export default function UserDetailPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155' }}>
-                  {['호실명', '상태', '입주사', '연락처', '월세', '보증금', '계약 시작', '계약 종료'].map(h => (
+                  {['호실명', '상태', '입주사', '연락처', '월 이용료', '보증금', '계약 시작', '계약 종료'].map(h => (
                     <Th key={h}>{h}</Th>
                   ))}
                 </tr>
@@ -308,7 +308,7 @@ export default function UserDetailPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #334155' }}>
-                  {['호실', '입주사', '월세', '보증금', '계약기간', '상태', '서명일', '생성일'].map(h => (
+                  {['호실', '입주사', '월 이용료', '보증금', '계약기간', '상태', '서명일', '생성일'].map(h => (
                     <Th key={h}>{h}</Th>
                   ))}
                 </tr>
@@ -424,7 +424,7 @@ export default function UserDetailPage() {
               {manageAction === 'delete'
                 ? ' 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.'
                 : manageAction === 'suspend'
-                ? ' 정지합니다. 해당 임대인은 로그인할 수 없게 됩니다.'
+                ? ' 정지합니다. 해당 운영사은 로그인할 수 없게 됩니다.'
                 : ' 다시 활성화합니다.'}
             </p>
             {manageAction === 'delete' && (
@@ -466,6 +466,7 @@ export default function UserDetailPage() {
         <AlimtalkModal
           type={modalType}
           rooms={rooms}
+          invoices={invoices}
           selectedRooms={selectedRooms}
           setSelectedRooms={setSelectedRooms}
           sending={sending}
@@ -528,11 +529,12 @@ function StatusBadge({ label, color, bg }: { label: string; color: string; bg: s
 /* ─── 알림톡 발송 모달 ─── */
 type SendResult = { message: string; results: { roomId: string; room: string; sent: boolean; reason?: string }[] }
 function AlimtalkModal({
-  type, rooms, selectedRooms, setSelectedRooms,
+  type, rooms, invoices, selectedRooms, setSelectedRooms,
   sending, sendResult, onClose, onSend,
 }: {
   type: 'UNPAID_REMINDER' | 'PAYMENT_CONFIRM'
   rooms: Record<string, unknown>[]
+  invoices: Record<string, unknown>[]
   selectedRooms: string[]
   setSelectedRooms: (ids: string[]) => void
   sending: boolean
@@ -544,9 +546,12 @@ function AlimtalkModal({
   const accentColor = isUnpaid ? '#ef4444' : '#10b981'
   const title       = isUnpaid ? '미납 독촉 알림톡 발송' : '수납 완료 알림톡 발송'
 
-  // 미납 독촉은 UNPAID 호실만, 수납 완료는 모든 입주 호실
+  // 미납 호실은 invoices 기준 (rooms.status 는 입주/퇴실/공실만 의미)
+  const unpaidRoomIds = new Set(
+    (invoices ?? []).filter(i => i.status !== 'paid').map(i => i.room_id as string)
+  )
   const targetRooms = isUnpaid
-    ? rooms.filter(r => r.status === 'UNPAID')
+    ? rooms.filter(r => unpaidRoomIds.has(r.id as string))
     : rooms.filter(r => r.status !== 'VACANT')
 
   const allChecked  = targetRooms.length > 0 && targetRooms.every(r => selectedRooms.includes(r.id as string))

@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 /**
- * /invite/[token] - 전자계약 서명 페이지 (임차인 접근)
+ * /invite/[token] - 전자계약 서명 페이지 (입주사 접근)
  * sign_token으로 계약서 조회 → Canvas 서명 → 저장
  */
 import { useEffect, useState, useRef } from 'react'
@@ -28,7 +28,7 @@ export default function InvitePage() {
   const [signDate, setSignDate] = useState<string | null>(null)
   const [contentHash, setContentHash] = useState<string | null>(null)
 
-  // 임차인 정보 입력 폼
+  // 입주사 정보 입력 폼
   const [tenantForm, setTenantForm] = useState({
     name: '',
     phone: '',
@@ -57,7 +57,7 @@ export default function InvitePage() {
       }
 
       setContract(data)
-      // 임차인 정보 초기화 (이미 입력된 정보가 있으면 사용)
+      // 입주사 정보 초기화 (이미 입력된 정보가 있으면 사용)
       setTenantForm(prev => ({
         ...prev,
         name: data.tenant_name || '',
@@ -137,7 +137,7 @@ export default function InvitePage() {
     const dataUrl  = canvas.toDataURL('image/png')
 
     try {
-      // 임차인이 입력한 정보로 스냅샷 업데이트
+      // 입주사이 입력한 정보로 스냅샷 업데이트
       const updatedSnapshot = {
         ...(contract.contract_snapshot || {}),
         tenant_name: tenantForm.name || contract.tenant_name,
@@ -154,7 +154,7 @@ export default function InvitePage() {
           contractId: contract.id,
           roomId: contract.room_id,
           signature: dataUrl,
-          tenantName: tenantForm.name || contract.tenant_name || '임차인',
+          tenantName: tenantForm.name || contract.tenant_name || '입주사',
           contractContent: updatedSnapshot,
         }),
       });
@@ -165,7 +165,7 @@ export default function InvitePage() {
       setSignDate(`${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
       setContentHash(data.contentHash);
 
-      // 초대한 토큰 계약 상태도 갱신 + 임차인 입력 정보 저장
+      // 초대한 토큰 계약 상태도 갱신 + 입주사 입력 정보 저장
       await supabase.from('contracts').update({
         status: 'signed',
         signed_at: new Date().toISOString(),
@@ -204,12 +204,12 @@ export default function InvitePage() {
 
   if (step === 'error') return (
     <FullPage icon={<AlertCircle size={48} />} iconColor="var(--color-danger)"
-      title="계약서를 찾을 수 없습니다" desc="링크가 올바른지 확인하거나 임대인에게 문의하세요." />
+      title="계약서를 찾을 수 없습니다" desc="링크가 올바른지 확인하거나 운영사에게 문의하세요." />
   )
 
   if (step === 'expired') return (
     <FullPage icon={<AlertCircle size={48} />} iconColor="var(--color-danger)"
-      title="서명 링크가 만료되었습니다" desc="임대인에게 새 링크를 요청해주세요." />
+      title="서명 링크가 만료되었습니다" desc="운영사에게 새 링크를 요청해주세요." />
   )
 
   if (step === 'done') return (
@@ -246,7 +246,7 @@ export default function InvitePage() {
         </button>
       </div>
 
-      {/* 인쇄 대상 — 계약서 + 임차인 정보 + 전자서명 통합 */}
+      {/* 인쇄 대상 — 계약서 + 입주사 정보 + 전자서명 통합 */}
       <div className="print-area w-full max-w-2xl mx-auto rounded-2xl overflow-hidden"
            style={{ background: 'white', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--color-border)' }}>
 
@@ -279,7 +279,7 @@ export default function InvitePage() {
                 {[
                   { label: '호실', value: (snap?.room_name as string) || '—' },
                   { label: '보증금', value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
-                  { label: '월세', value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
+                  { label: '월 이용료', value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
                   { label: '계약기간', value: snap?.lease_start && snap?.lease_end ? `${snap.lease_start} ~ ${snap.lease_end}` : '—' },
                   { label: '주소', value: (snap?.address as string) || '—' },
                   { label: '특약사항', value: (snap?.special_terms as string) || '없음' },
@@ -297,10 +297,10 @@ export default function InvitePage() {
         {/* 당사자 인적사항 + 전자서명 (2열) */}
         <div className="sign-section px-6 py-4" style={{ borderTop: '2px solid #1d3557' }}>
 
-          {/* ── 임대인 (갑) ── */}
+          {/* ── 운영사 (갑) ── */}
           <div className="flex gap-4 mb-3">
             <div className="flex-1">
-              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>임대인 (갑)</p>
+              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>운영사 (갑)</p>
               <table className="w-full border-collapse text-xs">
                 <tbody>
                   <tr>
@@ -322,8 +322,8 @@ export default function InvitePage() {
               {contract?.owner_signature_url ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={contract.owner_signature_url} alt="임대인 서명" className="h-14 mb-1" />
-                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>임대인 (인)</p>
+                  <img src={contract.owner_signature_url} alt="운영사 서명" className="h-14 mb-1" />
+                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>운영사 (인)</p>
                   <div className="text-center" style={{ fontSize: '8px', color: '#999' }}>
                     {contract.owner_signed_at && <span>{new Date(contract.owner_signed_at).toLocaleDateString('ko-KR')}</span>}
                     {contract.owner_signer_ip && <span> · IP: {contract.owner_signer_ip}</span>}
@@ -337,10 +337,10 @@ export default function InvitePage() {
             </div>
           </div>
 
-          {/* ── 임차인 (을) ── */}
+          {/* ── 입주사 (을) ── */}
           <div className="flex gap-4 pt-3" style={{ borderTop: '1px solid #dee2e6' }}>
             <div className="flex-1">
-              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>임차인 (을)</p>
+              <p className="text-xs font-bold mb-1.5" style={{ color: '#1d3557' }}>입주사 (을)</p>
               <table className="w-full border-collapse text-xs">
                 <tbody>
                   {[
@@ -361,8 +361,8 @@ export default function InvitePage() {
               {contract?.signature_data_url ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={contract.signature_data_url} alt="임차인 서명" className="h-14 mb-1" />
-                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>임차인 (인)</p>
+                  <img src={contract.signature_data_url} alt="입주사 서명" className="h-14 mb-1" />
+                  <p className="text-center font-medium" style={{ fontSize: '10px', color: '#1d3557' }}>입주사 (인)</p>
                   <div className="text-center" style={{ fontSize: '8px', color: '#999' }}>
                     {contract.signed_at && <span>{new Date(contract.signed_at).toLocaleDateString('ko-KR')}</span>}
                     {contract.signer_ip && <span> · IP: {contract.signer_ip}</span>}
@@ -409,7 +409,7 @@ export default function InvitePage() {
               아래 계약 내용을 확인 후 서명해주세요.
             </p>
 
-            {/* 임대인이 업로드한 계약서 양식 */}
+            {/* 운영사이 업로드한 계약서 양식 */}
             {contract?.template_url && (
               <div className="rounded-2xl p-4 mb-4"
                    style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)' }}>
@@ -462,19 +462,19 @@ export default function InvitePage() {
             <button onClick={() => setStep('fill-info')}
               className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
               style={{ background: 'var(--color-primary)' }}>
-              <PenTool size={16} /> 임차인 정보 입력 및 서명
+              <PenTool size={16} /> 입주사 정보 입력 및 서명
             </button>
           </>
         )}
 
-        {/* 임차인 정보 입력 */}
+        {/* 입주사 정보 입력 */}
         {step === 'fill-info' && (
           <>
             <h1 className="text-xl font-bold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-              임차인 정보 입력
+              입주사 정보 입력
             </h1>
             <p className="text-sm mb-6" style={{ color: 'var(--color-muted)' }}>
-              계약서에 기재될 임차인 정보를 입력해주세요.
+              계약서에 기재될 입주사 정보를 입력해주세요.
             </p>
 
             {/* 자동 채워진 계약 조건 (읽기 전용) */}
@@ -493,7 +493,7 @@ export default function InvitePage() {
                     ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}`
                     : '—' },
                   { label: '보증금', value: snap?.deposit ? formatKRW(Number(snap.deposit)) : '—' },
-                  { label: '월 임대료', value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
+                  { label: '월 이용료', value: snap?.monthly_rent ? formatKRW(Number(snap.monthly_rent)) : '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-baseline gap-3">
                     <span className="text-xs font-medium w-16 shrink-0" style={{ color: 'var(--color-muted)' }}>{label}</span>
@@ -503,7 +503,7 @@ export default function InvitePage() {
               </div>
             </div>
 
-            {/* 임차인 입력 폼 */}
+            {/* 입주사 입력 폼 */}
             <div className="rounded-2xl p-5 mb-6 space-y-3"
                  style={{ background: 'var(--color-surface)', boxShadow: 'var(--shadow-soft)' }}>
               <div className="flex items-center gap-2 mb-1">
@@ -511,7 +511,7 @@ export default function InvitePage() {
                      style={{ background: 'rgba(29,53,87,0.08)', color: 'var(--color-primary)' }}>
                   <User size={14} />
                 </div>
-                <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>임차인 정보</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>입주사 정보</span>
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>성명 (상호) *</label>

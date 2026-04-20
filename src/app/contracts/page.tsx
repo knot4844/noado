@@ -40,7 +40,7 @@ function isPaperContract(c: { template_name?: string | null }): boolean {
 
 const STATUS_META: Record<string, { label: string; bg: string; color: string; icon: React.ReactNode }> = {
   draft:        { label: '초안',        bg: 'rgba(29,53,87,0.06)',     color: 'var(--color-muted)',        icon: <Pencil size={11} /> },
-  owner_signed: { label: '임대인서명', bg: 'rgba(59,130,246,0.1)',    color: '#3b82f6',                   icon: <PenTool size={11} /> },
+  owner_signed: { label: '운영사서명', bg: 'rgba(59,130,246,0.1)',    color: '#3b82f6',                   icon: <PenTool size={11} /> },
   sent:         { label: '발송됨',     bg: 'rgba(168,218,220,0.2)',   color: 'var(--color-accent-dark)',   icon: <Send size={11} /> },
   signed:       { label: '서명완료',   bg: 'var(--color-success-bg)', color: 'var(--color-success)',       icon: <CheckCircle2 size={11} /> },
   expired:      { label: '만료됨',     bg: 'var(--color-danger-bg)',  color: 'var(--color-danger)',        icon: <Clock size={11} /> },
@@ -203,7 +203,7 @@ export default function ContractsPage() {
             전자계약
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-muted)' }}>
-            임대차 계약서 작성 및 전자서명 관리
+            공간 이용 계약서 작성 및 전자서명 관리
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export default function ContractsPage() {
       <div className="grid grid-cols-5 gap-3 mb-6">
         {[
           { key: 'draft',        label: '초안',        val: stats.draft        },
-          { key: 'owner_signed', label: '임대인서명',  val: stats.owner_signed },
+          { key: 'owner_signed', label: '운영사서명',  val: stats.owner_signed },
           { key: 'sent',         label: '발송됨',      val: stats.sent         },
           { key: 'signed',       label: '서명완료',    val: stats.signed       },
           { key: 'expired',      label: '만료됨',      val: stats.expired      },
@@ -332,7 +332,7 @@ export default function ContractsPage() {
                           <button onClick={() => setOwnerSignContract(c)}
                             className="p-1.5 rounded-lg text-xs"
                             style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}
-                            title="임대인 서명">
+                            title="운영사 서명">
                             <PenTool size={13} />
                           </button>
                         )}
@@ -406,12 +406,12 @@ export default function ContractsPage() {
         />
       )}
 
-      {/* 임대인 서명 모달 */}
+      {/* 운영사 서명 모달 */}
       {ownerSignContract && (
         <OwnerSignModal
           contract={ownerSignContract}
           onClose={() => setOwnerSignContract(null)}
-          onSigned={() => { setOwnerSignContract(null); load(); showToast('success', '임대인 서명이 완료되었습니다.') }}
+          onSigned={() => { setOwnerSignContract(null); load(); showToast('success', '운영사 서명이 완료되었습니다.') }}
           onError={msg => showToast('error', msg)}
         />
       )}
@@ -696,7 +696,7 @@ function CreateContractModal({
             <CField label="소재지/호실주소" value={form.address} onChange={set('address')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <CField label="월세 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
+            <CField label="월 이용료 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
             <CField label="보증금 (원)" value={form.deposit} onChange={set('deposit')} type="number" />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -712,7 +712,7 @@ function CreateContractModal({
               className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
               style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
               <option value="NONE">미발행 (부가세 해당없음)</option>
-              <option value="VAT_INVOICE">세금계산서 발행 (임대료의 10% 별도 표기)</option>
+              <option value="VAT_INVOICE">세금계산서 발행 (이용료의 10% 별도 표기)</option>
               <option value="CASH_RECEIPT">현금영수증 발행</option>
             </select>
           </div>
@@ -861,7 +861,7 @@ function CreateContractModal({
                   </div>
                 )}
                 <p className="text-[11px] mt-1" style={{ color: 'var(--color-muted)' }}>
-                  업로드한 양식이 임차인 서명 페이지에 그대로 노출됩니다.
+                  업로드한 양식이 입주사 서명 페이지에 그대로 노출됩니다.
                 </p>
               </>
             )}
@@ -949,27 +949,27 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   <tr><th>연락처</th><td>${s?.tenant_phone ?? c.tenant_phone ?? '—'}</td></tr>
   <tr><th>소재지</th><td>${s?.address ?? '—'}</td></tr>
   <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td></tr>
-  <tr><th>월 임대료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
+  <tr><th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
   <tr><th>계약기간</th><td>${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
   <tr><th>특약사항</th><td>${s?.special_terms ?? '없음'}</td></tr>
   <tr><th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
 </table>
 
-<h2>2. 임대인(갑) 전자서명</h2>
+<h2>2. 운영사(갑) 전자서명</h2>
 <table>
   <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
   <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
   <tr><th>서명자 IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
 </table>
-${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.owner_signature_url}" alt="임대인 서명" /></div>` : ''}
+${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
 
-<h2>3. 임차인(을) 전자서명</h2>
+<h2>3. 입주사(을) 전자서명</h2>
 <table>
   <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
   <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
   <tr><th>서명자 IP</th><td>${c.signer_ip ?? '—'}</td></tr>
 </table>
-${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.signature_data_url}" alt="임차인 서명" /></div>` : ''}
+${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
 
 <h2>4. 콘텐츠 무결성 검증 (SHA-256)</h2>
 <p>계약서 작성 시점에 계약 내용을 SHA-256으로 해싱하여 저장합니다.<br/>
@@ -1005,7 +1005,7 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
     { label: '사업자번호',  value: snap?.tenant_business_no ?? '—' },
     { label: '업종',        value: snap?.tenant_biz_type ?? '—' },
     { label: '보증금',      value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
-    { label: '월세',        value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
+    { label: '월 이용료',        value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
     { label: '계약기간',    value: contract.lease_start && contract.lease_end ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}` : '—' },
     { label: '특약사항',    value: snap?.special_terms ?? '없음' },
     { label: '콘텐츠 해시', value: contract.content_hash ? contract.content_hash.slice(0, 16) + '...' : '—' },
@@ -1076,7 +1076,7 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
           <div className="mt-5 pt-4 border-t space-y-4" style={{ borderColor: 'var(--color-border)' }}>
             <p className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>전자서명 증거</p>
 
-            {/* 임대인 서명 */}
+            {/* 운영사 서명 */}
             <div className="rounded-lg p-3" style={{ background: 'var(--color-background)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
@@ -1084,14 +1084,14 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
                               color: contract.owner_signature_url ? 'var(--color-success)' : 'var(--color-muted)' }}>
                   {contract.owner_signature_url ? '✓' : '—'}
                 </div>
-                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>임대인 (갑)</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>운영사 (갑)</span>
                 {!contract.owner_signature_url && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>미서명</span>}
               </div>
               {contract.owner_signature_url && (
                 <div className="flex items-center gap-3">
                   <div className="rounded border p-1.5 shrink-0" style={{ borderColor: 'var(--color-border)', background: 'white' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={contract.owner_signature_url} alt="임대인 서명" className="max-h-16" />
+                    <img src={contract.owner_signature_url} alt="운영사 서명" className="max-h-16" />
                   </div>
                   <div className="text-[11px] space-y-0.5" style={{ color: 'var(--color-muted)' }}>
                     <div>서명일: {contract.owner_signed_at ? formatDate(contract.owner_signed_at) : '—'}</div>
@@ -1101,7 +1101,7 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
               )}
             </div>
 
-            {/* 임차인 서명 */}
+            {/* 입주사 서명 */}
             <div className="rounded-lg p-3" style={{ background: 'var(--color-background)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
@@ -1109,14 +1109,14 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
                               color: contract.signature_data_url ? 'var(--color-success)' : 'var(--color-muted)' }}>
                   {contract.signature_data_url ? '✓' : '—'}
                 </div>
-                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>임차인 (을)</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>입주사 (을)</span>
                 {!contract.signature_data_url && <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'var(--color-muted-bg)', color: 'var(--color-muted)' }}>미서명</span>}
               </div>
               {contract.signature_data_url && (
                 <div className="flex items-center gap-3">
                   <div className="rounded border p-1.5 shrink-0" style={{ borderColor: 'var(--color-border)', background: 'white' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={contract.signature_data_url} alt="임차인 서명" className="max-h-16" />
+                    <img src={contract.signature_data_url} alt="입주사 서명" className="max-h-16" />
                   </div>
                   <div className="text-[11px] space-y-0.5" style={{ color: 'var(--color-muted)' }}>
                     <div>서명일: {contract.signed_at ? formatDate(contract.signed_at) : '—'}</div>
@@ -1162,7 +1162,7 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
   )
 }
 
-/* ─── 임대인 서명 모달 ─── */
+/* ─── 운영사 서명 모달 ─── */
 function OwnerSignModal({ contract, onClose, onSigned, onError }: {
   contract: ContractWithRoom
   onClose: () => void
@@ -1258,7 +1258,7 @@ function OwnerSignModal({ contract, onClose, onSigned, onError }: {
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <div>
             <h2 className="text-base font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-primary)' }}>
-              임대인 전자서명
+              운영사 전자서명
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
               {contract.room?.name} · {contract.tenant_name}
@@ -1282,7 +1282,7 @@ function OwnerSignModal({ contract, onClose, onSigned, onError }: {
             </span>
           </div>
           <div className="flex gap-3 text-sm">
-            <span className="font-medium w-20 shrink-0" style={{ color: 'var(--color-muted)' }}>월 임대료</span>
+            <span className="font-medium w-20 shrink-0" style={{ color: 'var(--color-muted)' }}>월 이용료</span>
             <span style={{ color: 'var(--color-text)' }}>
               {contract.monthly_rent ? `${contract.monthly_rent.toLocaleString()}원` : '—'}
             </span>
@@ -1310,7 +1310,7 @@ function OwnerSignModal({ contract, onClose, onSigned, onError }: {
             />
           </div>
           <p className="text-[11px] mt-2" style={{ color: 'var(--color-muted)' }}>
-            서명 시 위 계약 내용에 임대인으로서 동의하는 것으로 간주됩니다.
+            서명 시 위 계약 내용에 운영사으로서 동의하는 것으로 간주됩니다.
           </p>
         </div>
 
@@ -1924,7 +1924,7 @@ function ScanUploadModal({
                 <CField label="소재지/호실주소" value={form.address} onChange={set('address')} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <CField label="월세 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
+                <CField label="월 이용료 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
                 <CField label="보증금 (원)" value={form.deposit} onChange={set('deposit')} type="number" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -2007,7 +2007,7 @@ function ScanUploadModal({
                 {[
                   { l: '호실', v: rooms.find(r => r.id === form.room_id)?.name },
                   { l: '입주사', v: form.tenant_name },
-                  { l: '월세', v: form.monthly_rent ? `${Number(form.monthly_rent).toLocaleString()}원` : '' },
+                  { l: '월 이용료', v: form.monthly_rent ? `${Number(form.monthly_rent).toLocaleString()}원` : '' },
                   { l: '계약기간', v: form.lease_start && form.lease_end ? `${form.lease_start} ~ ${form.lease_end}` : '' },
                 ].filter(r => r.v).map(r => (
                   <div key={r.l} className="flex gap-2 text-xs">

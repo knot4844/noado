@@ -12,7 +12,7 @@ import type { BillingItem, BillingItemType, BillingCycleType } from '@/types'
 const TYPE_CONFIG: Record<BillingItemType, { label: string; icon: typeof Car }> = {
   PARKING:     { label: '주차비',   icon: Car },
   INTERNET:    { label: '인터넷',   icon: Wifi },
-  ELECTRICITY: { label: '전기료',   icon: Zap },
+  ELECTRICITY: { label: '전기 실비', icon: Zap },
   CUSTOM:      { label: '기타',     icon: Settings2 },
 }
 const CYCLE_LABELS: Record<BillingCycleType, string> = {
@@ -284,7 +284,7 @@ function AddBillingItemModal({
             <input
               value={form.name}
               onChange={set('name')}
-              placeholder="예: 주차비, 인터넷, 전기료"
+              placeholder="예: 주차비, 인터넷, 전기 실비"
               className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>

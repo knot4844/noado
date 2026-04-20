@@ -78,6 +78,8 @@ export default function RoomDetailPage() {
 
     const { tenant, paymentInfo, status } = room;
     const isVacant = status === "VACANT";
+    // 미납 여부는 invoices 에서 집계 (rooms.status 는 입주/퇴실/공실)
+    const hasUnpaid = invoiceHistory.some(r => r.status !== 'paid');
 
     const handleExportExcel = () => {
         const exportData = invoiceHistory.map((row) => ({
@@ -118,9 +120,9 @@ export default function RoomDetailPage() {
                         <div className="flex items-center gap-3">
                             <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">{room.name}</h1>
                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isVacant ? "bg-neutral-100 text-neutral-600 border border-neutral-200" :
-                                status === "UNPAID" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                                hasUnpaid ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
                                 }`}>
-                                {isVacant ? "공실" : status === "UNPAID" ? "미납 발생" : "납부 완료"}
+                                {isVacant ? "공실" : hasUnpaid ? "미납 발생" : "납부 완료"}
                             </span>
                         </div>
                         <p className="text-neutral-500 mt-1 flex items-center gap-2">
@@ -161,12 +163,12 @@ export default function RoomDetailPage() {
                                 보증금 ₩ {paymentInfo?.deposit.toLocaleString()}
                             </span>
                             <span className="text-blue-600 font-bold tracking-tight">
-                                월세 ₩ {paymentInfo?.monthlyRent.toLocaleString()} {paymentInfo?.isVATIncluded ? "(VAT 포함)" : "(VAT 별도)"}
+                                월 이용료 ₩ {paymentInfo?.monthlyRent.toLocaleString()} {paymentInfo?.isVATIncluded ? "(VAT 포함)" : "(VAT 별도)"}
                             </span>
                         </div>
 
                         <div className="bg-white p-5 rounded-xl border border-neutral-200 shadow-sm flex flex-col gap-1 lg:col-span-2">
-                            <span className="text-sm font-medium text-neutral-500 flex items-center gap-1.5"><FileText size={16} /> 임차인 및 사업자 정보</span>
+                            <span className="text-sm font-medium text-neutral-500 flex items-center gap-1.5"><FileText size={16} /> 입주사 및 사업자 정보</span>
                             <div className="flex items-center gap-6 mt-1">
                                 <div>
                                     <span className="text-xs text-neutral-400 block mb-0.5">상호명 (대표자)</span>
@@ -189,7 +191,7 @@ export default function RoomDetailPage() {
                     {/* Payment History Timeline */}
                     <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                         <div className="p-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
-                            <h3 className="font-bold text-neutral-900 text-lg">상세 임대료 징수 이력</h3>
+                            <h3 className="font-bold text-neutral-900 text-lg">상세 이용료 징수 이력</h3>
                             <button
                                 onClick={handleExportExcel}
                                 className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
@@ -219,7 +221,7 @@ export default function RoomDetailPage() {
                                         {/* Month & Amount */}
                                         <div>
                                             <h4 className="font-bold text-neutral-900 mb-1">
-                                                {history.year}년 {String(history.month).padStart(2, '0')}월 임대료
+                                                {history.year}년 {String(history.month).padStart(2, '0')}월 이용료
                                             </h4>
                                             <div className="flex items-center gap-3 text-sm">
                                                 <span className="font-bold text-neutral-700">₩ {history.amount.toLocaleString()}</span>

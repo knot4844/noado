@@ -91,14 +91,7 @@ export async function POST(request: Request) {
 
         if (error) throw error;
 
-        // rooms 테이블 상태도 업데이트 (납부 완료 시 PAID, 미납 시 UNPAID)
-        if (roomId) {
-            await client
-                .from('rooms')
-                .update({ status: status === 'PAID' ? 'PAID' : 'UNPAID' })
-                .eq('id', roomId)
-                .eq('owner_id', user.id);
-        }
+        // rooms.status 는 수납 상태를 저장하지 않음 (invoices 가 진실원본)
 
         return NextResponse.json({ payment: data }, { status: 201 });
     } catch (error: unknown) {

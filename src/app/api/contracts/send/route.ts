@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (contract.status !== 'draft' && contract.status !== 'owner_signed') {
-    return NextResponse.json({ error: '초안 또는 임대인서명 상태의 계약서만 발송할 수 있습니다.' }, { status: 400 })
+    return NextResponse.json({ error: '초안 또는 운영사서명 상태의 계약서만 발송할 수 있습니다.' }, { status: 400 })
   }
 
   if (!contract.sign_token) {

@@ -25,7 +25,7 @@ export function AIChatWidget() {
     useEffect(() => {
         if (currentBusiness && messages.length === 0) {
             setMessages([
-                { id: '1', role: 'assistant', content: `안녕하세요, 대표님! ${currentBusiness.name}의 DB와 연동된 AI 비서입니다.\n궁금한 통계나 특정 조건의 임차인 (예: "3개월 이상 연체된 사람 다 알려줘", "내년 초에 만기되는 방이 어디야?")을 질문해 주시면 즉각 답변해 드립니다.` }
+                { id: '1', role: 'assistant', content: `안녕하세요, 대표님! ${currentBusiness.name}의 DB와 연동된 AI 비서입니다.\n궁금한 통계나 특정 조건의 입주사 (예: "3개월 이상 연체된 사람 다 알려줘", "내년 초에 만기되는 방이 어디야?")을 질문해 주시면 즉각 답변해 드립니다.` }
             ]);
         }
     }, [currentBusiness]);
@@ -43,8 +43,8 @@ export function AIChatWidget() {
             const basicContext = rooms.map(r => ({
                 호실상태: r.status,
                 방이름: r.name,
-                임차인: r.tenant?.name || '공실',
-                월세: r.paymentInfo?.monthlyRent || 0,
+                입주사: r.tenant?.name || '공실',
+                "월 이용료": r.paymentInfo?.monthlyRent || 0,
                 계약종료일: r.leaseEnd,
                 연체개월수: r.unpaidMonths,
                 연체금액: r.unpaidAmount

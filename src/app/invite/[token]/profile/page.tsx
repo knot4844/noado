@@ -211,7 +211,7 @@ export default function ProfilePage() {
                 </div>
 
                 <p className="text-center text-xs text-neutral-400 mt-4">
-                    입력하신 정보는 임대차 계약서 작성에만 사용됩니다.
+                    입력하신 정보는 공간 이용 계약서 작성에만 사용됩니다.
                 </p>
             </div>
         </div>

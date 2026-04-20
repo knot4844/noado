@@ -43,7 +43,7 @@ export default function MasterAdminPage() {
       if (!sRes.ok) throw new Error(sData.error ?? '권한 없음')
       setStats(sData.stats)
 
-      /* 임대인 목록 */
+      /* 운영사 목록 */
       const uRes  = await fetch('/api/admin/users', { headers })
       const uData = await uRes.json()
       if (!uRes.ok) throw new Error(uData.error ?? '목록 조회 실패')
@@ -128,7 +128,7 @@ export default function MasterAdminPage() {
         {/* KPI */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
           {[
-            { label: '총 임대인 수',     value: `${users.length}명`,           icon: <Users size={18} />,      color: '#3b82f6', bg: '#1e3a5f' },
+            { label: '총 운영사 수',     value: `${users.length}명`,           icon: <Users size={18} />,      color: '#3b82f6', bg: '#1e3a5f' },
             { label: '전체 관리 호실',   value: `${stats.totalRooms ?? 0}개`,  icon: <Home size={18} />,       color: '#8b5cf6', bg: '#2d1b69' },
             { label: '입주 / 공실',      value: `${stats.occupiedRooms ?? 0} / ${stats.vacantRooms ?? 0}`, icon: <Building2 size={18} />, color: '#10b981', bg: '#064e3b' },
             { label: '미납 호실',        value: `${stats.unpaidRooms ?? 0}개`, icon: <AlertCircle size={18} />,color: '#f87171', bg: '#450a0a' },
@@ -146,12 +146,12 @@ export default function MasterAdminPage() {
           ))}
         </div>
 
-        {/* 임대인 목록 */}
+        {/* 운영사 목록 */}
         <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '20px', overflow: 'hidden' }}>
           {/* 헤더 + 검색 */}
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h2 style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 700, marginBottom: '2px' }}>임대인 목록</h2>
+              <h2 style={{ color: '#f1f5f9', fontSize: '16px', fontWeight: 700, marginBottom: '2px' }}>운영사 목록</h2>
               <p style={{ color: '#64748b', fontSize: '13px' }}>이름 클릭 시 상세 현황 조회</p>
             </div>
             <div style={{ position: 'relative', minWidth: '260px' }}>
@@ -173,14 +173,14 @@ export default function MasterAdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: '#0f172a' }}>
-                  {['임대인', '사업장', '호실 현황', '이번달 청구', '가입일', '최근 로그인', ''].map(h => (
+                  {['운영사', '사업장', '호실 현황', '이번달 청구', '가입일', '최근 로그인', ''].map(h => (
                     <th key={h} style={{ padding: '12px 20px', color: '#64748b', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '1px solid #334155' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>조회된 임대인이 없습니다.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>조회된 운영사이 없습니다.</td></tr>
                 ) : filtered.map(u => (
                   <tr key={u.id}
                     onClick={() => router.push(`/master-admin/users/${u.id}`)}
@@ -199,7 +199,6 @@ export default function MasterAdminPage() {
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <Badge label={`전체 ${u.rooms.total}`} color="#60a5fa" bg="#1e3a5f" />
-                        {u.rooms.unpaid > 0 && <Badge label={`미납 ${u.rooms.unpaid}`} color="#f87171" bg="#450a0a" />}
                         {u.rooms.vacant > 0 && <Badge label={`공실 ${u.rooms.vacant}`} color="#94a3b8" bg="#1e293b" />}
                       </div>
                     </td>

@@ -20,8 +20,8 @@ export function Header({ onMenuClick }: HeaderProps) {
     const today = new Date();
     const notifications: { type: 'unpaid' | 'expiring'; title: string; desc: string; href: string }[] = [];
 
-    // 1. 미납 임차인
-    const unpaidRooms = rooms.filter(r => r.status === 'UNPAID');
+    // 1. 미납 입주사 (unpaidMonths 로 판단 — rooms.status 아님)
+    const unpaidRooms = rooms.filter(r => (r.unpaidMonths ?? 0) > 0);
     unpaidRooms.slice(0, 5).forEach(r => {
         notifications.push({
             type: 'unpaid',

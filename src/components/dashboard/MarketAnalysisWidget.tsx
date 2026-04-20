@@ -76,7 +76,7 @@ export function MarketAnalysisWidget() {
                         <h4 className="text-base font-bold text-neutral-800 mb-2">건물 주변 실거래가 및 공실률 분석</h4>
                         <p className="text-sm text-neutral-500 leading-relaxed mb-8 max-w-sm">
                             Ai가 부동산 실거래가, 국토부 데이터, 주변 매물 정보를 실시간으로 종합하여
-                            <strong> 적정 임대료와 수익 극대화 전략</strong>을 제시합니다.
+                            <strong> 적정 이용료와 수익 극대화 전략</strong>을 제시합니다.
                         </p>
                         <button
                             onClick={handleAnalyze}

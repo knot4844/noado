@@ -173,7 +173,7 @@ export default function ContractPage() {
                     <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 mb-6 text-left space-y-3">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <span className="text-xs font-bold text-neutral-400 block mb-1">임차인</span>
+                                <span className="text-xs font-bold text-neutral-400 block mb-1">입주사</span>
                                 <div className="font-bold text-neutral-900 border-b border-neutral-200 pb-2">{displayTenantName}</div>
                             </div>
                             <div>
@@ -251,11 +251,11 @@ export default function ContractPage() {
             <main className="max-w-3xl mx-auto p-4 md:p-8 mt-4">
                 {/* Contract Document Preview */}
                 <div className="bg-white border border-neutral-200 shadow-sm rounded-2xl md:rounded-3xl p-6 md:p-12 mb-8">
-                    <h1 className="text-3xl font-black text-center text-neutral-900 tracking-tight mb-12">부동산 임대차 계약서</h1>
+                    <h1 className="text-3xl font-black text-center text-neutral-900 tracking-tight mb-12">부동산 공간 이용 계약서</h1>
 
                     <div className="space-y-8 text-sm md:text-base text-neutral-800 leading-loose mx-auto max-w-xl">
                         <p>
-                            임대인(이하 "갑"이라 한다)과 임차인(이하 "을"이라 한다)은 아래 기재된 부동산에 관하여 다음과 같이 임대차 계약을 체결한다.
+                            운영사(이하 "갑"이라 한다)과 입주사(이하 "을"이라 한다)은 아래 기재된 부동산에 관하여 다음과 같이 공간 이용 계약을 체결한다.
                         </p>
 
                         <div className="border border-neutral-200 rounded-xl overflow-hidden mt-6">
@@ -274,17 +274,17 @@ export default function ContractPage() {
                         </div>
 
                         <div>
-                            <h3 className="font-bold text-lg text-neutral-900 mb-3 mt-8 pb-2 border-b-2 border-neutral-900 inline-block">제 1 조 (목적 및 임대료)</h3>
-                            <p>위 부동산의 임대차에 있어 "갑"과 "을"은 합의하에 임대보증금 및 월임대료를 아래와 같이 지불하기로 한다.</p>
+                            <h3 className="font-bold text-lg text-neutral-900 mb-3 mt-8 pb-2 border-b-2 border-neutral-900 inline-block">제 1 조 (목적 및 이용료)</h3>
+                            <p>위 부동산의 이용에 있어 "갑"과 "을"은 합의하에 임대보증금 및 월이용료를 아래와 같이 지불하기로 한다.</p>
                             <ul className="list-disc pl-5 mt-4 space-y-2 bg-neutral-50 p-5 rounded-xl border border-neutral-100">
                                 <li><span className="font-medium text-neutral-500 inline-block w-20">보증금</span> <span className="font-bold">금 {paymentInfo?.deposit.toLocaleString()} 원정</span></li>
-                                <li><span className="font-medium text-neutral-500 inline-block w-20">월세</span> <span className="font-bold text-blue-600">금 {paymentInfo?.monthlyRent.toLocaleString()} 원정</span> (매월 {paymentInfo?.dueDate} 지급)</li>
+                                <li><span className="font-medium text-neutral-500 inline-block w-20">월 이용료</span> <span className="font-bold text-blue-600">금 {paymentInfo?.monthlyRent.toLocaleString()} 원정</span> (매월 {paymentInfo?.dueDate} 지급)</li>
                             </ul>
                         </div>
 
                         <div>
                             <h3 className="font-bold text-lg text-neutral-900 mb-3 mt-8 pb-2 border-b-2 border-neutral-900 inline-block">제 2 조 (존속기간)</h3>
-                            <p>"갑"은 위 부동산을 목적대로 사용 ㆍ수익할 수 있는 상태로 하여 <span className="font-bold text-rose-600 px-1 bg-rose-50">{room.leaseStart}</span> 부터 <span className="font-bold text-rose-600 px-1 bg-rose-50">{room.leaseEnd}</span> 까지 "을"에게 임대하며, 임대차 존속기간으로 한다.</p>
+                            <p>"갑"은 위 부동산을 목적대로 사용 ㆍ수익할 수 있는 상태로 하여 <span className="font-bold text-rose-600 px-1 bg-rose-50">{room.leaseStart}</span> 부터 <span className="font-bold text-rose-600 px-1 bg-rose-50">{room.leaseEnd}</span> 까지 "을"에게 임대하며, 이용 기간으로 한다.</p>
                         </div>
 
                         <div className="pt-8 text-neutral-500 text-sm text-center">
@@ -292,7 +292,7 @@ export default function ContractPage() {
                         </div>
 
                         <div className="pt-8 flex flex-col items-center gap-1 border-t border-neutral-200 mt-8">
-                            <span className="text-neutral-400 font-bold mb-2">임차인 ("을")</span>
+                            <span className="text-neutral-400 font-bold mb-2">입주사 ("을")</span>
                             <span className="text-2xl font-black text-neutral-900 tracking-tight">{tenant?.name} ({tenant?.companyName})</span>
                         </div>
                     </div>

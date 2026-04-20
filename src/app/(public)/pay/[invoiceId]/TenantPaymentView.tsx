@@ -4,7 +4,6 @@ import { useState } from 'react'
 import {
   Building2, CheckCircle2, Copy, FileText, Loader2,
   Wallet, AlertCircle, ChevronDown, ChevronUp, Download, Lock,
-  CreditCard,
 } from 'lucide-react'
 import { formatKRW, formatDate } from '@/lib/utils'
 import type { Invoice, Room, Contract } from '@/types'
@@ -29,14 +28,11 @@ interface Props {
   tenantPhone?: string
 }
 
-export default function TenantPaymentView({ invoice, room, contract, tenantName, tenantPhone }: Props) {
+export default function TenantPaymentView({ invoice, room, contract, tenantName }: Props) {
   const [bank, setBank]             = useState<string>('SHINHAN')
   const [loading, setLoading]       = useState(false)
-  const [cardLoading, setCardLoading] = useState(false)
   const [errorObj, setErrorObj]     = useState<string | null>(null)
   const [contractOpen, setContractOpen] = useState(false)
-  const [payMethod, setPayMethod]   = useState<'va' | 'card'>('va')
-  const [cardPaid, setCardPaid]     = useState(false)
 
   // 가상계좌 상태를 로컬에서 즉각 반영하기 위함
   const [vaInfo, setVaInfo] = useState<{
@@ -77,57 +73,6 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
     }
   }
 
-  // 카드결제 처리
-  const handleCardPayment = async () => {
-    setCardLoading(true)
-    setErrorObj(null)
-    try {
-      const PortOne = await import('@portone/browser-sdk/v2')
-      const paymentId = `R${invoice.id.replace(/-/g, '').slice(0, 20)}_${Date.now()}`
-      const storeId = (process.env.NEXT_PUBLIC_PORTONE_STORE_ID || '').trim()
-      const channelKey = (process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY || '').trim()
-
-      const response = await PortOne.requestPayment({
-        storeId,
-        channelKey,
-        paymentId,
-        orderName: `${invoice.year}년 ${invoice.month}월 이용료 - ${room?.name ?? ''}`,
-        totalAmount: invoice.amount ?? 0,
-        currency: 'CURRENCY_KRW',
-        payMethod: 'CARD',
-        customer: {
-          customerId: `TENANT_${invoice.id}`,
-          email: 'noreply@noado.kr',
-          fullName: tenantName || '이용자',
-          phoneNumber: tenantPhone || '01000000000',
-        },
-      })
-
-      if (response?.code) {
-        if (response.code === 'USER_CANCEL' || response.message?.includes('cancel')) {
-          setCardLoading(false)
-          return
-        }
-        throw new Error(response.message || '결제에 실패했습니다.')
-      }
-
-      // 서버 검증 + invoice 수납 처리
-      const res = await fetch('/api/portone/card-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentId, invoiceId: invoice.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || '결제 확인 실패')
-
-      setCardPaid(true)
-    } catch (err) {
-      setErrorObj(err instanceof Error ? err.message : '결제 중 오류 발생')
-    } finally {
-      setCardLoading(false)
-    }
-  }
-
   // 계약서 인쇄/PDF 저장
   const handlePrintContract = () => {
     window.print()
@@ -148,12 +93,12 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
       {contract && (
         <div id="contract-print-area" style={{ padding: '40px', fontFamily: 'serif', fontSize: '14px', lineHeight: '1.8' }}>
           <h1 style={{ textAlign: 'center', fontSize: '22px', marginBottom: '32px', fontWeight: 'bold' }}>
-            부동산 임대차 계약서
+            부동산 공간 이용 계약서
           </h1>
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px' }}>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #000', padding: '8px', width: '25%', background: '#f5f5f5', fontWeight: 'bold' }}>임차인</td>
+                <td style={{ border: '1px solid #000', padding: '8px', width: '25%', background: '#f5f5f5', fontWeight: 'bold' }}>입주사</td>
                 <td style={{ border: '1px solid #000', padding: '8px' }}>{contract.tenant_name}</td>
                 <td style={{ border: '1px solid #000', padding: '8px', width: '25%', background: '#f5f5f5', fontWeight: 'bold' }}>연락처</td>
                 <td style={{ border: '1px solid #000', padding: '8px' }}>{contract.tenant_phone ?? '-'}</td>
@@ -165,7 +110,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
               <tr>
                 <td style={{ border: '1px solid #000', padding: '8px', background: '#f5f5f5', fontWeight: 'bold' }}>보증금</td>
                 <td style={{ border: '1px solid #000', padding: '8px' }}>{formatKRW(contract.deposit)}</td>
-                <td style={{ border: '1px solid #000', padding: '8px', background: '#f5f5f5', fontWeight: 'bold' }}>월 임대료</td>
+                <td style={{ border: '1px solid #000', padding: '8px', background: '#f5f5f5', fontWeight: 'bold' }}>월 이용료</td>
                 <td style={{ border: '1px solid #000', padding: '8px' }}>{formatKRW(contract.monthly_rent)}</td>
               </tr>
               <tr>
@@ -268,7 +213,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
             {contractOpen && (
               <div className="px-5 py-4 space-y-3 text-sm border-t border-neutral-100">
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">임차인</span>
+                  <span className="text-neutral-500">입주사</span>
                   <span className="font-medium text-neutral-800">{contract.tenant_name}</span>
                 </div>
                 <div className="flex justify-between">
@@ -280,7 +225,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">월 임대료</span>
+                  <span className="text-neutral-500">월 이용료</span>
                   <span className="font-semibold text-neutral-800">{formatKRW(contract.monthly_rent)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -315,32 +260,8 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
         )}
 
         {/* Action / Payment Area */}
-        {!isPaid && !cardPaid && (
+        {!isPaid && (
           <div className="pt-2 space-y-4">
-            {/* 결제 방법 선택 탭 */}
-            <div className="flex gap-2 p-1 rounded-xl bg-neutral-100">
-              <button
-                onClick={() => { setPayMethod('va'); setErrorObj(null) }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all ${
-                  payMethod === 'va'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-neutral-500 hover:text-neutral-700'
-                }`}
-              >
-                <Wallet size={16} /> 계좌이체
-              </button>
-              <button
-                onClick={() => { setPayMethod('card'); setErrorObj(null) }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all ${
-                  payMethod === 'card'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-neutral-500 hover:text-neutral-700'
-                }`}
-              >
-                <CreditCard size={16} /> 카드결제
-              </button>
-            </div>
-
             {/* 에러 메시지 */}
             {errorObj && (
               <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-700 text-sm">
@@ -350,9 +271,7 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
             )}
 
             {/* 가상계좌 영역 */}
-            {payMethod === 'va' && (
-              <>
-                {vaInfo.accountNumber ? (
+            {vaInfo.accountNumber ? (
                   <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-100/50 rounded-full blur-2xl transform group-hover:scale-110 transition-transform duration-700 pointer-events-none" />
                     <div className="relative">
@@ -425,56 +344,9 @@ export default function TenantPaymentView({ invoice, room, contract, tenantName,
                     </button>
                   </div>
                 )}
-                <p className="text-center text-xs font-medium text-neutral-400 mt-2 px-4">
-                  위 계좌로 정확한 금액을 입금하시면 실시간으로 수납이 완료됩니다.
-                </p>
-              </>
-            )}
-
-            {/* 카드결제 영역 */}
-            {payMethod === 'card' && (
-              <div className="space-y-4">
-                <div className="bg-neutral-50 rounded-2xl p-5 border border-neutral-200">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                      <CreditCard size={20} className="text-blue-600" />
-                    </div>
-                    <div>
-                      <div className="text-xs text-neutral-500">결제 금액</div>
-                      <div className="text-2xl font-bold text-neutral-900">
-                        {formatKRW(invoice.amount)}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-neutral-400 leading-relaxed">
-                    신용카드 또는 체크카드로 즉시 결제됩니다.
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleCardPayment}
-                  disabled={cardLoading}
-                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-                >
-                  {cardLoading ? (
-                    <><Loader2 size={18} className="animate-spin" /> 결제 진행 중...</>
-                  ) : (
-                    <><CreditCard size={18} /> 카드로 결제하기</>
-                  )}
-                </button>
-                <p className="text-center text-xs font-medium text-neutral-400 px-4">
-                  KG이니시스 안전결제로 처리됩니다.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 카드결제 성공 */}
-        {cardPaid && (
-          <div className="flex items-center gap-2 px-4 py-4 rounded-xl bg-emerald-50 text-emerald-700 text-sm">
-            <CheckCircle2 size={18} className="shrink-0" />
-            <span className="font-semibold">카드결제가 완료되었습니다. 감사합니다.</span>
+            <p className="text-center text-xs font-medium text-neutral-400 mt-2 px-4">
+              위 계좌로 정확한 금액을 입금하시면 실시간으로 수납이 완료됩니다.
+            </p>
           </div>
         )}
 

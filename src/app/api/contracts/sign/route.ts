@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
 
-  // ── 3. rooms 상태 업데이트 (status만 — 제거된 컬럼 참조하지 않음) ──
+  // ── 3. rooms 상태 업데이트 — 계약 서명 = 입주 확정 ──
   try {
     await supabaseAdmin.from('rooms').update({
-      status: 'UNPAID',
+      status: 'OCCUPIED',
     }).eq('id', contract.room_id)
   } catch (e) {
     console.error('[sign] rooms 상태 업데이트 예외:', e)

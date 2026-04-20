@@ -1,4 +1,4 @@
-export type RoomStatus = "PAID" | "UNPAID" | "VACANT";
+export type RoomStatus = "OCCUPIED" | "VACATED" | "VACANT" | "PAID" | "UNPAID";
 export type PaymentStatus = "PAID" | "UNPAID" | "PARTIAL";
 
 export interface Payment {

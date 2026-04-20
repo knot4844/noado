@@ -15,6 +15,7 @@ import type { Room } from '@/types'
 
 interface Invoice {
   id: string
+  room_id: string
   year: number
   month: number
   paid_amount: number
@@ -111,8 +112,12 @@ export default function ReportsPage() {
   // ── 통계 계산 ──
   const totalRooms   = rooms.length
   const vacantRooms  = rooms.filter(r => r.status === 'VACANT').length
-  const unpaidRooms  = rooms.filter(r => r.status === 'UNPAID')
-  const paidRooms    = rooms.filter(r => r.status === 'PAID')
+  // 수납 상태는 이번 달 invoices 기준 (rooms.status 아님)
+  const currentInvs = invoices.filter(i => i.year === currentYear && i.month === currentMonth)
+  const paidRoomIdSet   = new Set(currentInvs.filter(i => i.status === 'paid').map(i => i.room_id))
+  const unpaidRoomIdSet = new Set(currentInvs.filter(i => i.status !== 'paid').map(i => i.room_id))
+  const unpaidRooms = rooms.filter(r => unpaidRoomIdSet.has(r.id))
+  const paidRooms   = rooms.filter(r => paidRoomIdSet.has(r.id))
   const occupancyRate = totalRooms > 0
     ? Math.round(((totalRooms - vacantRooms) / totalRooms) * 100) : 0
 
@@ -354,7 +359,7 @@ export default function ReportsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  {['호실', '입주사', '월 임대료', '납기일', '상태'].map(h => (
+                  {['호실', '입주사', '월 이용료', '납기일', '상태'].map(h => (
                     <th key={h} className="text-left pb-2 pr-4 font-medium text-xs uppercase tracking-wide"
                         style={{ color: 'var(--color-muted)' }}>
                       {h}

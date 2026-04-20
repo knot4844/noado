@@ -616,7 +616,7 @@ export default function BillingAutomationPage() {
         </div>
         <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight mb-3">정기 청구 스케줄링</h1>
         <p className="text-neutral-500 text-lg">
-          매월 정해진 일자에 임대료와 관리비 청구서를 자동으로 생성하고 <br /> 입주사에게 안내문을 발송합니다.
+          매월 정해진 일자에 이용료와 관리비 청구서를 자동으로 생성하고 <br /> 입주사에게 안내문을 발송합니다.
         </p>
       </header>
 
@@ -643,7 +643,7 @@ export default function BillingAutomationPage() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200 relative">
           <div className="absolute -top-3 -left-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold border-4 border-white shadow-sm">1</div>
           <h3 className="text-lg font-bold mb-2">계약 정보 연동</h3>
-          <p className="text-sm text-neutral-500 mb-6">등록된 입주사의 계약정보(보증금, 월세, 약정일)를 바탕으로 이번 달 청구 기준 데이터를 생성합니다.</p>
+          <p className="text-sm text-neutral-500 mb-6">등록된 입주사의 계약정보(보증금, 월 이용료, 약정일)를 바탕으로 이번 달 청구 기준 데이터를 생성합니다.</p>
           <div className="bg-neutral-50 rounded-lg p-4 flex items-center gap-3">
             <CheckCircle2 className="text-emerald-500" />
             <span className="text-sm font-bold">{activeLeaseCount}개 활성 계약 스캔 완료</span>

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
             roomId: token.replace('demo-token-', ''),
             roomName: '데모 호실',
             businessName: '데모 사업장',
-            tenantName: '데모 임차인',
+            tenantName: '데모 입주사',
             tenantEmail: 'demo-tenant@example.com',
         });
     }

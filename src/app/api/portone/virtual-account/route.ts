@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           channelKey,
-          orderName: `${invoice.year}년 ${invoice.month}월 월세 - ${room?.name ?? ''}`,
+          orderName: `${invoice.year}년 ${invoice.month}월 월 이용료 - ${room?.name ?? ''}`,
           amount:    { total: invoice.amount },
           currency:  'KRW',
           customer:  {

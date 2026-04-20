@@ -34,13 +34,13 @@ export function RoomStatusList() {
             const res = await fetch('/api/rooms', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session!.access_token}` },
-                body: JSON.stringify({ ...form, businessId: bizId, status: form.tenantName ? 'PAID' : 'VACANT' }),
+                body: JSON.stringify({ ...form, businessId: bizId, status: form.tenantName ? 'OCCUPIED' : 'VACANT' }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
             const newRoom: Room = {
                 id: data.room.id, businessId: bizId, name: form.name,
-                status: form.tenantName ? 'PAID' : 'VACANT',
+                status: form.tenantName ? 'OCCUPIED' : 'VACANT',
                 autoNotify: true, unpaidMonths: 0, unpaidAmount: 0,
                 leaseStart: '', leaseEnd: '',
                 paymentInfo: { monthlyRent: form.monthlyRent, deposit: 0, dueDate: '매월 25일', isVATIncluded: false },
@@ -95,7 +95,7 @@ export function RoomStatusList() {
                                 <input className="w-full px-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="101호" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-neutral-600 mb-1">월세 (원)</label>
+                                <label className="block text-xs font-semibold text-neutral-600 mb-1">월 이용료 (원)</label>
                                 <input type="number" className="w-full px-3 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm outline-none focus:border-blue-500" value={form.monthlyRent} onChange={e => setForm({ ...form, monthlyRent: Number(e.target.value) })} />
                             </div>
                             <div>
@@ -120,7 +120,7 @@ export function RoomStatusList() {
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-lg font-bold text-neutral-900">전체 호실 현황 ({rooms.length}개)</h2>
                 <div className="hidden sm:flex gap-4 text-sm">
-                    <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500"></span><span className="text-neutral-600">납부완료</span></div>
+                    <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500"></span><span className="text-neutral-600">완납</span></div>
                     <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500"></span><span className="text-neutral-600">미납</span></div>
                     <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-white border border-neutral-300"></span><span className="text-neutral-600">공실</span></div>
                 </div>
@@ -128,9 +128,10 @@ export function RoomStatusList() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
                 {rooms.map((room) => {
-                    const isPaid = room.status === "PAID";
-                    const isUnpaid = room.status === "UNPAID";
+                    // 수납 상태는 unpaidMonths 기준 (rooms.status 는 입주/퇴실/공실)
                     const isVacant = room.status === "VACANT";
+                    const isUnpaid = !isVacant && (room.unpaidMonths ?? 0) > 0;
+                    const isPaid   = !isVacant && !isUnpaid;
                     return (
                         <Link
                             key={room.id}
