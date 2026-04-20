@@ -41,6 +41,12 @@ export const BUILT_IN_TEMPLATES: TemplateInfo[] = [
     desc:  '프린트 후 대면 서명 — 전자서명 불필요',
     color: '#4a4e69',
   },
+  {
+    id:    'space-use',
+    name:  '공간이용계약서',
+    desc:  '공유오피스·시설 이용 계약 (예치금·상가건물임대차보호법 미적용)',
+    color: '#2a9d8f',
+  },
 ]
 
 function formatMoney(val: string): string {
@@ -117,6 +123,9 @@ export async function generateTemplateImage(
       break
     case 'commercial-lease':
       usedHeight = drawCommercialLease(ctx, W, maxH, data)
+      break
+    case 'space-use':
+      usedHeight = drawSpaceUseContract(ctx, W, maxH, data)
       break
   }
 
@@ -794,7 +803,223 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   5. 공간 이용 계약서 (서면용) — 프린트 후 대면 서명
+   5-1. 공간 이용 계약서 (전자) — 공유오피스·시설 이용, 상가법 미적용
+   ═══════════════════════════════════════════════════════════════ */
+function drawSpaceUseContract(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
+  const mx = 70
+  const clr = '#2a9d8f'
+
+  const PAGE_H = 1697
+
+  // ── 제목 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 54px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('공  간  이  용  계  약  서', W / 2, 70)
+
+  ctx.fillStyle = '#666'
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText('( 공유오피스·시설 이용 — 민법 적용 )', W / 2, 115)
+
+  ctx.strokeStyle = clr
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(mx, 145)
+  ctx.lineTo(W - mx, 145)
+  ctx.stroke()
+
+  const labelW = 200
+  const valueW = W - mx * 2 - labelW
+  const rowH = 50
+  const opts = { labelBg: '#e0f2f0', color: clr }
+
+  // ── 이용 목적물의 표시 ──
+  let y = 165
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillText('▪ 이용 목적물의 표시', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '소 재 지', d.address || '—', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용 공간', d.room_name || '—', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '공간 용도', '공유오피스 / 업무용 시설', opts)
+  y += rowH + 16
+
+  // ── 계약 당사자 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.fillText('▪ 계약 당사자', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '운영사 (갑)', '대우오피스 / 이동윤', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용자 (을)', d.tenant_name || '(서명 시 입력)', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', formatDateKR(d.tenant_birth || ''), opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '—', opts)
+  y += rowH + 16
+
+  // ── 이용 조건 ──
+  ctx.fillStyle = clr
+  ctx.font = 'bold 28px "Pretendard", sans-serif'
+  ctx.fillText('▪ 이용 조건', mx, y)
+  y += 38
+
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용 기간', `${formatDateKR(d.lease_start)} ~ ${formatDateKR(d.lease_end)}`, opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '예 치 금', `금 ${formatMoney(d.deposit)}원정`, opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 이용료', `금 ${formatMoney(d.monthly_rent)}원정`, opts)
+  y += rowH
+  const vatRow = computeVatRow(d.monthly_rent, d.vat_type)
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '부가가치세', vatRow.vatLabel, opts)
+  y += rowH
+  if (vatRow.totalLabel) {
+    drawTableRow(ctx, mx, y, labelW, valueW, rowH, '월 총 납부액', vatRow.totalLabel, opts)
+    y += rowH
+  }
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '납부 계좌', '신한 110-517-388781 (이동윤)', opts)
+  y += rowH + 20
+
+  // ── 계약 조항 ──
+  ctx.strokeStyle = '#ccc'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(mx, y)
+  ctx.lineTo(W - mx, y)
+  ctx.stroke()
+  y += 16
+
+  const clauses: { title: string; items: string[] }[] = [
+    { title: '제 1 조 (이용 기간 및 갱신)', items: [
+      '① 본 계약의 이용 기간은 상기 이용 조건에 기재된 기간으로 한다.',
+      '② 이용 기간 만료 1개월 전까지 쌍방이 갱신 거절 또는 조건 변경을 서면·전자문서로 통보하지 않는 경우, 동일한 조건으로 1개월씩 자동 갱신된 것으로 본다.',
+      '③ 이용자는 운영사의 사전 동의 없이 본 계약상 지위나 이용 공간을 제3자에게 양도·전대할 수 없다.',
+    ]},
+    { title: '제 2 조 (예치금)', items: [
+      '① 이용자는 본 계약 체결과 동시에 예치금 전액을 운영사에게 지급한다.',
+      '② 예치금은 이용료 미납, 실비 미납, 원상복구 비용 등 이용자의 채무를 담보하는 목적으로 보관된다.',
+      '③ 예치금은 무이자이며, 계약 종료 및 명도·정산 완료 후 14일 이내에 반환한다.',
+      '④ 이용자는 예치금을 월 이용료에 충당하도록 요구할 수 없다.',
+    ]},
+    { title: '제 3 조 (이용료 납부)', items: [
+      '① 이용자는 매월 이용료 및 부가가치세를 납부 기일까지 운영사의 지정 계좌로 선납한다.',
+      '② 부가가치세는 이용료에 포함되지 않으며 별도로 납부한다.',
+      '③ 납부 기일까지 미납 시 연 12%의 지연손해금을 가산하여 납부한다.',
+      '④ 전기료·주차·인터넷 등 실비는 별도로 청구되며, 사용 내역에 따라 정산한다.',
+    ]},
+    { title: '제 4 조 (이용료 연체 및 조치)', items: [
+      '① 1개월 연체 시 운영사는 서면·전자문서로 이행을 최고할 수 있다.',
+      '② 2개월 이상 연체 시 운영사는 별도 최고 없이 즉시 본 계약을 해지하고 이용 공간의 명도를 요구할 수 있다.',
+      '③ 명도 지연 시 월 이용료의 2배에 해당하는 금액을 지연 손해배상금으로 지급한다.',
+    ]},
+    { title: '제 5 조 (이용료 조정)', items: [
+      '① 운영 비용·공공요금 등 인상 요인이 있는 경우 운영사는 이용료를 조정할 수 있으며, 이용자에게 만료 1개월 전까지 서면 통보한다.',
+      '② 이용자가 조정에 동의하지 않을 경우 기간 만료일을 기준으로 계약을 종료한다.',
+    ]},
+    { title: '제 6 조 (시설 설치 및 원상복구)', items: [
+      '① 이용자는 운영사의 사전 서면 동의 없이 시설물을 신설·변경·부착할 수 없다.',
+      '② 계약 종료 시 이용 공간을 입주 당시 상태로 원상복구하여 반환한다.',
+    ]},
+    { title: '제 7 조 (이용자의 의무)', items: [
+      '① 이용자는 선량한 관리자의 주의로 공간 및 공용 시설을 사용한다.',
+      '② 계약상 용도 외로 사용하거나 제3자에게 전대·양도할 수 없다.',
+      '③ 퇴실 30일 전까지 운영사에게 서면·전자문서로 퇴실 의사를 통보한다.',
+      '④ 공동 이용자의 업무를 방해하거나 시설·설비를 손상시키지 아니한다.',
+    ]},
+    { title: '제 8 조 (운영사의 면책)', items: [
+      '① 천재지변, 화재, 도난, 정전, 통신장애 등 불가항력 사유로 인한 손해에 대하여 운영사는 책임을 지지 아니한다.',
+      '② 이용자의 귀책으로 발생한 손해는 이용자가 부담한다.',
+    ]},
+    { title: '제 9 조 (계약의 해지)', items: [
+      '① 이용자가 본 계약의 각 조항을 위반하거나 이용료를 2개월 이상 연체한 경우 운영사는 즉시 계약을 해지할 수 있다.',
+      '② 이용자의 사정으로 중도 해지 시 잔여기간 이용료의 10%를 위약금으로 지급한다.',
+      '③ 중대 위반 또는 해지 사유 발생 시 이용자는 즉시 이용 공간을 자진 명도한다.',
+    ]},
+    { title: '제 10 조 (개인정보 및 비밀유지)', items: [
+      '① 쌍방은 본 계약 수행 과정에서 알게 된 상대방의 정보를 제3자에게 누설하지 아니한다.',
+      '② 운영사는 관계 법령에 따라 이용자의 개인정보를 안전하게 관리한다.',
+    ]},
+    { title: '제 11 조 (기타 사항 및 준거법)', items: [
+      '① 본 계약은 공유오피스·시설 이용 계약으로서 상가건물임대차보호법이 적용되지 아니하며, 민법 및 관계 법령에 따른다.',
+      '② 본 계약에서 정하지 않은 사항은 민법, 약관의 규제에 관한 법률 등 관계 법령과 운영사의 이용 약관에 따른다.',
+      '③ 분쟁의 관할 법원은 운영사 소재지를 관할하는 법원으로 한다.',
+      '④ 본 계약서는 전자문서로 작성·보관되며, 쌍방의 전자서명으로 효력이 발생한다.',
+    ]},
+  ]
+
+  ctx.textAlign = 'left'
+  for (const clause of clauses) {
+    ctx.fillStyle = clr
+    ctx.font = 'bold 24px "Pretendard", sans-serif'
+    ctx.fillText(clause.title, mx, y)
+    y += 30
+    ctx.fillStyle = '#333'
+    ctx.font = '20px "Pretendard", sans-serif'
+    for (const item of clause.items) {
+      y = drawWrappedText(ctx, item, mx + 14, y, W - mx * 2 - 28, 28)
+      y += 2
+    }
+    y += 10
+  }
+
+  // ── 특약사항 ──
+  if (d.special_terms) {
+    ctx.fillStyle = clr
+    ctx.font = 'bold 28px "Pretendard", sans-serif'
+    ctx.fillText('▪ 특약 사항', mx, y)
+    y += 38
+    ctx.fillStyle = '#333'
+    ctx.font = '22px "Pretendard", sans-serif'
+    y = drawWrappedText(ctx, d.special_terms, mx, y, W - mx * 2, 32)
+    y += 16
+  }
+
+  const maxY = PAGE_H * 2 - 140
+  if (y > maxY) y = maxY
+
+  // ── 날짜 + 확인 문구 ──
+  y += 14
+  ctx.strokeStyle = clr
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(mx, y)
+  ctx.lineTo(W - mx, y)
+  ctx.stroke()
+  y += 20
+
+  ctx.fillStyle = '#333'
+  ctx.font = '20px "Pretendard", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
+  y += 28
+  ctx.font = '22px "Pretendard", sans-serif'
+  ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
+  y += 32
+
+  ctx.textAlign = 'left'
+  ctx.font = '18px "Pretendard", sans-serif'
+  ctx.fillText('운 영 사 (갑):  대우오피스 / 이동윤          (서명 또는 날인)', mx, y)
+  y += 24
+  ctx.fillText(`이 용 자 (을):  ${d.tenant_name || ''}                        (서명 또는 날인)`, mx, y)
+  y += 18
+
+  ctx.fillStyle = '#888'
+  ctx.font = '14px "Pretendard", sans-serif'
+  ctx.fillText('※ 아래 전자서명란에 서명해주세요.', mx, y)
+  y += 14
+
+  return y
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5-2. 공간 이용 계약서 (서면용) — 프린트 후 대면 서명
    ═══════════════════════════════════════════════════════════════ */
 function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number, d: TemplateData) {
   const mx = 70
