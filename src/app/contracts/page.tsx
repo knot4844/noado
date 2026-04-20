@@ -82,19 +82,20 @@ export default function ContractsPage() {
       supabase.from('rooms').select('id, name, status, owner_id, building, area').eq('owner_id', user.id),
       supabase
         .from('leases')
-        .select('room_id, tenant_id, monthly_rent, pledge_amount, lease_start, lease_end, vat_type, status, tenants(name, phone, email)')
+        .select('room_id, tenant_id, monthly_rent, pledge_amount, lease_start, lease_end, vat_type, status, tenants(name, phone, email, birth_date)')
         .eq('owner_id', user.id)
         .eq('status', 'ACTIVE'),
     ])
 
     // leases → room별 입주사 정보 매핑
-    const leaseByRoom: Record<string, { tenant_name: string; tenant_phone: string; tenant_email: string; monthly_rent: number; deposit: number; lease_start: string; lease_end: string; vat_type: string }> = {}
+    const leaseByRoom: Record<string, { tenant_name: string; tenant_phone: string; tenant_email: string; tenant_birth: string; monthly_rent: number; deposit: number; lease_start: string; lease_end: string; vat_type: string }> = {}
     for (const l of (leaseData || []) as Array<Record<string, unknown>>) {
       const t = l.tenants as Record<string, string> | null
       leaseByRoom[l.room_id as string] = {
         tenant_name: t?.name || '',
         tenant_phone: t?.phone || '',
         tenant_email: t?.email || '',
+        tenant_birth: t?.birth_date || '',
         monthly_rent: (l.monthly_rent as number) || 0,
         deposit: (l.pledge_amount as number) || 0,
         lease_start: (l.lease_start as string) || '',
@@ -465,6 +466,7 @@ function CreateContractModal({
     tenant_name:  '',
     tenant_phone: '',
     tenant_email: '',
+    tenant_birth: '',
     address:      '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스',
     monthly_rent: '',
     deposit:      '',
@@ -528,6 +530,7 @@ function CreateContractModal({
       tenant_name:  (r.tenant_name as string)  ?? '',
       tenant_phone: (r.tenant_phone as string) ?? '',
       tenant_email: (r.tenant_email as string) ?? '',
+      tenant_birth: (r.tenant_birth as string) ?? '',
       monthly_rent: String(r.monthly_rent ?? ''),
       deposit:      String(r.deposit ?? ''),
       lease_start:  (r.lease_start as string) ?? '',
@@ -570,6 +573,7 @@ function CreateContractModal({
           const tplData: TemplateData = {
             tenant_name:   form.tenant_name,
             tenant_phone:  form.tenant_phone,
+            tenant_birth:  form.tenant_birth,
             address:       form.address,
             monthly_rent:  form.monthly_rent,
             deposit:       form.deposit,
@@ -692,7 +696,10 @@ function CreateContractModal({
             <CField label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} type="tel" />
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <CField label="생년월일" value={form.tenant_birth} onChange={set('tenant_birth')} type="date" />
             <CField label="이메일" value={form.tenant_email} onChange={set('tenant_email')} type="email" />
+          </div>
+          <div className="grid grid-cols-1 gap-3">
             <CField label="소재지/호실주소" value={form.address} onChange={set('address')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1654,7 +1661,7 @@ function ScanUploadModal({
   const [step, setStep] = useState<1 | 2>(1)
 
   const [form, setForm] = useState({
-    room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '',
+    room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '', tenant_birth: '',
     address: '경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스', monthly_rent: '', deposit: '',
     lease_start: '', lease_end: '', special_terms: '',
     vat_type: 'NONE' as 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE',
@@ -1681,6 +1688,7 @@ function ScanUploadModal({
       tenant_name:  (r.tenant_name as string)  ?? '',
       tenant_phone: (r.tenant_phone as string) ?? '',
       tenant_email: (r.tenant_email as string) ?? '',
+      tenant_birth: (r.tenant_birth as string) ?? '',
       monthly_rent: String(r.monthly_rent ?? ''),
       deposit:      String(r.deposit ?? ''),
       lease_start:  (r.lease_start as string) ?? '',
@@ -1711,6 +1719,7 @@ function ScanUploadModal({
       const selectedRoom = rooms.find(r => r.id === form.room_id)
       const tplData: TemplateData = {
         tenant_name: form.tenant_name, tenant_phone: form.tenant_phone,
+        tenant_birth: form.tenant_birth,
         address: form.address, monthly_rent: form.monthly_rent,
         deposit: form.deposit, lease_start: form.lease_start,
         lease_end: form.lease_end, special_terms: form.special_terms,
@@ -1920,7 +1929,10 @@ function ScanUploadModal({
                 <CField label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} type="tel" />
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <CField label="생년월일" value={form.tenant_birth} onChange={set('tenant_birth')} type="date" />
                 <CField label="이메일" value={form.tenant_email} onChange={set('tenant_email')} type="email" />
+              </div>
+              <div className="grid grid-cols-1 gap-3">
                 <CField label="소재지/호실주소" value={form.address} onChange={set('address')} />
               </div>
               <div className="grid grid-cols-2 gap-3">

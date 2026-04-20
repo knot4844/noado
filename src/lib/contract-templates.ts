@@ -10,6 +10,7 @@ export type ContractVatType = 'VAT_INVOICE' | 'CASH_RECEIPT' | 'NONE'
 export interface TemplateData {
   tenant_name:  string
   tenant_phone: string
+  tenant_birth?: string          // 생년월일 (YYYY-MM-DD)
   address:      string
   monthly_rent: string
   deposit:      string
@@ -255,6 +256,8 @@ function drawBasicLease(ctx: CanvasRenderingContext2D, W: number, _H: number, d:
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '성명/상호', d.tenant_name || '—')
   y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', formatDateKR(d.tenant_birth || ''))
+  y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '—')
   y += rowH + 20
 
@@ -383,6 +386,8 @@ function drawSharedOffice(ctx: CanvasRenderingContext2D, W: number, _H: number, 
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '상호/성명', d.tenant_name || '—', opts)
   y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', formatDateKR(d.tenant_birth || ''), opts)
+  y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '—', opts)
   y += rowH + 20
 
@@ -487,6 +492,8 @@ function drawShortTerm(ctx: CanvasRenderingContext2D, W: number, _H: number, d: 
   y += 45
 
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '이용자', d.tenant_name || '—', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', formatDateKR(d.tenant_birth || ''), opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연락처', d.tenant_phone || '—', opts)
   y += rowH
@@ -626,6 +633,10 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '운영사 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '입주사 (을)', d.tenant_name || '(서명 시 입력)', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', formatDateKR(d.tenant_birth || ''), opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '—', opts)
   y += rowH + 16
 
   // ── 이용 조건 ──
@@ -840,6 +851,10 @@ function drawPaperContract(ctx: CanvasRenderingContext2D, W: number, _H: number,
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '운영사 (갑)', '대우오피스 / 이동윤', opts)
   y += rowH
   drawTableRow(ctx, mx, y, labelW, valueW, rowH, '입주사 (을)', d.tenant_name || '(                    )', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '생년월일', d.tenant_birth ? formatDateKR(d.tenant_birth) : '(                    )', opts)
+  y += rowH
+  drawTableRow(ctx, mx, y, labelW, valueW, rowH, '연 락 처', d.tenant_phone || '(                    )', opts)
   y += rowH + 16
 
   // ── 이용 조건 ──
