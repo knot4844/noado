@@ -921,20 +921,28 @@ function CreateContractModal({
 
 /* ─── 계약서 미리보기 모달 ─── */
 function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoom; onClose: () => void }) {
-  const snap = contract.contract_snapshot as Record<string, string> | null
+  const snap = contract.contract_snapshot as Record<string, unknown> | null
   const r    = contract.room
 
-  /* 계약서 양식 인쇄 */
+  /* 다중 페이지 지원: snapshot.scan_urls 가 있으면 그걸 쓰고, 없으면 template_url 단일 사용 */
+  const scanUrls: string[] = Array.isArray(snap?.scan_urls)
+    ? (snap!.scan_urls as string[])
+    : (contract.template_url ? [contract.template_url] : [])
+
+  /* 계약서 양식 인쇄 (전체 페이지) */
   const handlePrint = () => {
-    if (!contract.template_url) return
+    if (scanUrls.length === 0) return
     const w = window.open('', '_blank')
     if (!w) return
+    const total = scanUrls.length
+    const imgs = scanUrls.map((u, i) =>
+      `<img src="${u}" data-idx="${i}" onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),300);" />`
+    ).join('')
     w.document.write(`<!DOCTYPE html><html><head><title>계약서 인쇄</title><style>
-      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; } }
-      body { margin: 0; display: flex; justify-content: center; } img { max-width: 100%; height: auto; }
-    </style></head><body>
-      <img src="${contract.template_url}" onload="setTimeout(()=>{window.print();},300)" />
-    </body></html>`)
+      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; page-break-after: always; } img:last-child { page-break-after: auto; } }
+      body { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+      img { max-width: 100%; height: auto; }
+    </style></head><body>${imgs}</body></html>`)
     w.document.close()
   }
 
@@ -972,13 +980,13 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 <table>
   <tr><th>계약 ID</th><td style="font-family:monospace;font-size:11px">${c.id}</td></tr>
   <tr><th>호실</th><td>${r?.name ?? '—'}</td></tr>
-  <tr><th>입주사</th><td>${s?.tenant_name ?? c.tenant_name ?? '—'}</td></tr>
-  <tr><th>연락처</th><td>${s?.tenant_phone ?? c.tenant_phone ?? '—'}</td></tr>
-  <tr><th>소재지</th><td>${s?.address ?? '—'}</td></tr>
+  <tr><th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
+  <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td></tr>
+  <tr><th>소재지</th><td>${String(s?.address ?? '—')}</td></tr>
   <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td></tr>
   <tr><th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
   <tr><th>계약기간</th><td>${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
-  <tr><th>특약사항</th><td>${s?.special_terms ?? '없음'}</td></tr>
+  <tr><th>특약사항</th><td>${String(s?.special_terms ?? '없음')}</td></tr>
   <tr><th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
 </table>
 
@@ -1009,7 +1017,7 @@ ${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src=
 <p>서명 당시 계약 내용의 원본 데이터입니다.</p>
 <div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
 
-${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.template_url}" target="_blank">${c.template_name ?? c.template_url}</a></p>` : ''}
+${scanUrls.length > 0 ? `<h2>6. 계약서 양식 (${scanUrls.length}장)</h2>${scanUrls.map((u, i) => `<p>${i + 1}쪽: <a href="${u}" target="_blank">${u}</a></p><div style="margin: 8px 0; page-break-inside: avoid;"><img src="${u}" style="max-width: 100%; border: 1px solid #ccc;" /></div>`).join('')}` : ''}
 
 <div class="footer">
   <p>본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
@@ -1025,16 +1033,20 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
     setTimeout(() => w.print(), 500)
   }
 
+  const sv = (k: string): string => {
+    const v = snap?.[k]
+    return v == null || v === '' ? '' : String(v)
+  }
   const rows = [
-    { label: '입주사',      value: snap?.tenant_name ?? contract.tenant_name ?? '—' },
-    { label: '연락처',      value: snap?.tenant_phone ?? contract.tenant_phone ?? '—' },
-    { label: '주소',        value: snap?.tenant_address ?? snap?.address ?? '—' },
-    { label: '사업자번호',  value: snap?.tenant_business_no ?? '—' },
-    { label: '업종',        value: snap?.tenant_biz_type ?? '—' },
-    { label: '보증금',      value: snap?.deposit ? `${Number(snap.deposit).toLocaleString()}원` : '—' },
-    { label: '월 이용료',        value: snap?.monthly_rent ? `${Number(snap.monthly_rent).toLocaleString()}원` : '—' },
+    { label: '입주사',      value: sv('tenant_name') || contract.tenant_name || '—' },
+    { label: '연락처',      value: sv('tenant_phone') || contract.tenant_phone || '—' },
+    { label: '주소',        value: sv('tenant_address') || sv('address') || '—' },
+    { label: '사업자번호',  value: sv('tenant_business_no') || '—' },
+    { label: '업종',        value: sv('tenant_biz_type') || '—' },
+    { label: '보증금',      value: sv('deposit') ? `${Number(sv('deposit')).toLocaleString()}원` : '—' },
+    { label: '월 이용료',   value: sv('monthly_rent') ? `${Number(sv('monthly_rent')).toLocaleString()}원` : '—' },
     { label: '계약기간',    value: contract.lease_start && contract.lease_end ? `${formatDate(contract.lease_start)} ~ ${formatDate(contract.lease_end)}` : '—' },
-    { label: '특약사항',    value: snap?.special_terms ?? '없음' },
+    { label: '특약사항',    value: sv('special_terms') || '없음' },
     { label: '콘텐츠 해시', value: contract.content_hash ? contract.content_hash.slice(0, 16) + '...' : '—' },
     { label: '서명일',      value: contract.signed_at ? formatDate(contract.signed_at) : '미서명' },
     { label: '서명 IP',     value: contract.signer_ip ?? '—' },
@@ -1067,26 +1079,37 @@ ${c.template_url ? `<h2>6. 계약서 양식</h2><p>양식 URL: <a href="${c.temp
             </div>
           </div>
 
-          {/* 업로드된 계약서 양식 */}
-          {contract.template_url && (
+          {/* 업로드된 계약서 양식 (다중 페이지 지원) */}
+          {scanUrls.length > 0 && (
             <div className="mb-5 pb-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>업로드된 계약서 양식</p>
-                <a href={contract.template_url} target="_blank" rel="noreferrer"
-                   className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
-                  <Download size={11} /> {contract.template_name || '다운로드'}
-                </a>
+                <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>
+                  업로드된 계약서 양식 {scanUrls.length > 1 ? `(${scanUrls.length}장)` : ''}
+                </p>
+                {contract.template_url && (
+                  <a href={contract.template_url} target="_blank" rel="noreferrer"
+                     className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
+                    <Download size={11} /> {contract.template_name || '다운로드'}
+                  </a>
+                )}
               </div>
-              {contract.template_mime?.startsWith('image/') ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={contract.template_url} alt={contract.template_name || '계약서 양식'}
-                     className="w-full rounded-lg border" style={{ borderColor: 'var(--color-border)' }} />
-              ) : contract.template_mime === 'application/pdf' ? (
-                <iframe src={contract.template_url} className="w-full rounded-lg border"
-                        style={{ borderColor: 'var(--color-border)', height: 360 }} title="계약서 양식" />
-              ) : (
-                <p className="text-xs" style={{ color: 'var(--color-muted)' }}>미리보기를 지원하지 않는 형식입니다. 다운로드 후 확인해주세요.</p>
-              )}
+              <div className="flex flex-col gap-3">
+                {scanUrls.map((url, i) => (
+                  <div key={i}>
+                    {scanUrls.length > 1 && (
+                      <p className="text-xs mb-1" style={{ color: 'var(--color-muted)' }}>{i + 1}쪽</p>
+                    )}
+                    {contract.template_mime === 'application/pdf' && i === 0 && scanUrls.length === 1 ? (
+                      <iframe src={url} className="w-full rounded-lg border"
+                              style={{ borderColor: 'var(--color-border)', height: 360 }} title={`계약서 양식 ${i + 1}`} />
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={url} alt={`계약서 양식 ${i + 1}`}
+                           className="w-full rounded-lg border" style={{ borderColor: 'var(--color-border)' }} />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
