@@ -929,20 +929,78 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
     ? (snap!.scan_urls as string[])
     : (contract.template_url ? [contract.template_url] : [])
 
-  /* 계약서 양식 인쇄 (전체 페이지) */
+  /* 계약서 양식 인쇄 (전체 페이지 + 서명 페이지) */
   const handlePrint = () => {
-    if (scanUrls.length === 0) return
+    if (scanUrls.length === 0 && !contract.signature_data_url && !contract.owner_signature_url) return
     const w = window.open('', '_blank')
     if (!w) return
-    const total = scanUrls.length
-    const imgs = scanUrls.map((u, i) =>
-      `<img src="${u}" data-idx="${i}" onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),300);" />`
-    ).join('')
-    w.document.write(`<!DOCTYPE html><html><head><title>계약서 인쇄</title><style>
-      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; page-break-after: always; } img:last-child { page-break-after: auto; } }
-      body { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-      img { max-width: 100%; height: auto; }
-    </style></head><body>${imgs}</body></html>`)
+
+    /* 모든 이미지 (계약서 페이지 + 서명들) — 전부 로딩 후 인쇄 */
+    const allImgs: string[] = [...scanUrls]
+    if (contract.owner_signature_url) allImgs.push(contract.owner_signature_url)
+    if (contract.signature_data_url) allImgs.push(contract.signature_data_url)
+    const total = allImgs.length
+
+    const onloadAttr = `onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);" onerror="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);"`
+
+    const pages = scanUrls.map(u => `<div class="page"><img src="${u}" ${onloadAttr} /></div>`).join('')
+
+    /* 서명 페이지 — 운영사 + 입주사 서명을 한 페이지에 */
+    const sigPage = (contract.owner_signature_url || contract.signature_data_url) ? `
+      <div class="page sig-page">
+        <h2>전자서명</h2>
+        <table>
+          <tr><th>호실</th><td>${r?.name ?? '—'}</td>
+              <th>입주사</th><td>${String(snap?.tenant_name ?? contract.tenant_name ?? '—')}</td></tr>
+          <tr><th>계약기간</th><td colspan="3">${contract.lease_start && contract.lease_end ? contract.lease_start + ' ~ ' + contract.lease_end : '—'}</td></tr>
+        </table>
+
+        <div class="sig-grid">
+          <div class="sig-cell">
+            <div class="sig-label">운영사 (갑)</div>
+            ${contract.owner_signature_url ? `<img class="sig-img" src="${contract.owner_signature_url}" ${onloadAttr} />` : '<div class="sig-empty">미서명</div>'}
+            <div class="sig-meta">
+              ${contract.owner_signed_at ? '서명일: ' + new Date(contract.owner_signed_at).toLocaleString('ko-KR') : ''}
+              ${contract.owner_signer_ip ? '<br/>IP: ' + contract.owner_signer_ip : ''}
+            </div>
+          </div>
+          <div class="sig-cell">
+            <div class="sig-label">입주사 (을)</div>
+            ${contract.signature_data_url ? `<img class="sig-img" src="${contract.signature_data_url}" ${onloadAttr} />` : '<div class="sig-empty">미서명</div>'}
+            <div class="sig-meta">
+              ${contract.signed_at ? '서명일: ' + new Date(contract.signed_at).toLocaleString('ko-KR') : ''}
+              ${contract.signer_ip ? '<br/>IP: ' + contract.signer_ip : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="hash-box">
+          <div class="hash-label">콘텐츠 무결성 해시 (SHA-256)</div>
+          <div class="hash-val">${contract.content_hash ?? '(없음)'}</div>
+        </div>
+      </div>
+    ` : ''
+
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>계약서 인쇄</title><style>
+      @media print { @page { margin: 10mm; } body { margin: 0; } .page { page-break-after: always; } .page:last-child { page-break-after: auto; } }
+      body { margin: 0; font-family: 'Pretendard', sans-serif; color: #1d3557; }
+      .page { display: flex; flex-direction: column; align-items: center; padding: 12px; }
+      .page > img { max-width: 100%; height: auto; }
+      .sig-page { padding: 40px; }
+      .sig-page h2 { font-size: 20px; border-bottom: 2px solid #1d3557; padding-bottom: 8px; margin-bottom: 20px; align-self: stretch; }
+      .sig-page table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 13px; }
+      .sig-page th, .sig-page td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+      .sig-page th { background: #f0f4f8; width: 100px; }
+      .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; margin-bottom: 28px; }
+      .sig-cell { border: 1px solid #ccc; padding: 16px; min-height: 200px; display: flex; flex-direction: column; }
+      .sig-label { font-weight: bold; font-size: 14px; margin-bottom: 12px; }
+      .sig-img { max-height: 100px; max-width: 100%; align-self: center; margin: 8px 0; }
+      .sig-empty { color: #999; padding: 30px; text-align: center; }
+      .sig-meta { font-size: 11px; color: #666; margin-top: auto; padding-top: 12px; border-top: 1px dashed #ddd; }
+      .hash-box { width: 100%; background: #f5f5f5; padding: 12px; border-radius: 4px; }
+      .hash-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+      .hash-val { font-family: monospace; font-size: 10px; word-break: break-all; }
+    </style></head><body>${pages}${sigPage}</body></html>`)
     w.document.close()
   }
 
@@ -1017,7 +1075,7 @@ ${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src=
 <p>서명 당시 계약 내용의 원본 데이터입니다.</p>
 <div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
 
-${scanUrls.length > 0 ? `<h2>6. 계약서 양식 (${scanUrls.length}장)</h2>${scanUrls.map((u, i) => `<p>${i + 1}쪽: <a href="${u}" target="_blank">${u}</a></p><div style="margin: 8px 0; page-break-inside: avoid;"><img src="${u}" style="max-width: 100%; border: 1px solid #ccc;" /></div>`).join('')}` : ''}
+${scanUrls.length > 0 ? `<h2>6. 계약서 양식 (${scanUrls.length}장)</h2><ol style="font-size:12px;">${scanUrls.map((u, i) => `<li>${i + 1}쪽: <a href="${u}" target="_blank">${u}</a></li>`).join('')}</ol>` : ''}
 
 <div class="footer">
   <p>본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
