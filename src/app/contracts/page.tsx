@@ -1035,14 +1035,26 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   .badge-ok { background: #d4edda; color: #155724; }
   .badge-no { background: #f8d7da; color: #721c24; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #1d3557; font-size: 11px; color: #888; }
-  @media print { body { padding: 20px; } }
+  .doc-page { margin: 16px 0; page-break-inside: avoid; break-inside: avoid; text-align: center; }
+  .doc-page img { max-width: 100%; max-height: 270mm; height: auto; border: 1px solid #ddd; display: block; margin: 0 auto; }
+  .doc-page .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  @page { size: A4; margin: 12mm; }
+  @media print {
+    body { max-width: none; padding: 0; }
+    .doc-page { page-break-after: always; break-after: page; }
+    h2.section-break { page-break-before: always; break-before: page; }
+  }
 </style></head><body>
 <h1>전자서명 증거 패키지</h1>
-<p>출력일시: ${now}</p>
+<p>출력일시: ${now} · 계약 ID: <span style="font-family:monospace;font-size:11px">${c.id}</span></p>
 
-<h2>1. 계약 정보</h2>
+${scanUrls.length > 0 ? `
+<h2>1. 계약서 원본 (${scanUrls.length}장)</h2>
+${scanUrls.map((u, i) => `<div class="doc-page"><div class="label">${i + 1} / ${scanUrls.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
+` : ''}
+
+<h2 class="section-break">2. 계약 정보</h2>
 <table>
-  <tr><th>계약 ID</th><td style="font-family:monospace;font-size:11px">${c.id}</td></tr>
   <tr><th>호실</th><td>${r?.name ?? '—'}</td></tr>
   <tr><th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
   <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td></tr>
@@ -1054,7 +1066,7 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   <tr><th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
 </table>
 
-<h2>2. 운영사(갑) 전자서명</h2>
+<h2>3. 운영사(갑) 전자서명</h2>
 <table>
   <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
   <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
@@ -1062,7 +1074,7 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 </table>
 ${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
 
-<h2>3. 입주사(을) 전자서명</h2>
+<h2>4. 입주사(을) 전자서명</h2>
 <table>
   <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
   <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
@@ -1070,18 +1082,16 @@ ${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src
 </table>
 ${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
 
-<h2>4. 콘텐츠 무결성 검증 (SHA-256)</h2>
+<h2>5. 콘텐츠 무결성 검증 (SHA-256)</h2>
 <p>계약서 작성 시점에 계약 내용을 SHA-256으로 해싱하여 저장합니다.<br/>
 아래 해시값이 일치하면 서명 이후 계약 내용이 변조되지 않았음을 증명합니다.</p>
 <table>
   <tr><th>저장된 해시</th><td class="hash">${c.content_hash ?? '(없음)'}</td></tr>
 </table>
 
-<h2>5. 계약 원문 스냅샷 (JSON)</h2>
+<h2>6. 계약 원문 스냅샷 (JSON)</h2>
 <p>서명 당시 계약 내용의 원본 데이터입니다.</p>
 <div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-
-${scanUrls.length > 0 ? `<h2>6. 계약서 양식 (${scanUrls.length}장)</h2><ol style="font-size:12px;">${scanUrls.map((u, i) => `<li>${i + 1}쪽: <a href="${u}" target="_blank">${u}</a></li>`).join('')}</ol>` : ''}
 
 <div class="footer">
   <p>본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
@@ -1089,12 +1099,36 @@ ${scanUrls.length > 0 ? `<h2>6. 계약서 양식 (${scanUrls.length}장)</h2><ol
 </div>
 </body></html>`
 
+    /* 모든 이미지가 로딩된 후 인쇄 — 빈 페이지/누락 방지 */
+    const allImgs = [
+      ...scanUrls,
+      ...(c.owner_signature_url ? [c.owner_signature_url] : []),
+      ...(c.signature_data_url ? [c.signature_data_url] : []),
+    ]
+    const total = allImgs.length
+
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(html)
     w.document.close()
-    // 자동 인쇄 (PDF 저장 가능)
-    setTimeout(() => w.print(), 500)
+    // 모든 이미지 로딩 완료 후 인쇄 (이미지 없으면 즉시)
+    if (total === 0) {
+      setTimeout(() => w.print(), 300)
+    } else {
+      let loaded = 0
+      const tryPrint = () => {
+        loaded += 1
+        if (loaded >= total) setTimeout(() => w.print(), 400)
+      }
+      const imgs = w.document.images
+      for (let i = 0; i < imgs.length; i++) {
+        const img = imgs[i]
+        if (img.complete) tryPrint()
+        else { img.addEventListener('load', tryPrint); img.addEventListener('error', tryPrint) }
+      }
+      // 안전망: 6초 후 무조건 인쇄
+      setTimeout(() => w.print(), 6000)
+    }
   }
 
   const sv = (k: string): string => {
