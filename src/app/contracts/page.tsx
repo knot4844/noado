@@ -12,7 +12,7 @@ import {
   Camera, ArrowRight, ArrowLeft, ImageIcon,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import { BUILT_IN_TEMPLATES, generateTemplateImage } from '@/lib/contract-templates'
+import { BUILT_IN_TEMPLATES, generateTemplateImagePages } from '@/lib/contract-templates'
 import type { TemplateData } from '@/lib/contract-templates'
 import type { Contract, Room } from '@/types'
 
@@ -586,7 +586,7 @@ function CreateContractModal({
         setSaving(false)
         return
       } else {
-        // Canvas 자동생성
+        // Canvas 자동생성 (다중 페이지)
         setGeneratingTemplate(true)
         try {
           const selectedRoom = rooms.find(r => r.id === form.room_id)
@@ -603,10 +603,12 @@ function CreateContractModal({
             room_name:     selectedRoom?.name ?? '',
             vat_type:      form.vat_type,
           }
-          const blob = await generateTemplateImage(selectedBuiltIn, tplData)
+          const pageBlobs = await generateTemplateImagePages(selectedBuiltIn, tplData)
           const tplInfo = BUILT_IN_TEMPLATES.find(t => t.id === selectedBuiltIn)
-          finalTemplateFile = new File([blob], `${tplInfo?.name ?? '계약서'}.png`, { type: 'image/png' })
+          finalTemplateFile = new File([pageBlobs[0]], `${tplInfo?.name ?? '계약서'}.png`, { type: 'image/png' })
           finalOriginalName = null
+          /* 추가 페이지를 모두 업로드 후 scan_urls 에 저장 */
+          ;(window as unknown as { __extraPages?: Blob[] }).__extraPages = pageBlobs.slice(1)
         } catch (err) {
           const msg = err instanceof Error ? err.message : '양식 생성 실패'
           onError(`양식 생성 실패: ${msg}`)
@@ -618,10 +620,11 @@ function CreateContractModal({
       }
     }
 
-    // 양식 파일 업로드
+    // 양식 파일 업로드 (다중 페이지 지원)
     let template_url: string | null = sampleTemplateUrl
     let template_name: string | null = sampleTemplateName
     let template_mime: string | null = sampleTemplateMime
+    const scan_urls: string[] = []
     if (!template_url && finalTemplateFile) {
       const ext  = finalTemplateFile.name.split('.').pop() || 'bin'
       const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`
@@ -637,6 +640,22 @@ function CreateContractModal({
       template_url  = pub.publicUrl
       template_name = finalOriginalName ?? finalTemplateFile.name
       template_mime = finalTemplateFile.type
+      scan_urls.push(template_url)
+
+      /* 2페이지 이상이면 추가 페이지도 업로드 */
+      const extraPages = (window as unknown as { __extraPages?: Blob[] }).__extraPages || []
+      for (let i = 0; i < extraPages.length; i++) {
+        const pg = extraPages[i]
+        const pPath = `${user.id}/${Date.now()}-${crypto.randomUUID()}-p${i + 2}.png`
+        const { error: pErr } = await supabase.storage
+          .from('contract-templates')
+          .upload(pPath, pg, { contentType: 'image/png', cacheControl: '3600', upsert: false })
+        if (!pErr) {
+          const { data: pPub } = supabase.storage.from('contract-templates').getPublicUrl(pPath)
+          scan_urls.push(pPub.publicUrl)
+        }
+      }
+      ;(window as unknown as { __extraPages?: Blob[] }).__extraPages = []
     }
 
     // 계약 스냅샷 + 해시
@@ -644,6 +663,7 @@ function CreateContractModal({
       ...form,
       template_url:  template_url  ?? '',
       template_name: template_name ?? '',
+      scan_urls,
       created_at: new Date().toISOString(),
       owner_id:   user.id,
     }
@@ -1021,81 +1041,90 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>전자서명 증거 패키지</title>
 <style>
-  body { font-family: 'Pretendard', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; font-size: 14px; line-height: 1.6; }
-  h1 { font-size: 22px; color: #1d3557; border-bottom: 3px solid #1d3557; padding-bottom: 8px; }
-  h2 { font-size: 16px; color: #4a4e69; margin-top: 28px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
-  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; font-size: 13px; }
-  th { background: #f0f4f8; font-weight: bold; width: 140px; }
-  .sig-box { display: inline-block; border: 1px solid #ccc; padding: 8px; background: #fff; margin: 8px 0; }
-  .sig-box img { max-height: 80px; }
-  .hash { font-family: monospace; font-size: 11px; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px; }
-  .snapshot { font-family: monospace; font-size: 10px; word-break: break-all; background: #f9f9f9; padding: 10px; border-radius: 4px; max-height: 300px; overflow: auto; white-space: pre-wrap; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+  @page { size: A4; margin: 10mm; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.5; padding: 14px 18px; }
+  h1 { font-size: 18px; color: #1d3557; border-bottom: 2px solid #1d3557; padding-bottom: 6px; margin: 0 0 6px 0; }
+  h2 { font-size: 13px; color: #4a4e69; margin: 14px 0 6px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0 8px 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 11px; }
+  th { background: #f0f4f8; font-weight: bold; width: 110px; }
+  .sig-box { display: inline-block; border: 1px solid #ccc; padding: 4px; background: #fff; margin: 4px 6px 4px 0; vertical-align: top; }
+  .sig-box img { max-height: 60px; display: block; }
+  .sig-row { display: flex; gap: 8px; }
+  .sig-row > div { flex: 1; }
+  .hash { font-family: monospace; font-size: 10px; word-break: break-all; background: #f5f5f5; padding: 6px; border-radius: 3px; }
+  .snapshot { font-family: monospace; font-size: 9px; word-break: break-all; background: #f9f9f9; padding: 6px; border-radius: 3px; white-space: pre-wrap; max-height: 180px; overflow: hidden; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
   .badge-ok { background: #d4edda; color: #155724; }
   .badge-no { background: #f8d7da; color: #721c24; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #1d3557; font-size: 11px; color: #888; }
-  .doc-page { margin: 16px 0; page-break-inside: avoid; break-inside: avoid; text-align: center; }
-  .doc-page img { max-width: 100%; max-height: 270mm; height: auto; border: 1px solid #ddd; display: block; margin: 0 auto; }
-  .doc-page .label { font-size: 11px; color: #888; margin-bottom: 4px; }
-  @page { size: A4; margin: 12mm; }
+  .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #1d3557; font-size: 10px; color: #888; }
+  .doc-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .doc-grid img { width: 100%; max-width: 100%; max-height: 250mm; height: auto; border: 1px solid #ddd; display: block; page-break-inside: avoid; break-inside: avoid; }
+  .doc-grid .label { font-size: 10px; color: #888; margin: 0 0 2px 0; }
   @media print {
-    body { max-width: none; padding: 0; }
-    .doc-page { page-break-after: always; break-after: page; }
-    h2.section-break { page-break-before: always; break-before: page; }
+    body { padding: 8mm; }
+    .doc-grid img { page-break-after: always; break-after: page; }
+    .doc-grid img:last-child { page-break-after: auto; break-after: auto; }
+    .meta-section { page-break-before: always; break-before: page; }
   }
 </style></head><body>
 <h1>전자서명 증거 패키지</h1>
-<p>출력일시: ${now} · 계약 ID: <span style="font-family:monospace;font-size:11px">${c.id}</span></p>
+<p style="margin:0 0 8px 0;font-size:11px;color:#666;">출력일시: ${now} · 계약 ID: <span style="font-family:monospace">${c.id}</span></p>
 
 ${scanUrls.length > 0 ? `
 <h2>1. 계약서 원본 (${scanUrls.length}장)</h2>
-${scanUrls.map((u, i) => `<div class="doc-page"><div class="label">${i + 1} / ${scanUrls.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
+<div class="doc-grid">
+  ${scanUrls.map((u, i) => `<div><div class="label">${i + 1} / ${scanUrls.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
+</div>
 ` : ''}
 
-<h2 class="section-break">2. 계약 정보</h2>
+<div class="meta-section">
+<h2>2. 계약 정보</h2>
 <table>
-  <tr><th>호실</th><td>${r?.name ?? '—'}</td></tr>
-  <tr><th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
-  <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td></tr>
-  <tr><th>소재지</th><td>${String(s?.address ?? '—')}</td></tr>
-  <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td></tr>
-  <tr><th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
-  <tr><th>계약기간</th><td>${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
-  <tr><th>특약사항</th><td>${String(s?.special_terms ?? '없음')}</td></tr>
-  <tr><th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
+  <tr><th>호실</th><td>${r?.name ?? '—'}</td>
+      <th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
+  <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td>
+      <th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
+  <tr><th>소재지</th><td colspan="3">${String(s?.address ?? '—')}</td></tr>
+  <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td>
+      <th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
+  <tr><th>계약기간</th><td colspan="3">${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
+  <tr><th>특약사항</th><td colspan="3">${String(s?.special_terms ?? '없음')}</td></tr>
 </table>
 
-<h2>3. 운영사(갑) 전자서명</h2>
-<table>
-  <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
-  <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
-  <tr><th>서명자 IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
-</table>
-${c.owner_signature_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
+<h2>3. 전자서명</h2>
+<div class="sig-row">
+  <div>
+    <table>
+      <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">운영사 (갑)</th></tr>
+      <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+      <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
+      <tr><th>서명자 IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
+    </table>
+    ${c.owner_signature_url ? `<div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
+  </div>
+  <div>
+    <table>
+      <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">입주사 (을)</th></tr>
+      <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+      <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
+      <tr><th>서명자 IP</th><td>${c.signer_ip ?? '—'}</td></tr>
+    </table>
+    ${c.signature_data_url ? `<div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
+  </div>
+</div>
 
-<h2>4. 입주사(을) 전자서명</h2>
-<table>
-  <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">서명 완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
-  <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
-  <tr><th>서명자 IP</th><td>${c.signer_ip ?? '—'}</td></tr>
-</table>
-${c.signature_data_url ? `<p>서명 이미지:</p><div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
+<h2>4. 콘텐츠 무결성 (SHA-256)</h2>
+<div class="hash">${c.content_hash ?? '(없음)'}</div>
 
-<h2>5. 콘텐츠 무결성 검증 (SHA-256)</h2>
-<p>계약서 작성 시점에 계약 내용을 SHA-256으로 해싱하여 저장합니다.<br/>
-아래 해시값이 일치하면 서명 이후 계약 내용이 변조되지 않았음을 증명합니다.</p>
-<table>
-  <tr><th>저장된 해시</th><td class="hash">${c.content_hash ?? '(없음)'}</td></tr>
-</table>
-
-<h2>6. 계약 원문 스냅샷 (JSON)</h2>
-<p>서명 당시 계약 내용의 원본 데이터입니다.</p>
-<div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+<h2>5. 계약 원문 스냅샷 (JSON · 요약)</h2>
+<div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 1500)}${snapshotStr.length > 1500 ? '\n... (이후 생략, 전문은 DB에 저장됨)' : ''}</div>
 
 <div class="footer">
-  <p>본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
-  <p>전자서명법 제3조에 의거, 전자서명은 서면 서명과 동일한 법적 효력을 가집니다.</p>
+  <p style="margin:2px 0">본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
+  <p style="margin:2px 0">전자서명법 제3조에 의거, 전자서명은 서면 서명과 동일한 법적 효력을 가집니다.</p>
+</div>
 </div>
 </body></html>`
 
@@ -1847,7 +1876,7 @@ function ScanUploadModal({
     const customUpload = selectedBuiltIn ? builtinUploads.find(u => u.template_key === selectedBuiltIn) : null
     if (customUpload) {
       setPreviewUrl(customUpload.template_url)
-      printImage(customUpload.template_url)
+      printImages([customUpload.template_url])
       return
     }
 
@@ -1867,10 +1896,10 @@ function ScanUploadModal({
         room_name: selectedRoom?.name ?? '',
         vat_type: form.vat_type,
       }
-      const blob = await generateTemplateImage(selectedBuiltIn, tplData)
-      const url = URL.createObjectURL(blob)
-      setPreviewUrl(url)
-      printImage(url)
+      const pageBlobs = await generateTemplateImagePages(selectedBuiltIn, tplData)
+      const urls = pageBlobs.map(b => URL.createObjectURL(b))
+      setPreviewUrl(urls[0])
+      printImages(urls)
     } catch (err) {
       onError(err instanceof Error ? err.message : '양식 생성 실패')
     } finally {
@@ -1878,16 +1907,19 @@ function ScanUploadModal({
     }
   }
 
-  const printImage = (url: string) => {
+  const printImages = (urls: string[]) => {
     const w = window.open('', '_blank')
     if (!w) return onError('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.')
+    const total = urls.length
+    const imgs = urls.map(u =>
+      `<img src="${u}" onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),300);" />`
+    ).join('')
     w.document.write(`<!DOCTYPE html><html><head><title>계약서 인쇄</title><style>
-      @media print { @page { margin: 10mm; } body { margin: 0; } img { max-width: 100%; height: auto; } }
-      body { margin: 0; display: flex; justify-content: center; }
-      img { max-width: 100%; height: auto; }
-    </style></head><body>
-      <img src="${url}" onload="setTimeout(()=>{window.print();},300)" />
-    </body></html>`)
+      @page { size: A4; margin: 10mm; }
+      @media print { html, body { margin: 0; } img { max-width: 100%; max-height: 270mm; height: auto; display: block; margin: 0 auto; page-break-after: always; } img:last-child { page-break-after: auto; } }
+      body { margin: 0; }
+      img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    </style></head><body>${imgs}</body></html>`)
     w.document.close()
   }
 
@@ -2126,7 +2158,7 @@ function ScanUploadModal({
                 <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--color-border)' }}>
                   <div className="flex items-center justify-between px-3 py-2" style={{ background: 'var(--color-muted-bg)' }}>
                     <span className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>양식 미리보기</span>
-                    <button onClick={() => printImage(previewUrl)} className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
+                    <button onClick={() => printImages([previewUrl])} className="text-xs flex items-center gap-1" style={{ color: 'var(--color-accent-dark)' }}>
                       <Printer size={12} /> 다시 인쇄
                     </button>
                   </div>

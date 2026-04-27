@@ -145,6 +145,56 @@ export async function generateTemplateImage(
   })
 }
 
+/** Canvas에 계약서를 그려 페이지별 PNG Blob 배열로 반환 (A4 1페이지 = 1697px) */
+export async function generateTemplateImagePages(
+  templateId: string,
+  data: TemplateData,
+): Promise<Blob[]> {
+  const W = 1200
+  const PAGE_H = 1697  // A4 비율 (W=1200 기준)
+  const maxH = 5000
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = maxH
+  const ctx = canvas.getContext('2d')!
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, maxH)
+
+  let usedHeight = maxH
+  switch (templateId) {
+    case 'basic-lease':       usedHeight = drawCommercialLease(ctx, W, maxH, data); break
+    case 'paper-lease':       usedHeight = drawPaperContract(ctx, W, maxH, data); break
+    case 'shared-office':     drawSharedOffice(ctx, W, maxH, data); usedHeight = PAGE_H; break
+    case 'short-term':        drawShortTerm(ctx, W, maxH, data); usedHeight = PAGE_H; break
+    case 'commercial-lease':  usedHeight = drawCommercialLease(ctx, W, maxH, data); break
+    case 'space-use':         usedHeight = drawSpaceUseContract(ctx, W, maxH, data); break
+  }
+
+  const totalH = Math.min(usedHeight + 40, maxH)
+  const pageCount = Math.max(1, Math.ceil(totalH / PAGE_H))
+
+  /* 페이지마다 별도 Canvas → Blob 변환 */
+  const blobs: Blob[] = []
+  for (let i = 0; i < pageCount; i++) {
+    const sliceY = i * PAGE_H
+    const sliceH = Math.min(PAGE_H, totalH - sliceY)
+    if (sliceH <= 0) break
+    const pageCanvas = document.createElement('canvas')
+    pageCanvas.width = W
+    pageCanvas.height = sliceH
+    const pCtx = pageCanvas.getContext('2d')!
+    pCtx.fillStyle = '#ffffff'
+    pCtx.fillRect(0, 0, W, sliceH)
+    pCtx.drawImage(canvas, 0, sliceY, W, sliceH, 0, 0, W, sliceH)
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      pageCanvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas to Blob 실패')), 'image/png')
+    })
+    blobs.push(blob)
+  }
+  return blobs
+}
+
 /* ─── 유틸: 박스 그리기 ─── */
 function drawBox(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, opts?: { fill?: string; stroke?: string; lineWidth?: number }) {
   if (opts?.fill) {
@@ -740,16 +790,16 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   ctx.textAlign = 'left'
   for (const clause of clauses) {
     ctx.fillStyle = clr
-    ctx.font = 'bold 24px "Pretendard", sans-serif'
+    ctx.font = 'bold 28px "Pretendard", sans-serif'
     ctx.fillText(clause.title, mx, y)
-    y += 30
+    y += 36
     ctx.fillStyle = '#333'
-    ctx.font = '20px "Pretendard", sans-serif'
+    ctx.font = '22px "Pretendard", sans-serif'
     for (const item of clause.items) {
-      y = drawWrappedText(ctx, item, mx + 14, y, W - mx * 2 - 28, 28)
-      y += 2
+      y = drawWrappedText(ctx, item, mx + 16, y, W - mx * 2 - 32, 32)
+      y += 4
     }
-    y += 10
+    y += 12
   }
 
   // ── 특약사항 ──
@@ -764,8 +814,10 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
     y += 16
   }
 
-  // ── 2페이지 내 맞춤: 날짜+서명 텍스트 = 약 120px (절반 크기) ──
-  const maxY = PAGE_H * 2 - 140
+  // ── 2페이지 강제 정렬: 본문은 1.5페이지에 끝내고, 서명 영역은 2페이지 하단부터 ──
+  const sigStartY = PAGE_H + Math.floor(PAGE_H / 2) // 1.5 페이지 = 약 2545px
+  if (y < sigStartY) y = sigStartY
+  const maxY = PAGE_H * 2 - 200
   if (y > maxY) y = maxY
 
   // ── 날짜 + 확인 문구 ──
@@ -779,27 +831,28 @@ function drawCommercialLease(ctx: CanvasRenderingContext2D, W: number, _H: numbe
   y += 20
 
   ctx.fillStyle = '#333'
-  ctx.font = '20px "Pretendard", sans-serif'
+  ctx.font = '22px "Pretendard", sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('위와 같이 계약이 성립하였음을 확인하고, 쌍방 서명·날인한다.', W / 2, y)
-  y += 28
-  ctx.font = '22px "Pretendard", sans-serif'
-  ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
   y += 32
+  ctx.font = '24px "Pretendard", sans-serif'
+  ctx.fillText(`${new Date().getFullYear()}년   ${new Date().getMonth() + 1}월   ${new Date().getDate()}일`, W / 2, y)
+  y += 40
 
   ctx.textAlign = 'left'
-  ctx.font = '18px "Pretendard", sans-serif'
+  ctx.font = '20px "Pretendard", sans-serif'
   ctx.fillText('임 대 인 (갑):  대우오피스 / 이동윤          (서명 또는 날인)', mx, y)
-  y += 24
+  y += 30
   ctx.fillText(`임 차 인 (을):  ${d.tenant_name || ''}                        (서명 또는 날인)`, mx, y)
-  y += 18
+  y += 22
 
   ctx.fillStyle = '#888'
-  ctx.font = '14px "Pretendard", sans-serif'
+  ctx.font = '16px "Pretendard", sans-serif'
   ctx.fillText('※ 아래 전자서명란에 서명해주세요.', mx, y)
-  y += 14
+  y += 16
 
-  return y
+  // 항상 정확히 2페이지로 반환
+  return PAGE_H * 2
 }
 
 /* ═══════════════════════════════════════════════════════════════
