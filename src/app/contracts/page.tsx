@@ -61,7 +61,7 @@ export default function ContractsPage() {
   const [builtinUploads, setBuiltinUploads] = useState<BuiltinUploadInfo[]>([])
   const [showBuiltinUploadManager, setShowBuiltinUploadManager] = useState(false)
   const [showScanUpload, setShowScanUpload] = useState(false)
-  const [showQuickUpload, setShowQuickUpload] = useState(false)
+  const [quickUploadContract, setQuickUploadContract] = useState<ContractWithRoom | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -373,6 +373,14 @@ export default function ContractsPage() {
                             <Link2 size={13} />
                           </button>
                         )}
+                        {c.status !== 'signed' && (
+                          <button onClick={() => setQuickUploadContract(c)}
+                            className="p-1.5 rounded-lg text-xs"
+                            style={{ color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.2)' }}
+                            title="서면 서명본 바로 업로드 (인쇄 생략)">
+                            <Upload size={13} />
+                          </button>
+                        )}
                         <button onClick={() => deleteContract(c.id)}
                           className="p-1.5 rounded-lg text-xs"
                           style={{ color: 'var(--color-danger)', background: 'var(--color-danger-bg)' }}
@@ -388,30 +396,6 @@ export default function ContractsPage() {
           </table>
         </div>
       )}
-
-      {/* ─── 하단: 이미 서명된 종이 계약서 바로 업로드 ─── */}
-      <div className="mt-6 rounded-2xl border border-dashed p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
-           style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.08)' }}>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-               style={{ background: 'rgba(168,218,220,0.25)', color: 'var(--color-accent-dark)' }}>
-            <ScanLine size={20} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold mb-0.5" style={{ color: 'var(--color-primary)' }}>
-              이미 서명된 종이 계약서가 있나요?
-            </h3>
-            <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-              인쇄 단계 없이 스캔 이미지·PDF만 바로 업로드해서 등록할 수 있습니다.
-            </p>
-          </div>
-        </div>
-        <button onClick={() => setShowQuickUpload(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white whitespace-nowrap"
-          style={{ background: 'var(--color-accent-dark)' }}>
-          <Upload size={15} /> 서명된 계약서 바로 업로드
-        </button>
-      </div>
 
       {/* 계약서 작성 모달 */}
       {showCreate && (
@@ -462,11 +446,12 @@ export default function ContractsPage() {
       )}
 
       {/* 간편 업로드 모달 (인쇄 단계 생략) */}
-      {showQuickUpload && (
+      {quickUploadContract && (
         <QuickScanUploadModal
           rooms={rooms}
-          onClose={() => setShowQuickUpload(false)}
-          onCreated={() => { setShowQuickUpload(false); load(); showToast('success', '서명된 계약서가 등록되었습니다.') }}
+          existingContract={quickUploadContract}
+          onClose={() => setQuickUploadContract(null)}
+          onCreated={() => { setQuickUploadContract(null); load(); showToast('success', '서명된 계약서가 등록되었습니다.') }}
           onError={msg => showToast('error', msg)}
         />
       )}
@@ -2157,9 +2142,10 @@ function ScanUploadModal({
 
 /* ─── 간편 업로드 모달 (이미 서명된 종이 계약서 → 스캔만 업로드) ─── */
 function QuickScanUploadModal({
-  rooms, onClose, onCreated, onError,
+  rooms, existingContract, onClose, onCreated, onError,
 }: {
   rooms: Room[]
+  existingContract?: ContractWithRoom | null
   onClose: () => void
   onCreated: () => void
   onError: (msg: string) => void
@@ -2168,8 +2154,15 @@ function QuickScanUploadModal({
   const scanInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
-    room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '', tenant_birth: '',
-    monthly_rent: '', deposit: '', lease_start: '', lease_end: '',
+    room_id:      existingContract?.room_id ?? '',
+    tenant_name:  existingContract?.tenant_name ?? existingContract?.room?.tenant_name ?? '',
+    tenant_phone: existingContract?.tenant_phone ?? existingContract?.room?.tenant_phone ?? '',
+    tenant_email: existingContract?.tenant_email ?? existingContract?.room?.tenant_email ?? '',
+    tenant_birth: '',
+    monthly_rent: existingContract?.monthly_rent ? String(existingContract.monthly_rent) : '',
+    deposit:      existingContract?.deposit      ? String(existingContract.deposit)      : '',
+    lease_start:  existingContract?.lease_start ?? '',
+    lease_end:    existingContract?.lease_end ?? '',
   })
   const [scanFiles, setScanFiles] = useState<File[]>([])
   const [scanPreviews, setScanPreviews] = useState<string[]>([])
@@ -2266,25 +2259,46 @@ function QuickScanUploadModal({
       const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashStr))
       const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
 
-      const { error } = await supabase.from('contracts').insert({
-        owner_id: user.id,
-        room_id: form.room_id,
-        tenant_name: form.tenant_name,
-        tenant_phone: form.tenant_phone || null,
-        tenant_email: form.tenant_email || null,
-        monthly_rent: Number(form.monthly_rent) || 0,
-        deposit: Number(form.deposit) || 0,
-        lease_start: form.lease_start || null,
-        lease_end: form.lease_end || null,
-        status: 'signed',
-        signed_at: new Date().toISOString(),
-        content_hash: hashHex,
-        contract_snapshot: snapshot,
-        template_url: uploadedUrls[0],
-        template_name: `서면계약_${form.tenant_name}_바로업로드`,
-        template_mime: 'image/png',
-      })
-      if (error) throw new Error(error.message)
+      if (existingContract) {
+        // 기존 계약 업데이트
+        const { error } = await supabase.from('contracts').update({
+          tenant_name: form.tenant_name,
+          tenant_phone: form.tenant_phone || null,
+          tenant_email: form.tenant_email || null,
+          monthly_rent: Number(form.monthly_rent) || 0,
+          deposit: Number(form.deposit) || 0,
+          lease_start: form.lease_start || null,
+          lease_end: form.lease_end || null,
+          status: 'signed',
+          signed_at: new Date().toISOString(),
+          content_hash: hashHex,
+          contract_snapshot: snapshot,
+          template_url: uploadedUrls[0],
+          template_name: `서면계약_${form.tenant_name}_바로업로드`,
+          template_mime: 'image/png',
+        }).eq('id', existingContract.id)
+        if (error) throw new Error(error.message)
+      } else {
+        const { error } = await supabase.from('contracts').insert({
+          owner_id: user.id,
+          room_id: form.room_id,
+          tenant_name: form.tenant_name,
+          tenant_phone: form.tenant_phone || null,
+          tenant_email: form.tenant_email || null,
+          monthly_rent: Number(form.monthly_rent) || 0,
+          deposit: Number(form.deposit) || 0,
+          lease_start: form.lease_start || null,
+          lease_end: form.lease_end || null,
+          status: 'signed',
+          signed_at: new Date().toISOString(),
+          content_hash: hashHex,
+          contract_snapshot: snapshot,
+          template_url: uploadedUrls[0],
+          template_name: `서면계약_${form.tenant_name}_바로업로드`,
+          template_mime: 'image/png',
+        })
+        if (error) throw new Error(error.message)
+      }
 
       onCreated()
     } catch (err) {
@@ -2310,10 +2324,14 @@ function QuickScanUploadModal({
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
           <div>
             <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--color-primary)' }}>
-              <Upload size={18} /> 서명된 계약서 바로 업로드
+              <Upload size={18} /> {existingContract
+                ? `${existingContract.room?.name ?? ''} ${form.tenant_name || ''} — 서면 서명본 업로드`.trim()
+                : '서명된 계약서 바로 업로드'}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
-              이미 인쇄·서명된 종이 계약서를 스캔 또는 촬영해 등록합니다. (인쇄 단계 생략)
+              {existingContract
+                ? '이미 인쇄·서명된 종이 계약서를 스캔하여 이 계약 건에 첨부합니다. 상태가 "서명완료"로 자동 변경됩니다.'
+                : '이미 인쇄·서명된 종이 계약서를 스캔 또는 촬영해 등록합니다. (인쇄 단계 생략)'}
             </p>
           </div>
           <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
