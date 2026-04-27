@@ -61,6 +61,7 @@ export default function ContractsPage() {
   const [builtinUploads, setBuiltinUploads] = useState<BuiltinUploadInfo[]>([])
   const [showBuiltinUploadManager, setShowBuiltinUploadManager] = useState(false)
   const [showScanUpload, setShowScanUpload] = useState(false)
+  const [showQuickUpload, setShowQuickUpload] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -388,6 +389,30 @@ export default function ContractsPage() {
         </div>
       )}
 
+      {/* ─── 하단: 이미 서명된 종이 계약서 바로 업로드 ─── */}
+      <div className="mt-6 rounded-2xl border border-dashed p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+           style={{ borderColor: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.08)' }}>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+               style={{ background: 'rgba(168,218,220,0.25)', color: 'var(--color-accent-dark)' }}>
+            <ScanLine size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold mb-0.5" style={{ color: 'var(--color-primary)' }}>
+              이미 서명된 종이 계약서가 있나요?
+            </h3>
+            <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+              인쇄 단계 없이 스캔 이미지·PDF만 바로 업로드해서 등록할 수 있습니다.
+            </p>
+          </div>
+        </div>
+        <button onClick={() => setShowQuickUpload(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white whitespace-nowrap"
+          style={{ background: 'var(--color-accent-dark)' }}>
+          <Upload size={15} /> 서명된 계약서 바로 업로드
+        </button>
+      </div>
+
       {/* 계약서 작성 모달 */}
       {showCreate && (
         <CreateContractModal
@@ -432,6 +457,16 @@ export default function ContractsPage() {
           builtinUploads={builtinUploads}
           onClose={() => setShowScanUpload(false)}
           onCreated={() => { setShowScanUpload(false); load(); showToast('success', '수기 계약서가 등록되었습니다.') }}
+          onError={msg => showToast('error', msg)}
+        />
+      )}
+
+      {/* 간편 업로드 모달 (인쇄 단계 생략) */}
+      {showQuickUpload && (
+        <QuickScanUploadModal
+          rooms={rooms}
+          onClose={() => setShowQuickUpload(false)}
+          onCreated={() => { setShowQuickUpload(false); load(); showToast('success', '서명된 계약서가 등록되었습니다.') }}
           onError={msg => showToast('error', msg)}
         />
       )}
@@ -2114,6 +2149,255 @@ function ScanUploadModal({
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── 간편 업로드 모달 (이미 서명된 종이 계약서 → 스캔만 업로드) ─── */
+function QuickScanUploadModal({
+  rooms, onClose, onCreated, onError,
+}: {
+  rooms: Room[]
+  onClose: () => void
+  onCreated: () => void
+  onError: (msg: string) => void
+}) {
+  const supabase = createClient()
+  const scanInputRef = useRef<HTMLInputElement>(null)
+
+  const [form, setForm] = useState({
+    room_id: '', tenant_name: '', tenant_phone: '', tenant_email: '', tenant_birth: '',
+    monthly_rent: '', deposit: '', lease_start: '', lease_end: '',
+  })
+  const [scanFiles, setScanFiles] = useState<File[]>([])
+  const [scanPreviews, setScanPreviews] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [convertingPdf, setConvertingPdf] = useState(false)
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }))
+
+  const handleRoomSelect = (roomId: string) => {
+    const r = rooms.find(r => r.id === roomId) as Room & Record<string, unknown> | undefined
+    if (!r) return
+    setForm(prev => ({
+      ...prev,
+      room_id: roomId,
+      tenant_name:  (r.tenant_name as string)  ?? prev.tenant_name,
+      tenant_phone: (r.tenant_phone as string) ?? prev.tenant_phone,
+      tenant_email: (r.tenant_email as string) ?? prev.tenant_email,
+      tenant_birth: (r.tenant_birth as string) ?? prev.tenant_birth,
+      monthly_rent: r.monthly_rent ? String(r.monthly_rent) : prev.monthly_rent,
+      deposit:      r.deposit      ? String(r.deposit)      : prev.deposit,
+      lease_start:  (r.lease_start as string) ?? prev.lease_start,
+      lease_end:    (r.lease_end as string)   ?? prev.lease_end,
+    }))
+  }
+
+  const onPickScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+
+    for (const f of Array.from(files)) {
+      if (!allowed.includes(f.type)) { onError('PDF 또는 이미지(JPG/PNG/WEBP) 파일만 업로드 가능합니다.'); continue }
+      if (f.size > 50 * 1024 * 1024) { onError('파일 크기는 50MB 이하여야 합니다.'); continue }
+
+      if (f.type === 'application/pdf') {
+        setConvertingPdf(true)
+        try {
+          const { convertPdfToPngBlob } = await import('@/lib/pdf-to-image')
+          const { blob } = await convertPdfToPngBlob(f)
+          const pngFile = new File([blob], f.name.replace(/\.pdf$/i, '.png'), { type: 'image/png' })
+          setScanFiles(prev => [...prev, pngFile])
+          setScanPreviews(prev => [...prev, URL.createObjectURL(pngFile)])
+        } catch {
+          onError('PDF → 이미지 변환 실패')
+        } finally {
+          setConvertingPdf(false)
+        }
+      } else {
+        setScanFiles(prev => [...prev, f])
+        setScanPreviews(prev => [...prev, URL.createObjectURL(f)])
+      }
+    }
+    if (scanInputRef.current) scanInputRef.current.value = ''
+  }
+
+  const removeScan = (idx: number) => {
+    URL.revokeObjectURL(scanPreviews[idx])
+    setScanFiles(prev => prev.filter((_, i) => i !== idx))
+    setScanPreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const handleSave = async () => {
+    if (!form.room_id) return onError('호실을 선택해주세요.')
+    if (!form.tenant_name) return onError('입주사 이름을 입력해주세요.')
+    if (scanFiles.length === 0) return onError('스캔 이미지를 업로드해주세요.')
+
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return onError('로그인이 필요합니다.') }
+
+    try {
+      const uploadedUrls: string[] = []
+      for (const f of scanFiles) {
+        const ext = f.name.split('.').pop() || 'png'
+        const path = `${user.id}/quick-scan-${Date.now()}-${crypto.randomUUID()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('contract-templates')
+          .upload(path, f, { contentType: f.type, cacheControl: '3600', upsert: false })
+        if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
+        const { data: pub } = supabase.storage.from('contract-templates').getPublicUrl(path)
+        uploadedUrls.push(pub.publicUrl)
+      }
+
+      const snapshot = {
+        ...form,
+        scan_type: 'quick_upload',
+        scan_urls: uploadedUrls,
+        template_url: uploadedUrls[0],
+        created_at: new Date().toISOString(),
+        owner_id: user.id,
+      }
+      const hashStr = JSON.stringify(snapshot)
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(hashStr))
+      const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+      const { error } = await supabase.from('contracts').insert({
+        owner_id: user.id,
+        room_id: form.room_id,
+        tenant_name: form.tenant_name,
+        tenant_phone: form.tenant_phone || null,
+        tenant_email: form.tenant_email || null,
+        monthly_rent: Number(form.monthly_rent) || 0,
+        deposit: Number(form.deposit) || 0,
+        lease_start: form.lease_start || null,
+        lease_end: form.lease_end || null,
+        status: 'signed',
+        signed_at: new Date().toISOString(),
+        content_hash: hashHex,
+        contract_snapshot: snapshot,
+        template_url: uploadedUrls[0],
+        template_name: `서면계약_${form.tenant_name}_바로업로드`,
+        template_mime: 'image/png',
+      })
+      if (error) throw new Error(error.message)
+
+      onCreated()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => { scanPreviews.forEach(u => URL.revokeObjectURL(u)) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ background: 'rgba(0,0,0,0.4)' }}
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-xl rounded-2xl overflow-hidden"
+           style={{ background: 'var(--color-surface)', boxShadow: '0 20px 60px rgba(29,53,87,0.2)' }}>
+
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
+            <h2 className="text-base font-bold flex items-center gap-2" style={{ color: 'var(--color-primary)' }}>
+              <Upload size={18} /> 서명된 계약서 바로 업로드
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+              이미 인쇄·서명된 종이 계약서를 스캔 또는 촬영해 등록합니다. (인쇄 단계 생략)
+            </p>
+          </div>
+          <button onClick={onClose} style={{ color: 'var(--color-muted)' }}><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-4">
+          {/* 호실 선택 */}
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>호실 선택 *</label>
+            <select value={form.room_id} onChange={e => handleRoomSelect(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+              style={{ borderColor: 'var(--color-border)', background: 'var(--color-background)' }}>
+              <option value="">호실을 선택하세요</option>
+              {[...rooms].sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true })).map(r => (
+                <option key={r.id} value={r.id}>{r.name} {(r as Room & Record<string, unknown>).tenant_name ? `(${(r as Room & Record<string, unknown>).tenant_name})` : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <CField label="입주사 이름 *" value={form.tenant_name} onChange={set('tenant_name')} />
+            <CField label="연락처" value={form.tenant_phone} onChange={set('tenant_phone')} type="tel" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <CField label="생년월일" value={form.tenant_birth} onChange={set('tenant_birth')} type="date" />
+            <CField label="이메일" value={form.tenant_email} onChange={set('tenant_email')} type="email" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <CField label="월 이용료 (원)" value={form.monthly_rent} onChange={set('monthly_rent')} type="number" />
+            <CField label="보증금/예치금 (원)" value={form.deposit} onChange={set('deposit')} type="number" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <CField label="계약 시작일" value={form.lease_start} onChange={set('lease_start')} type="date" />
+            <CField label="계약 만료일" value={form.lease_end} onChange={set('lease_end')} type="date" />
+          </div>
+
+          {/* 스캔 이미지 */}
+          <div>
+            <label className="block text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>
+              서명된 계약서 스캔 / 사진 *
+            </label>
+
+            {scanPreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {scanPreviews.map((url, idx) => (
+                  <div key={idx} className="relative rounded-lg overflow-hidden border" style={{ borderColor: 'var(--color-border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`스캔 ${idx + 1}`} className="w-full h-32 object-cover" />
+                    <button onClick={() => removeScan(idx)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-white"
+                      style={{ background: 'rgba(0,0,0,0.6)' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input ref={scanInputRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp"
+              multiple onChange={onPickScan} className="hidden" />
+            <button onClick={() => scanInputRef.current?.click()} disabled={convertingPdf}
+              className="w-full py-3 rounded-lg border-2 border-dashed text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+              style={{ borderColor: 'var(--color-accent-dark)', color: 'var(--color-accent-dark)', background: 'rgba(168,218,220,0.06)' }}>
+              {convertingPdf ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+              {convertingPdf ? 'PDF 변환 중...' :
+                scanFiles.length === 0 ? '이미지 / PDF 선택 (여러 장 가능)' : '이미지 추가'}
+            </button>
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--color-muted)' }}>
+              PDF는 자동으로 PNG로 변환됩니다. JPG · PNG · WEBP 지원, 50MB 이하.
+            </p>
+          </div>
+        </div>
+
+        {/* 하단 버튼 */}
+        <div className="flex gap-2 px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-medium border"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>취소</button>
+          <button onClick={handleSave} disabled={saving || scanFiles.length === 0 || !form.room_id || !form.tenant_name}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ background: 'var(--color-primary)' }}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            {saving ? '저장 중...' : `계약서 등록${scanFiles.length > 0 ? ` (${scanFiles.length}장)` : ''}`}
+          </button>
         </div>
       </div>
     </div>
