@@ -943,7 +943,7 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 
     const onloadAttr = `onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);" onerror="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);"`
 
-    const pages = scanUrls.map(u => `<div class="page"><img src="${u}" ${onloadAttr} /></div>`).join('')
+    const pages = scanUrls.map(u => `<div class="page"><img class="doc-img" src="${u}" ${onloadAttr} /></div>`).join('')
 
     /* 서명 페이지 — 운영사 + 입주사 서명을 한 페이지에 */
     const sigPage = (contract.owner_signature_url || contract.signature_data_url) ? `
@@ -982,16 +982,22 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
     ` : ''
 
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>계약서 인쇄</title><style>
-      @media print { @page { margin: 10mm; } body { margin: 0; } .page { page-break-after: always; } .page:last-child { page-break-after: auto; } }
+      @page { size: A4; margin: 10mm; }
+      @media print {
+        html, body { margin: 0; padding: 0; }
+        .page { page-break-after: always; page-break-inside: avoid; break-after: page; break-inside: avoid; }
+        .page:last-child { page-break-after: auto; break-after: auto; }
+        .doc-img { max-width: 100%; max-height: 270mm; width: auto; height: auto; display: block; margin: 0 auto; object-fit: contain; }
+      }
       body { margin: 0; font-family: 'Pretendard', sans-serif; color: #1d3557; }
-      .page { display: flex; flex-direction: column; align-items: center; padding: 12px; }
-      .page > img { max-width: 100%; height: auto; }
-      .sig-page { padding: 40px; }
-      .sig-page h2 { font-size: 20px; border-bottom: 2px solid #1d3557; padding-bottom: 8px; margin-bottom: 20px; align-self: stretch; }
+      .page { padding: 0; margin: 0; box-sizing: border-box; }
+      .doc-img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+      .sig-page { padding: 20mm; box-sizing: border-box; }
+      .sig-page h2 { font-size: 20px; border-bottom: 2px solid #1d3557; padding-bottom: 8px; margin: 0 0 20px 0; }
       .sig-page table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 13px; }
       .sig-page th, .sig-page td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
       .sig-page th { background: #f0f4f8; width: 100px; }
-      .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; margin-bottom: 28px; }
+      .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
       .sig-cell { border: 1px solid #ccc; padding: 16px; min-height: 200px; display: flex; flex-direction: column; }
       .sig-label { font-weight: bold; font-size: 14px; margin-bottom: 12px; }
       .sig-img { max-height: 100px; max-width: 100%; align-self: center; margin: 8px 0; }
