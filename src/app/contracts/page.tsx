@@ -949,21 +949,78 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
     ? (snap!.scan_urls as string[])
     : (contract.template_url ? [contract.template_url] : [])
 
+  /* 미리보기용: 기존 단일 긴 이미지를 슬라이스해 표시 */
+  const [previewSlices, setPreviewSlices] = useState<string[]>(scanUrls)
+  useEffect(() => {
+    /* 새 계약서(이미 페이지별)거나 1장이면 슬라이스 시도 */
+    let cancelled = false
+    ;(async () => {
+      const out: string[] = []
+      for (const u of scanUrls) {
+        const parts = await sliceTallImage(u)
+        out.push(...parts)
+      }
+      if (!cancelled) setPreviewSlices(out.length > 0 ? out : scanUrls)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract.id])
+
+  /* 긴 이미지를 A4 비율(W:H = 1:√2 ≈ 0.707)로 슬라이스하여 data URL 배열 반환 */
+  const sliceTallImage = async (url: string): Promise<string[]> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const aspect = img.naturalHeight / img.naturalWidth
+        // A4 portrait 비율 (1.414) 기준: 1.6 이상이면 2페이지 이상으로 간주
+        if (aspect <= 1.6) { resolve([url]); return }
+        const pageH = Math.round(img.naturalWidth * 1.414) // A4 비율 한 페이지 높이
+        const pages = Math.ceil(img.naturalHeight / pageH)
+        const out: string[] = []
+        for (let i = 0; i < pages; i++) {
+          const sliceY = i * pageH
+          const sliceH = Math.min(pageH, img.naturalHeight - sliceY)
+          if (sliceH <= 0) break
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth
+          c.height = sliceH
+          const cx = c.getContext('2d')!
+          cx.fillStyle = '#fff'
+          cx.fillRect(0, 0, c.width, c.height)
+          cx.drawImage(img, 0, sliceY, img.naturalWidth, sliceH, 0, 0, img.naturalWidth, sliceH)
+          out.push(c.toDataURL('image/png'))
+        }
+        resolve(out.length > 0 ? out : [url])
+      }
+      img.onerror = () => resolve([url])  // 로딩 실패 시 원본 사용
+      img.src = url
+    })
+  }
+
   /* 계약서 양식 인쇄 (전체 페이지 + 서명 페이지) */
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (scanUrls.length === 0 && !contract.signature_data_url && !contract.owner_signature_url) return
+
+    /* 기존 계약서(긴 단일 PNG) 자동 슬라이스 — 새로 만든 계약서는 이미 페이지별이라 그대로 통과 */
+    const slicedPages: string[] = []
+    for (const u of scanUrls) {
+      const parts = await sliceTallImage(u)
+      slicedPages.push(...parts)
+    }
+
     const w = window.open('', '_blank')
     if (!w) return
 
     /* 모든 이미지 (계약서 페이지 + 서명들) — 전부 로딩 후 인쇄 */
-    const allImgs: string[] = [...scanUrls]
+    const allImgs: string[] = [...slicedPages]
     if (contract.owner_signature_url) allImgs.push(contract.owner_signature_url)
     if (contract.signature_data_url) allImgs.push(contract.signature_data_url)
     const total = allImgs.length
 
     const onloadAttr = `onload="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);" onerror="window.__loaded=(window.__loaded||0)+1; if(window.__loaded===${total}) setTimeout(()=>window.print(),400);"`
 
-    const pages = scanUrls.map(u => `<div class="page"><img class="doc-img" src="${u}" ${onloadAttr} /></div>`).join('')
+    const pages = slicedPages.map(u => `<div class="page"><img class="doc-img" src="${u}" ${onloadAttr} /></div>`).join('')
 
     /* 서명 페이지 — 운영사 + 입주사 서명을 한 페이지에 */
     const sigPage = (contract.owner_signature_url || contract.signature_data_url) ? `
@@ -1031,10 +1088,17 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   }
 
   /* 법적 증거 패키지 다운로드 (HTML → 인쇄/PDF) */
-  const handleEvidenceDownload = () => {
+  const handleEvidenceDownload = async () => {
     const c = contract
     const s = snap
     const now = new Date().toLocaleString('ko-KR')
+
+    /* 기존 계약서(긴 단일 PNG) 자동 슬라이스 — 새로 만든 계약서는 이미 페이지별 */
+    const slicedScans: string[] = []
+    for (const u of scanUrls) {
+      const parts = await sliceTallImage(u)
+      slicedScans.push(...parts)
+    }
 
     // 해시 검증: snapshot을 다시 해싱하여 저장된 해시와 비교
     const snapshotStr = s ? JSON.stringify(s) : '(스냅샷 없음)'
@@ -1072,10 +1136,10 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 <h1>전자서명 증거 패키지</h1>
 <p style="margin:0 0 8px 0;font-size:11px;color:#666;">출력일시: ${now} · 계약 ID: <span style="font-family:monospace">${c.id}</span></p>
 
-${scanUrls.length > 0 ? `
-<h2>1. 계약서 원본 (${scanUrls.length}장)</h2>
+${slicedScans.length > 0 ? `
+<h2>1. 계약서 원본 (${slicedScans.length}장)</h2>
 <div class="doc-grid">
-  ${scanUrls.map((u, i) => `<div><div class="label">${i + 1} / ${scanUrls.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
+  ${slicedScans.map((u, i) => `<div><div class="label">${i + 1} / ${slicedScans.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
 </div>
 ` : ''}
 
@@ -1211,7 +1275,7 @@ ${scanUrls.length > 0 ? `
             <div className="mb-5 pb-5 border-b" style={{ borderColor: 'var(--color-border)' }}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-medium" style={{ color: 'var(--color-muted)' }}>
-                  업로드된 계약서 양식 {scanUrls.length > 1 ? `(${scanUrls.length}장)` : ''}
+                  업로드된 계약서 양식 {previewSlices.length > 1 ? `(${previewSlices.length}장)` : ''}
                 </p>
                 {contract.template_url && (
                   <a href={contract.template_url} target="_blank" rel="noreferrer"
@@ -1221,12 +1285,12 @@ ${scanUrls.length > 0 ? `
                 )}
               </div>
               <div className="flex flex-col gap-3">
-                {scanUrls.map((url, i) => (
+                {previewSlices.map((url, i) => (
                   <div key={i}>
-                    {scanUrls.length > 1 && (
+                    {previewSlices.length > 1 && (
                       <p className="text-xs mb-1" style={{ color: 'var(--color-muted)' }}>{i + 1}쪽</p>
                     )}
-                    {contract.template_mime === 'application/pdf' && i === 0 && scanUrls.length === 1 ? (
+                    {contract.template_mime === 'application/pdf' && i === 0 && previewSlices.length === 1 ? (
                       <iframe src={url} className="w-full rounded-lg border"
                               style={{ borderColor: 'var(--color-border)', height: 360 }} title={`계약서 양식 ${i + 1}`} />
                     ) : (
