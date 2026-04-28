@@ -1111,9 +1111,9 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.45; }
 
   /* ── 계약서 스캔 페이지: 헤더 없이 이미지만 풀페이지 ── */
-  .scan-page { page-break-after: always; break-after: page; text-align: center; }
-  .scan-page img { width: 100%; max-width: 100%; max-height: 287mm; height: auto; display: block; margin: 0 auto; }
-  .scan-page .label { font-size: 9px; color: #aaa; margin: 0; padding: 1mm 2mm; text-align: right; }
+  .scan-page { page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; text-align: center; }
+  .scan-page img { width: 100%; max-width: 100%; max-height: 280mm; height: auto; display: block; margin: 0 auto; }
+  .scan-page .label { font-size: 9px; color: #aaa; margin: 0; padding: 0; text-align: right; line-height: 1; }
 
   /* ── 마지막 메타데이터 페이지 ── */
   .meta { padding: 4mm 6mm; }
