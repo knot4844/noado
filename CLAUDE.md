@@ -1,11 +1,73 @@
 # Noado 프로젝트 진행 상황 (Project Status & Handoff)
 
-> **Last Updated:** 2026-04-22 — 계약서 양식 정비 + PG/수납 아키텍처 재설계 논의
+> **Last Updated:** 2026-04-28 — 증거패키지 빈페이지 제거 + 새창 A4 비율 + 인쇄 중복 호출 수정
 > **목적:** 다른 AI(Claude 등)로 작업을 이관하거나 다음 작업 세션(Antigravity 등)을 재개할 때 즉시 문맥을 파악하기 위한 진행 상황 기록 문서입니다.
 
 ---
 
 ## ✅ 완료된 작업 (Completed)
+
+### 28. 증거패키지 추가 다듬기 + 모달 차이 정리 + 주소 하드코딩 발견 (2026-04-28)
+- **완료:**
+  - **증거패키지 스캔 페이지 빈페이지 추가 발생 수정** (commit `e7d8479`)
+    - 원인: `.scan-page` 안에서 `img max-height: 287mm`(인쇄영역 풀) + `.label` div가 287mm 초과 → label이 다음 페이지로 밀려 빈 페이지 발생
+    - 수정: img max-height 287mm → 280mm, label padding/line-height 압축, `page-break-inside: avoid` 추가
+  - **전자계약 빈 서명란 스캔 페이지 제거 → 2페이지 출력** (commit `62307c1`)
+    - 전자계약은 마지막 스캔 페이지가 빈 서명란 placeholder인데 증거패키지 메타에 실제 전자서명 정보가 이미 들어있어 중복
+    - `if (hasESign && slicedScans.length > 1) slicedScans.pop()` 처리
+    - 결과: 1페이지(계약서 본문) + 2페이지(전자서명 증거 + 계약정보 + 해시 + 스냅샷) = 총 2페이지
+  - **증거패키지 새창 A4 비율 + 인쇄 다이얼로그 1회만 호출** (commit `348b8c4`)
+    - `.sheet { width: 210mm }` wrapper로 콘텐츠 고정 → 풀스크린에서도 좌우 비율 유지, 글자 늘어짐 방지
+    - `@media print { .sheet { width: auto } }` 로 인쇄 시엔 풀페이지
+    - `printed` 플래그 추가로 `w.print()` 1회만 호출. 기존: 이미지 로드마다 setTimeout 누적 + 6초 safety net 모두 발동 → 취소 후 다이얼로그 2~3번 반복
+  - **수기 계약 모달 2종 차이 정리 (논의)**
+    - 「수기 계약서 스캔 업로드」(`ScanUploadModal`) — 처음부터 종이로 계약. 인쇄→대면서명→스캔 풀 워크플로. 신규 계약 row 생성
+    - 「간편 업로드」(`QuickScanUploadModal`) — 외부에서 이미 서명 끝낸 계약서를 사후 등록. 인쇄 단계 생략, 기존 contract row 갱신
+- **결정 / 유보 (2026-04-28):**
+  - **계약서 "소재지/호실주소" 하드코딩 발견** (`contracts/page.tsx:491, 1905`) — 모든 사용자에게 `'경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스'` 가 default. 다른 사업장 운영자에게 잘못된 주소 노출 위험
+  - `rooms.building` 필드는 `/units` 표시용으로만 쓰이고 계약서에 자동 반영 안 됨
+  - **개선안:** ① `businesses` 테이블에 `address` 컬럼 추가 ② `/settings`에서 기본 주소 입력 ③ `handleRoomSelect`에서 `business.address + room.building + room.name` 자동 prefill
+  - **유보 사유:** "지금 건드리면 복잡해진다" — PG/수납 재설계 시 `businesses` 마이그레이션에 `bank_name`/`account_number`/`account_holder` + `address` 한꺼번에 추가하기로
+- **유저 언급:**
+  - 증거패키지 2번째 페이지가 빈 페이지로 나옴 (원인: img+label overflow)
+  - 1번 메타 페이지 내용이 2번 스캔(서명란)과 중복 → 2번을 삭제하고 2페이지로 압축
+  - 새창이 풀스크린에 맞춰 글자가 넓게 보임 → A4 비율 유지
+  - 인쇄 취소 시 다이얼로그 3번 뜸 → 1회만
+  - 건물/구역 필드가 계약서 주소에 반영되는지 확인 요청 → 반영 안 됨 확인
+  - 주소 자동 prefix 적용은 나중에 (지금 복잡)
+- **다음:** 아래 "🚀 다음 세션 시작 순서" 참조
+
+### 27. 계약서 프린트/증거패키지 정비 + 스캔 자동 압축 (2026-04-27)
+- **완료:**
+  - **상가임대차 1번 양식 폰트 픽스** — 제목 54 / 조항 28 / 본문 22 (`drawCommercialLease` in `contract-templates.ts`)
+  - **2페이지 강제 레이아웃** — 계약서 본문 1.5페이지 + 서명 0.5페이지로 고정. `if (y < sigStartY) y = sigStartY` (sigStartY = PAGE_H + PAGE_H/2)
+  - **멀티페이지 PNG 분할 출력** — 신규 `generateTemplateImagePages()` 캔버스를 PAGE_H=1697px(A4 1:√2) 단위로 슬라이스 → `Blob[]` 반환. 업로드 시 `scan_urls`에 전 페이지 저장
+  - **기존 단일 PNG 호환** — `ContractPreviewModal`에 `sliceTallImage()` 클라이언트 슬라이서 추가. 기존 long-PNG 계약도 프린트 시 페이지 분할 정상 작동
+  - **프린트 서명 누락 수정** — 전자계약 프린트에 서명 페이지 별도 추가 (운영사/입주사 서명 이미지 + 메타 + 해시)
+  - **프린트 빈페이지 제거** — `.page` 컨테이너에서 flex 제거, A4 size + max-height 270mm로 강제
+  - **증거패키지 3페이지 압축 레이아웃** (commit `23f8af5`):
+    - `@page` 여백 10mm → 5mm
+    - 스캔 페이지는 이미지만(헤더 제거), 풀 A4
+    - 모든 메타데이터(제목/계약정보/서명/해시/스냅샷)를 마지막 1페이지에 압축. 폰트 크기 변화 없이 여백·패딩만 축소
+    - 결과: 1·2페이지 = 스캔 이미지, 3페이지 = 전자서명·검증 정보
+  - **스캔 업로드 자동 압축** (`src/lib/compress-image.ts` 신규):
+    - `compressImageFile(file)` — 3MB 초과 이미지를 max 2200px / JPEG q78로 압축
+    - PDF·작은 파일·압축 실패 시 원본 통과
+    - `onPickScan`(종이계약 모달) + `QuickScanUploadModal` 양쪽 적용
+  - **손옥발/김종우 기존 스캔 일괄 재압축** — `scripts/compress-contract-scans.mjs` (sharp 사용, service role) 작성·실행. 60MB → 0.6MB (99% 절감), DB `template_url`/`scan_urls`/`template_mime` 갱신, 기존 스토리지 파일 삭제
+- **결정:**
+  - 계약서 = A4 비율 1:√2, PAGE_H 1697px @ width 1200 기준으로 슬라이스
+  - 신규 계약은 서버사이드 분할(`generateTemplateImagePages`), 기존 계약은 클라이언트 분할(`sliceTallImage`)로 양쪽 처리
+  - 스캔 업로드는 클라이언트 압축, 기존 대용량 파일은 sharp 스크립트로 일괄 처리
+- **유저 언급:**
+  - 폰트는 54/28/22 픽스, 본문 1.5p + 서명 0.5p = 2페이지로 맞춰라
+  - 증거패키지 1·2페이지가 빈 페이지로 나옴 → 폰트 변화 없이 여백 축소로 3페이지 이내 압축
+  - 스캔 30MB 파일 업로드 시 자동 압축으로 프린트 가능하게 해달라
+- **파일 변경:**
+  - 수정: `src/app/contracts/page.tsx`, `src/lib/contract-templates.ts`
+  - 신규: `src/lib/compress-image.ts`, `scripts/compress-contract-scans.mjs`
+- **다음:** 다른 입주사 대용량 스캔도 압축 스크립트로 일괄 정리 가능
+- **유보(2026-04-28 논의):** 계약서 "소재지/호실주소" 하드코딩 (`contracts/page.tsx:491, 1905`)을 발견. 현재 모든 사용자에게 `'경기도 고양시 일산동구 중앙로 1129 제서관동 2017, 2018호 대우오피스'` 가 default로 박혀있음. 다른 사업장 운영자가 쓰면 잘못된 주소 그대로 들어갈 위험. `rooms.building` 필드는 `/units` 표시용으로만 쓰이고 계약서에 반영 안 됨. **개선 방향:** ① `businesses` 테이블에 `address` 컬럼 추가(추후 수납계좌 마이그레이션과 함께) ② `/settings`에서 기본 주소 입력 ③ `handleRoomSelect`에서 `business.address + room.building + room.name` 자동 prefill. **결정:** 지금 건드리면 복잡해지므로 PG/수납 재설계 작업 시 묶어서 처리.
 
 ### 26. 계약서 양식 정비 + PG/수납 아키텍처 재설계 논의 (2026-04-22)
 - **완료:**
@@ -555,10 +617,12 @@
 - 가상계좌는 보조 옵션으로 격하 (또는 제거)
 - 입금자명 규칙 안내: "213호 홍길동" 형식
 
-**작업 4. 사업장 설정에 "수납 계좌" 입력 필드 추가** 🟡
+**작업 4. 사업장 설정에 "수납 계좌" + "기본 주소" 입력 필드 추가** 🟡
 - 은행 / 계좌번호 / 예금주 입력 UI
-- DB: `businesses` 테이블에 `bank_name`, `account_number`, `account_holder` 컬럼 추가 (마이그레이션 필요)
-- 입주사 결제 페이지에서 이 정보 표시
+- **+ 기본 주소 필드 동시 추가** (2026-04-28 추가 결정 — 계약서 주소 하드코딩 해결)
+- DB: `businesses` 테이블에 `bank_name`, `account_number`, `account_holder`, `address` 컬럼 추가 (마이그레이션 필요)
+- 입주사 결제 페이지에서 계좌 정보 표시
+- 계약서 모달 `handleRoomSelect`에서 `business.address + room.building + room.name` 자동 prefill (3개 모달 모두 — `contracts/page.tsx:491, 1905`, `ScanUploadModal`)
 
 **작업 5. `/pricing` 정기결제(빌링키) 전용 전환** 🟡
 - `PortOneCheckout mode="billing"` 만 사용
