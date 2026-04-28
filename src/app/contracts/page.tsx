@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { BUILT_IN_TEMPLATES, generateTemplateImagePages } from '@/lib/contract-templates'
+import { compressImageFile } from '@/lib/compress-image'
 import type { TemplateData } from '@/lib/contract-templates'
 import type { Contract, Room } from '@/types'
 
@@ -2017,8 +2018,14 @@ function ScanUploadModal({
           setConvertingPdf(false)
         }
       } else {
-        setScanFiles(prev => [...prev, f])
-        setScanPreviews(prev => [...prev, URL.createObjectURL(f)])
+        const compressed = await compressImageFile(f)
+        if (compressed.size < f.size) {
+          const origMb = (f.size / 1024 / 1024).toFixed(1)
+          const newMb  = (compressed.size / 1024 / 1024).toFixed(2)
+          console.log(`📦 ${f.name} 압축: ${origMb}MB → ${newMb}MB`)
+        }
+        setScanFiles(prev => [...prev, compressed])
+        setScanPreviews(prev => [...prev, URL.createObjectURL(compressed)])
       }
     }
     if (scanInputRef.current) scanInputRef.current.value = ''
@@ -2429,8 +2436,14 @@ function QuickScanUploadModal({
           setConvertingPdf(false)
         }
       } else {
-        setScanFiles(prev => [...prev, f])
-        setScanPreviews(prev => [...prev, URL.createObjectURL(f)])
+        const compressed = await compressImageFile(f)
+        if (compressed.size < f.size) {
+          const origMb = (f.size / 1024 / 1024).toFixed(1)
+          const newMb  = (compressed.size / 1024 / 1024).toFixed(2)
+          console.log(`📦 ${f.name} 압축: ${origMb}MB → ${newMb}MB`)
+        }
+        setScanFiles(prev => [...prev, compressed])
+        setScanPreviews(prev => [...prev, URL.createObjectURL(compressed)])
       }
     }
     if (scanInputRef.current) scanInputRef.current.value = ''
