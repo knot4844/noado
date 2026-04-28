@@ -1106,90 +1106,85 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>전자서명 증거 패키지</title>
 <style>
-  @page { size: A4; margin: 10mm; }
+  @page { size: A4; margin: 5mm; }
   html, body { margin: 0; padding: 0; }
-  body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.5; padding: 14px 18px; }
-  h1 { font-size: 18px; color: #1d3557; border-bottom: 2px solid #1d3557; padding-bottom: 6px; margin: 0 0 6px 0; }
-  h2 { font-size: 13px; color: #4a4e69; margin: 14px 0 6px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
-  table { width: 100%; border-collapse: collapse; margin: 4px 0 8px 0; }
-  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 11px; }
-  th { background: #f0f4f8; font-weight: bold; width: 110px; }
-  .sig-box { display: inline-block; border: 1px solid #ccc; padding: 4px; background: #fff; margin: 4px 6px 4px 0; vertical-align: top; }
-  .sig-box img { max-height: 60px; display: block; }
-  .sig-row { display: flex; gap: 8px; }
+  body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.45; }
+
+  /* ── 계약서 스캔 페이지: 헤더 없이 이미지만 풀페이지 ── */
+  .scan-page { page-break-after: always; break-after: page; text-align: center; }
+  .scan-page img { width: 100%; max-width: 100%; max-height: 287mm; height: auto; display: block; margin: 0 auto; }
+  .scan-page .label { font-size: 9px; color: #aaa; margin: 0; padding: 1mm 2mm; text-align: right; }
+
+  /* ── 마지막 메타데이터 페이지 ── */
+  .meta { padding: 4mm 6mm; }
+  .meta h1 { font-size: 16px; color: #1d3557; border-bottom: 2px solid #1d3557; padding-bottom: 4px; margin: 0 0 4px 0; }
+  .meta h2 { font-size: 12px; color: #4a4e69; margin: 8px 0 3px 0; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+  .meta .sub { font-size: 10px; color: #666; margin: 0 0 4px 0; }
+  .meta table { width: 100%; border-collapse: collapse; margin: 2px 0 4px 0; }
+  .meta th, .meta td { border: 1px solid #ccc; padding: 2px 6px; text-align: left; font-size: 10px; line-height: 1.3; }
+  .meta th { background: #f0f4f8; font-weight: bold; width: 90px; }
+  .sig-box { display: inline-block; border: 1px solid #ccc; padding: 2px; background: #fff; margin: 2px 4px 2px 0; vertical-align: top; }
+  .sig-box img { max-height: 40px; display: block; }
+  .sig-row { display: flex; gap: 6px; }
   .sig-row > div { flex: 1; }
-  .hash { font-family: monospace; font-size: 10px; word-break: break-all; background: #f5f5f5; padding: 6px; border-radius: 3px; }
-  .snapshot { font-family: monospace; font-size: 9px; word-break: break-all; background: #f9f9f9; padding: 6px; border-radius: 3px; white-space: pre-wrap; max-height: 180px; overflow: hidden; }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+  .hash { font-family: monospace; font-size: 9px; word-break: break-all; background: #f5f5f5; padding: 4px; border-radius: 2px; }
+  .snapshot { font-family: monospace; font-size: 8px; word-break: break-all; background: #f9f9f9; padding: 4px; border-radius: 2px; white-space: pre-wrap; max-height: 90mm; overflow: hidden; }
+  .badge { display: inline-block; padding: 1px 5px; border-radius: 2px; font-size: 9px; font-weight: bold; }
   .badge-ok { background: #d4edda; color: #155724; }
   .badge-no { background: #f8d7da; color: #721c24; }
-  .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #1d3557; font-size: 10px; color: #888; }
-  .doc-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
-  .doc-grid img { width: 100%; max-width: 100%; max-height: 250mm; height: auto; border: 1px solid #ddd; display: block; page-break-inside: avoid; break-inside: avoid; }
-  .doc-grid .label { font-size: 10px; color: #888; margin: 0 0 2px 0; }
-  @media print {
-    body { padding: 8mm; }
-    .doc-grid img { page-break-after: always; break-after: page; }
-    .doc-grid img:last-child { page-break-after: auto; break-after: auto; }
-    .meta-section { page-break-before: always; break-before: page; }
-  }
+  .footer { margin-top: 6px; padding-top: 4px; border-top: 1px solid #1d3557; font-size: 9px; color: #888; }
 </style></head><body>
-<h1>전자서명 증거 패키지</h1>
-<p style="margin:0 0 8px 0;font-size:11px;color:#666;">출력일시: ${now} · 계약 ID: <span style="font-family:monospace">${c.id}</span></p>
 
-${slicedScans.length > 0 ? `
-<h2>1. 계약서 원본 (${slicedScans.length}장)</h2>
-<div class="doc-grid">
-  ${slicedScans.map((u, i) => `<div><div class="label">${i + 1} / ${slicedScans.length}쪽</div><img src="${u}" alt="계약서 ${i + 1}쪽" /></div>`).join('')}
-</div>
-` : ''}
+${slicedScans.map((u, i) => `<div class="scan-page"><img src="${u}" alt="계약서 ${i + 1}쪽" /><div class="label">계약서 ${i + 1} / ${slicedScans.length}쪽 · ID ${c.id.slice(0, 8)}</div></div>`).join('')}
 
-<div class="meta-section">
-<h2>2. 계약 정보</h2>
-<table>
-  <tr><th>호실</th><td>${r?.name ?? '—'}</td>
-      <th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
-  <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td>
-      <th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
-  <tr><th>소재지</th><td colspan="3">${String(s?.address ?? '—')}</td></tr>
-  <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td>
-      <th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
-  <tr><th>계약기간</th><td colspan="3">${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
-  <tr><th>특약사항</th><td colspan="3">${String(s?.special_terms ?? '없음')}</td></tr>
-</table>
+<div class="meta">
+  <h1>전자서명 증거 패키지</h1>
+  <p class="sub">출력일시: ${now} · 계약 ID: <span style="font-family:monospace">${c.id}</span></p>
 
-<h2>3. 전자서명</h2>
-<div class="sig-row">
-  <div>
-    <table>
-      <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">운영사 (갑)</th></tr>
-      <tr><th>서명 여부</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
-      <tr><th>서명 일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
-      <tr><th>서명자 IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
-    </table>
-    ${c.owner_signature_url ? `<div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
+  <h2>1. 계약 정보</h2>
+  <table>
+    <tr><th>호실</th><td>${r?.name ?? '—'}</td>
+        <th>입주사</th><td>${String(s?.tenant_name ?? c.tenant_name ?? '—')}</td></tr>
+    <tr><th>연락처</th><td>${String(s?.tenant_phone ?? c.tenant_phone ?? '—')}</td>
+        <th>계약 상태</th><td><span class="badge ${c.status === 'signed' ? 'badge-ok' : 'badge-no'}">${c.status}</span></td></tr>
+    <tr><th>소재지</th><td colspan="3">${String(s?.address ?? '—')}</td></tr>
+    <tr><th>보증금</th><td>${s?.deposit ? Number(s.deposit).toLocaleString() + '원' : '—'}</td>
+        <th>월 이용료</th><td>${s?.monthly_rent ? Number(s.monthly_rent).toLocaleString() + '원' : '—'}</td></tr>
+    <tr><th>계약기간</th><td colspan="3">${c.lease_start && c.lease_end ? c.lease_start + ' ~ ' + c.lease_end : '—'}</td></tr>
+    <tr><th>특약사항</th><td colspan="3">${String(s?.special_terms ?? '없음')}</td></tr>
+  </table>
+
+  <h2>2. 전자서명</h2>
+  <div class="sig-row">
+    <div>
+      <table>
+        <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">운영사 (갑)</th></tr>
+        <tr><th>서명</th><td>${c.owner_signature_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+        <tr><th>일시</th><td>${c.owner_signed_at ?? '—'}</td></tr>
+        <tr><th>IP</th><td>${c.owner_signer_ip ?? '—'}</td></tr>
+      </table>
+      ${c.owner_signature_url ? `<div class="sig-box"><img src="${c.owner_signature_url}" alt="운영사 서명" /></div>` : ''}
+    </div>
+    <div>
+      <table>
+        <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">입주사 (을)</th></tr>
+        <tr><th>서명</th><td>${c.signature_data_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
+        <tr><th>일시</th><td>${c.signed_at ?? '—'}</td></tr>
+        <tr><th>IP</th><td>${c.signer_ip ?? '—'}</td></tr>
+      </table>
+      ${c.signature_data_url ? `<div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
+    </div>
   </div>
-  <div>
-    <table>
-      <tr><th colspan="2" style="background:#1d3557;color:#fff;text-align:center;width:auto">입주사 (을)</th></tr>
-      <tr><th>서명 여부</th><td>${c.signature_data_url ? '<span class="badge badge-ok">완료</span>' : '<span class="badge badge-no">미서명</span>'}</td></tr>
-      <tr><th>서명 일시</th><td>${c.signed_at ?? '—'}</td></tr>
-      <tr><th>서명자 IP</th><td>${c.signer_ip ?? '—'}</td></tr>
-    </table>
-    ${c.signature_data_url ? `<div class="sig-box"><img src="${c.signature_data_url}" alt="입주사 서명" /></div>` : ''}
+
+  <h2>3. 콘텐츠 무결성 (SHA-256)</h2>
+  <div class="hash">${c.content_hash ?? '(없음)'}</div>
+
+  <h2>4. 계약 원문 스냅샷 (JSON · 요약)</h2>
+  <div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 1200)}${snapshotStr.length > 1200 ? '\n... (이후 생략, 전문은 DB에 저장됨)' : ''}</div>
+
+  <div class="footer">
+    본 문서는 노아도(noado.kr)에서 자동 생성된 전자서명 증거 패키지입니다. 전자서명법 제3조에 따라 서면 서명과 동일한 법적 효력을 가집니다.
   </div>
-</div>
-
-<h2>4. 콘텐츠 무결성 (SHA-256)</h2>
-<div class="hash">${c.content_hash ?? '(없음)'}</div>
-
-<h2>5. 계약 원문 스냅샷 (JSON · 요약)</h2>
-<div class="snapshot">${snapshotStr.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 1500)}${snapshotStr.length > 1500 ? '\n... (이후 생략, 전문은 DB에 저장됨)' : ''}</div>
-
-<div class="footer">
-  <p style="margin:2px 0">본 문서는 노아도(noado.kr) 임대관리 시스템에서 자동 생성된 전자서명 증거 패키지입니다.</p>
-  <p style="margin:2px 0">전자서명법 제3조에 의거, 전자서명은 서면 서명과 동일한 법적 효력을 가집니다.</p>
-</div>
 </div>
 </body></html>`
 
