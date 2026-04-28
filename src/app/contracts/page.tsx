@@ -1101,6 +1101,10 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
       slicedScans.push(...parts)
     }
 
+    /* 전자계약의 마지막 스캔 페이지는 빈 서명란(증거패키지의 실제 전자서명과 중복) → 제거 */
+    const hasESign = !!(c.signature_data_url || c.owner_signature_url)
+    if (hasESign && slicedScans.length > 1) slicedScans.pop()
+
     // 해시 검증: snapshot을 다시 해싱하여 저장된 해시와 비교
     const snapshotStr = s ? JSON.stringify(s) : '(스냅샷 없음)'
 
