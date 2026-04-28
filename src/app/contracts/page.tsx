@@ -1112,7 +1112,13 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
 <style>
   @page { size: A4; margin: 5mm; }
   html, body { margin: 0; padding: 0; }
-  body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.45; }
+  body { font-family: 'Pretendard', sans-serif; color: #333; font-size: 12px; line-height: 1.45; background: #eee; }
+  /* 화면 보기: A4 비율 고정 (210mm 너비). 인쇄 시에는 풀페이지 */
+  .sheet { width: 210mm; min-height: 297mm; margin: 8mm auto; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  @media print {
+    body { background: #fff; }
+    .sheet { width: auto; min-height: 0; margin: 0; box-shadow: none; }
+  }
 
   /* ── 계약서 스캔 페이지: 헤더 없이 이미지만 풀페이지 ── */
   .scan-page { page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; text-align: center; }
@@ -1139,9 +1145,9 @@ function ContractPreviewModal({ contract, onClose }: { contract: ContractWithRoo
   .footer { margin-top: 6px; padding-top: 4px; border-top: 1px solid #1d3557; font-size: 9px; color: #888; }
 </style></head><body>
 
-${slicedScans.map((u, i) => `<div class="scan-page"><img src="${u}" alt="계약서 ${i + 1}쪽" /><div class="label">계약서 ${i + 1} / ${slicedScans.length}쪽 · ID ${c.id.slice(0, 8)}</div></div>`).join('')}
+${slicedScans.map((u, i) => `<div class="sheet scan-page"><img src="${u}" alt="계약서 ${i + 1}쪽" /><div class="label">계약서 ${i + 1} / ${slicedScans.length}쪽 · ID ${c.id.slice(0, 8)}</div></div>`).join('')}
 
-<div class="meta">
+<div class="sheet meta">
   <h1>전자서명 증거 패키지</h1>
   <p class="sub">출력일시: ${now} · 계약 ID: <span style="font-family:monospace">${c.id}</span></p>
 
@@ -1192,35 +1198,35 @@ ${slicedScans.map((u, i) => `<div class="scan-page"><img src="${u}" alt="계약�
 </div>
 </body></html>`
 
-    /* 모든 이미지가 로딩된 후 인쇄 — 빈 페이지/누락 방지 */
-    const allImgs = [
-      ...scanUrls,
-      ...(c.owner_signature_url ? [c.owner_signature_url] : []),
-      ...(c.signature_data_url ? [c.signature_data_url] : []),
-    ]
-    const total = allImgs.length
-
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(html)
     w.document.close()
-    // 모든 이미지 로딩 완료 후 인쇄 (이미지 없으면 즉시)
+
+    /* 모든 이미지 로딩 완료 후 단 1회만 인쇄 (취소 후 재호출 방지) */
+    let printed = false
+    const doPrint = () => {
+      if (printed) return
+      printed = true
+      w.print()
+    }
+    const imgs = w.document.images
+    const total = imgs.length
     if (total === 0) {
-      setTimeout(() => w.print(), 300)
+      setTimeout(doPrint, 300)
     } else {
       let loaded = 0
       const tryPrint = () => {
         loaded += 1
-        if (loaded >= total) setTimeout(() => w.print(), 400)
+        if (loaded >= total && !printed) setTimeout(doPrint, 400)
       }
-      const imgs = w.document.images
       for (let i = 0; i < imgs.length; i++) {
         const img = imgs[i]
         if (img.complete) tryPrint()
         else { img.addEventListener('load', tryPrint); img.addEventListener('error', tryPrint) }
       }
       // 안전망: 6초 후 무조건 인쇄
-      setTimeout(() => w.print(), 6000)
+      setTimeout(doPrint, 6000)
     }
   }
 
