@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Trash2, Loader2, X, Car, Wifi, Zap, Settings2,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, Pencil,
 } from 'lucide-react'
 import type { BillingItem, BillingItemType, BillingCycleType } from '@/types'
 
@@ -30,7 +30,8 @@ interface Props {
 export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props) {
   const [items, setItems]     = useState<BillingItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<BillingItem | null>(null)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
 
@@ -68,6 +69,23 @@ export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props)
     onChange?.()
   }
 
+  /* ── 모달 오픈 헬퍼 ── */
+  function openAdd() {
+    setEditing(null)
+    setError(null)
+    setShowModal(true)
+  }
+  function openEdit(item: BillingItem) {
+    setEditing(item)
+    setError(null)
+    setShowModal(true)
+  }
+  function closeModal() {
+    setShowModal(false)
+    setEditing(null)
+    setError(null)
+  }
+
   /* ── 합계 ── */
   const activeTotal = items
     .filter(i => i.is_active)
@@ -86,7 +104,7 @@ export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props)
           )}
         </h4>
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={openAdd}
           className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
         >
           <Plus size={12} /> 추가
@@ -127,6 +145,13 @@ export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props)
                   ₩{(item.amount ?? 0).toLocaleString()}
                 </span>
                 <button
+                  onClick={() => openEdit(item)}
+                  className="shrink-0 p-0.5 rounded hover:bg-blue-50 transition-colors"
+                  title="수정"
+                >
+                  <Pencil size={13} className="text-neutral-400 hover:text-blue-500" />
+                </button>
+                <button
                   onClick={() => handleToggle(item)}
                   className="shrink-0 p-0.5 rounded hover:bg-neutral-100 transition-colors"
                   title={item.is_active ? '비활성화' : '활성화'}
@@ -149,13 +174,14 @@ export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props)
         </div>
       )}
 
-      {/* ── 추가 모달 ── */}
-      {showAdd && (
-        <AddBillingItemModal
+      {/* ── 추가/수정 모달 ── */}
+      {showModal && (
+        <BillingItemModal
           leaseId={leaseId}
           ownerId={ownerId}
-          onClose={() => { setShowAdd(false); setError(null) }}
-          onSaved={() => { setShowAdd(false); load(); onChange?.() }}
+          editing={editing}
+          onClose={closeModal}
+          onSaved={() => { closeModal(); load(); onChange?.() }}
           saving={saving}
           setSaving={setSaving}
           error={error}
@@ -166,10 +192,11 @@ export default function BillingItemsPanel({ leaseId, ownerId, onChange }: Props)
   )
 }
 
-/* ── 추가 모달 ── */
-function AddBillingItemModal({
+/* ── 추가/수정 모달 ── */
+function BillingItemModal({
   leaseId,
   ownerId,
+  editing,
   onClose,
   onSaved,
   saving,
@@ -179,6 +206,7 @@ function AddBillingItemModal({
 }: {
   leaseId: string
   ownerId: string
+  editing: BillingItem | null
   onClose: () => void
   onSaved: () => void
   saving: boolean
@@ -186,18 +214,19 @@ function AddBillingItemModal({
   error: string | null
   setError: (v: string | null) => void
 }) {
+  const isEdit = !!editing
   const [form, setForm] = useState({
-    item_type: 'CUSTOM' as BillingItemType,
-    name: '',
-    billing_cycle: 'MONTHLY' as BillingCycleType,
-    amount: '',
-    memo: '',
+    item_type: (editing?.item_type ?? 'CUSTOM') as BillingItemType,
+    name: editing?.name ?? '',
+    billing_cycle: (editing?.billing_cycle ?? 'MONTHLY') as BillingCycleType,
+    amount: editing?.amount != null ? String(editing.amount) : '',
+    memo: editing?.memo ?? '',
   })
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }))
 
-  // 타입 선택 시 이름 자동 설정
+  // 타입 선택 시 이름 자동 설정 (신규일 때만)
   function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const type = e.target.value as BillingItemType
     const autoName = type !== 'CUSTOM' ? TYPE_CONFIG[type].label : ''
@@ -211,24 +240,30 @@ function AddBillingItemModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) { setError('항목명을 입력해주세요.'); return }
-    const amt = Number(form.amount.replace(/,/g, ''))
+    const amt = Number(String(form.amount).replace(/,/g, ''))
     if (isNaN(amt) || amt < 0) { setError('올바른 금액을 입력해주세요.'); return }
 
     setSaving(true)
     setError(null)
 
     const supabase = createClient()
-    const { error: err } = await supabase.from('billing_items').insert({
-      owner_id: ownerId,
-      lease_id: leaseId,
+    const payload = {
       item_type: form.item_type,
       name: form.name.trim(),
       billing_cycle: form.billing_cycle,
       amount: amt,
       unit_price: form.billing_cycle === 'ACTUAL' ? amt : null,
-      is_active: true,
       memo: form.memo.trim() || null,
-    })
+    }
+
+    const { error: err } = isEdit && editing
+      ? await supabase.from('billing_items').update(payload).eq('id', editing.id)
+      : await supabase.from('billing_items').insert({
+          ...payload,
+          owner_id: ownerId,
+          lease_id: leaseId,
+          is_active: true,
+        })
 
     setSaving(false)
 
@@ -243,7 +278,9 @@ function AddBillingItemModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b">
-          <h3 className="font-bold text-neutral-900">실비 항목 추가</h3>
+          <h3 className="font-bold text-neutral-900">
+            {isEdit ? '실비 항목 수정' : '실비 항목 추가'}
+          </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors">
             <X size={18} className="text-neutral-400" />
           </button>
@@ -331,7 +368,7 @@ function AddBillingItemModal({
               className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
-              {saving ? '저장 중...' : '추가'}
+              {saving ? '저장 중...' : (isEdit ? '저장' : '추가')}
             </button>
           </div>
         </form>
