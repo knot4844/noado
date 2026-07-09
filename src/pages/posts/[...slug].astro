@@ -18,8 +18,55 @@ const relatedPosts = allPosts
   .filter(p => p.slug !== entry.slug && p.data.category === entry.data.category)
   .sort(() => Math.random() - 0.5) // shuffle
   .slice(0, 4); // max 4 related posts
+
+// Extract FAQs from markdown body for JSON-LD schema
+function parseFAQs(markdownText: string) {
+  const faqs = [];
+  const lines = markdownText.split('\n');
+  let currentQuestion = null;
+  let currentAnswerParts = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const qMatch = line.match(/^(?:###\s+)?(?:Q|질문)\s*(\d+)[\.\s:]+\s*(.*)$/i) || 
+                   line.match(/^\*\*(?:Q|질문)\s*(\d+)[\.\s:]+\s*(.*?)\*\*$/i);
+    
+    if (qMatch) {
+      if (currentQuestion) {
+        faqs.push({
+          question: currentQuestion,
+          answer: currentAnswerParts.join('\n').trim()
+        });
+      }
+      currentQuestion = qMatch[2].replace(/\*\*$/, '').trim();
+      currentAnswerParts = [];
+    } else if (currentQuestion !== null) {
+      if (line.startsWith('##') || line.startsWith('---') || line.includes('class="post-disclaimer"') || line.includes('adsense-container')) {
+        faqs.push({
+          question: currentQuestion,
+          answer: currentAnswerParts.join('\n').trim()
+        });
+        currentQuestion = null;
+        currentAnswerParts = [];
+      } else {
+        currentAnswerParts.push(lines[i]);
+      }
+    }
+  }
+
+  if (currentQuestion) {
+    faqs.push({
+      question: currentQuestion,
+      answer: currentAnswerParts.join('\n').trim()
+    });
+  }
+
+  return faqs.filter(f => f.question && f.answer);
+}
+
+const faqs = parseFAQs(entry.body);
 ---
 
-<BlogPostLayout frontmatter={entry.data} headings={headings} relatedPosts={relatedPosts} currentSlug={entry.slug}>
+<BlogPostLayout frontmatter={entry.data} headings={headings} relatedPosts={relatedPosts} currentSlug={entry.slug} faqs={faqs}>
   <Content />
 </BlogPostLayout>

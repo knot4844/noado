@@ -9,13 +9,17 @@ interface Props {
 const { 
   title, 
   description = "정부 지원금, 금융 혜택, 실생활 꿀팁을 전하는 정보 전문 블로그입니다.", 
-  image = "/default-og.jpg",
+  image = "/default-og.png",
   articleDate
 } = Astro.props;
 
 // AdSense Publisher ID - Loaded from env or fallback placeholder
 const adsenseId = import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX";
 const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : adsenseId;
+
+// Search Console Verification Keys
+const naverVerification = import.meta.env.PUBLIC_NAVER_VERIFICATION || "";
+const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
 ---
 
 <!DOCTYPE html>
@@ -25,6 +29,9 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
+    
+    {naverVerification && <meta name="naver-site-verification" content={naverVerification} />}
+    {googleVerification && <meta name="google-site-verification" content={googleVerification} />}
     
     <!-- SEO Meta Tags -->
     <title>{title} | 노아도 알짜정책 포털</title>

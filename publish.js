@@ -379,6 +379,14 @@ async function main() {
   fs.writeFileSync(filePath, finalResult, 'utf-8');
   console.log(`\n💾 글 저장 완료: ${filePath}`);
 
+  // 신규 글 생성 후 전체 글 간 상호 내부 링크(Cross-linking) 자동 갱신
+  try {
+    console.log("🔗 신규 기사 추가에 따른 상호 내부 링크(Cross-linking) 갱신 중...");
+    execSync('node scratch/cross_link.js', { stdio: 'inherit', cwd: __dirname });
+  } catch (linkErr) {
+    console.error("⚠️ 내부 링크 자동 갱신 오류:", linkErr.message);
+  }
+
   // Extract top 3 bullet highlights from the post body for Remotion video props
   const bulletRegex = /^\s*[\-\*]\s+(.+)$/gm;
   const highlights = [];

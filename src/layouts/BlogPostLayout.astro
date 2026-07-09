@@ -17,9 +17,10 @@ interface Props {
   }[];
   relatedPosts?: any[];
   currentSlug?: string;
+  faqs?: { question: string; answer: string; }[];
 }
 
-const { frontmatter, headings = [], relatedPosts = [], currentSlug = '' } = Astro.props;
+const { frontmatter, headings = [], relatedPosts = [], currentSlug = '', faqs = [] } = Astro.props;
 const filteredHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
   year: 'numeric',
@@ -103,6 +104,20 @@ const breadcrumbSchema = {
     }
   ]
 };
+
+// FAQ Schema
+const faqSchema = faqs.length > 0 ? {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": faqs.map(faq => ({
+    "@type": "Question",
+    "name": faq.question,
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": faq.answer.replace(/<[^>]*>/g, '').replace(/\*\*|__/g, '') // remove HTML tags and markdown bold inside JSON-LD
+    }
+  }))
+} : null;
 ---
 
 <BaseLayout 
@@ -115,6 +130,8 @@ const breadcrumbSchema = {
   <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
   <!-- Inject Breadcrumb Schema -->
   <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
+  <!-- Inject FAQ Schema if available -->
+  {faqSchema && <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />}
 
   <article class="blog-post">
     <!-- Breadcrumb Navigation -->
@@ -134,6 +151,11 @@ const breadcrumbSchema = {
 
     <!-- Title -->
     <h1 class="post-title">{frontmatter.title}</h1>
+
+    <!-- Featured Image -->
+    <div class="post-featured-image">
+      <img src={frontmatter.image || "/default-og.png"} alt={frontmatter.title} class="featured-img" loading="eager" />
+    </div>
 
     <!-- AdSense Top Banner -->
     <div class="adsense-container header-ad">
@@ -288,6 +310,28 @@ const breadcrumbSchema = {
 </script>
 
 <style>
+  .post-featured-image {
+    width: 100%;
+    margin-bottom: 2rem;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .featured-img {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: cover;
+    display: block;
+    transition: var(--transition-smooth);
+  }
+
+  .featured-img:hover {
+    transform: scale(1.01);
+  }
+
   .blog-post {
     max-width: 800px;
     margin: 0 auto;
