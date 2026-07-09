@@ -10,9 +10,15 @@ interface Props {
     image?: string;
     keywords?: string[];
   };
+  headings?: {
+    depth: number;
+    slug: string;
+    text: string;
+  }[];
 }
 
-const { frontmatter } = Astro.props;
+const { frontmatter, headings = [] } = Astro.props;
+const filteredHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
   year: 'numeric',
   month: 'long',
@@ -106,6 +112,23 @@ const articleSchema = {
                (adsbygoogle = window.adsbygoogle || []).push({});
           </script>
         </div>
+      </div>
+    )}
+
+    <!-- Table of Contents (TOC) -->
+    {filteredHeadings.length > 0 && (
+      <div class="toc-container">
+        <div class="toc-header">
+          <span class="toc-icon">📋</span>
+          <span class="toc-title">목차</span>
+        </div>
+        <ul class="toc-list">
+          {filteredHeadings.map((h) => (
+            <li class={`toc-item depth-${h.depth}`}>
+              <a href={`#${h.slug}`}>{h.text}</a>
+            </li>
+          ))}
+        </ul>
       </div>
     )}
 
@@ -270,6 +293,75 @@ const articleSchema = {
     margin-bottom: 0;
     font-style: italic;
     color: var(--text-secondary);
+  }
+
+  /* TOC Styling */
+  .toc-container {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  :root.light-mode .toc-container {
+    background: rgba(248, 250, 252, 0.85);
+  }
+
+  .toc-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--border-color);
+  }
+
+  .toc-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .toc-icon {
+    font-size: 1.25rem;
+  }
+
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .toc-item {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+  }
+
+  .toc-item.depth-2 {
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+
+  .toc-item.depth-3 {
+    padding-left: 1.25rem;
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+  }
+
+  .toc-item a {
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .toc-item a:hover {
+    color: #60a5fa;
+    text-decoration: underline;
+  }
+
+  :root.light-mode .toc-item a:hover {
+    color: var(--accent);
   }
 
   .post-tags {
