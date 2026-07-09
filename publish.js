@@ -379,9 +379,9 @@ async function main() {
   if (process.env.AUTO_DEPLOY === 'true') {
     try {
       console.log("\n📦 자동 배포를 위해 Git Commit & Push 진행 중...");
-      execSync('git add .', { cwd: path.join(__dirname, '../../') });
-      execSync(`git commit -m "auto: publish post - ${postTitle}"`, { cwd: path.join(__dirname, '../../') });
-      execSync('git push', { cwd: path.join(__dirname, '../../') });
+      execSync('git add .', { cwd: __dirname });
+      execSync(`git commit -m "auto: publish post - ${postTitle}"`, { cwd: __dirname });
+      execSync('git push', { cwd: __dirname });
       console.log("🚀 Git Push 완료! Cloudflare Pages 또는 Vercel이 즉시 빌드 및 배포를 진행합니다.");
     } catch (gitErr) {
       console.error("❌ Git 자동화 오류 (아직 git에 등록되지 않았거나 변경 사항이 없을 수 있습니다):", gitErr.message);
