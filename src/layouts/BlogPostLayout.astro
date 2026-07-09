@@ -196,39 +196,41 @@ const articleSchema = {
 
   /* Markdown content styling */
   .post-content :global(p) {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
+    line-height: 1.8;
     color: var(--text-primary);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.75rem;
     word-break: keep-all;
   }
 
   .post-content :global(h2) {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 700;
-    margin: 2.5rem 0 1.2rem;
-    padding-bottom: 0.5rem;
+    margin: 2.8rem 0 1.5rem;
+    padding-bottom: 0.6rem;
     border-bottom: 2px solid var(--border-color);
     color: var(--text-primary);
   }
 
   .post-content :global(h3) {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 700;
-    margin: 2rem 0 1rem;
+    margin: 2.2rem 0 1.2rem;
     color: var(--text-primary);
   }
 
   .post-content :global(ul), .post-content :global(ol) {
-    margin: 0 0 1.5rem 1.5rem;
-    font-size: 1.05rem;
+    margin: 0 0 1.75rem 1.75rem;
+    font-size: 1.2rem;
+    line-height: 1.8;
   }
 
   .post-content :global(li) {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
   }
 
   .post-content :global(strong) {
-    font-weight: 700;
+    font-weight: 800;
     color: #fca5a5; /* highlight key text */
   }
 
@@ -240,8 +242,8 @@ const articleSchema = {
   .post-content :global(table) {
     width: 100%;
     border-collapse: collapse;
-    margin: 2rem 0;
-    font-size: 0.95rem;
+    margin: 2.2rem 0;
+    font-size: 1.1rem;
   }
 
   .post-content :global(th), .post-content :global(td) {
