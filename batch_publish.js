@@ -31,7 +31,15 @@ async function runBatch() {
   let count = 0;
   for (const item of keywords) {
     const keyword = item.keyword.trim();
-    const category = item.category.trim();
+    const rawCategory = item.category.trim();
+    
+    // Map legacy categories to new 5 premium senior categories
+    let category = "생활 지원금";
+    if (rawCategory === '국가연금') category = '기초·국민연금';
+    else if (rawCategory === '의료혜택') category = '의료·건강 혜택';
+    else if (rawCategory === '노인일자리') category = '노인 일자리';
+    else if (rawCategory === '주거돌봄') category = '주거·돌봄 지원';
+    else if (rawCategory === '정부지원금') category = '생활 지원금';
 
     // Normalize keyword to check filename duplicates
     const cleanSlugKeyword = keyword
