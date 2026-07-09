@@ -8,7 +8,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function generateArticleWithBrowser(targetKeyword, targetCategory, feedback = null) {
   console.log(`🌐 [브라우저 자동화] 크롬 브라우저를 실행합니다...`);
   
-  // Create a dedicated profile directory in scratch to save login cookies/session!
   const profileDir = path.join(__dirname, 'chrome-profile');
   if (!fs.existsSync(profileDir)) {
     fs.mkdirSync(profileDir, { recursive: true });
@@ -26,32 +25,32 @@ export async function generateArticleWithBrowser(targetKeyword, targetCategory, 
     ]
   });
 
-  const page = await browser.newPage();
-  
-  console.log(`🌐 구글 제미나이 웹페이지로 이동합니다: https://gemini.google.com/app`);
-  await page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
+  try {
+    const page = await browser.newPage();
+    
+    console.log(`🌐 구글 제미나이 웹페이지로 이동합니다: https://gemini.google.com/app`);
+    await page.goto('https://gemini.google.com/app', { waitUntil: 'networkidle2' });
 
-  // Check if logged in. Gemini input is contenteditable.
-  let isLoggedIn = false;
-  for (let i = 0; i < 30; i++) { // wait up to 300 seconds (5 mins) for user login
-    const inputExists = await page.$('div[contenteditable="true"], textarea, [role="textbox"]');
-    if (inputExists) {
-      isLoggedIn = true;
-      break;
+    // Check if logged in. Gemini input is contenteditable.
+    let isLoggedIn = false;
+    for (let i = 0; i < 30; i++) { // wait up to 300 seconds (5 mins) for user login
+      const inputExists = await page.$('div[contenteditable="true"], textarea, [role="textbox"]');
+      if (inputExists) {
+        isLoggedIn = true;
+        break;
+      }
+      console.log(`⚠️ 로그인이 감지되지 않았습니다. 브라우저 창에서 구글 로그인을 완료해 주십시오... (${i * 10}초 대기 중)`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
     }
-    console.log(`⚠️ 로그인이 감지되지 않았습니다. 브라우저 창에서 구글 로그인을 완료해 주십시오... (${i * 10}초 대기 중)`);
-    await new Promise(resolve => setTimeout(resolve, 10000));
-  }
 
-  if (!isLoggedIn) {
-    await browser.close();
-    throw new Error("❌ 로그인 대기 시간 초과: 구글 계정 로그인이 완료되지 않았습니다.");
-  }
+    if (!isLoggedIn) {
+      throw new Error("❌ 로그인 대기 시간 초과: 구글 계정 로그인이 완료되지 않았습니다.");
+    }
 
-  console.log(`✅ 제미나이 서비스 활성화 감지! 기사 작성을 요청합니다...`);
+    console.log(`✅ 제미나이 서비스 활성화 감지! 기사 작성을 요청합니다...`);
 
-  const today = new Date().toISOString().split('T')[0];
-  let prompt = `
+    const today = new Date().toISOString().split('T')[0];
+    let prompt = `
 당신은 한국 최고의 구글 애드센스 수익형 블로그 전문 필진이자 SEO(검색엔진 최적화) 전문가입니다.
 목표 키워드인 "${targetKeyword}"에 대한 매력적이고 유용하며 상세한 정보성 블로그 글을 작성해 주세요.
 
@@ -82,73 +81,85 @@ keywords: ["${targetKeyword}", "${targetKeyword} 신청", "${targetKeyword} 자�
 답변은 마크다운 코드 블록 형식(\`\`\`markdown ... \`\`\`)으로 묶어서 가독성 있게 리턴해 주세요.
 `;
 
-  if (feedback) {
-    prompt += `\n\n⚠️ 중요: 이전 작성물에 대해 다음과 같은 피드백이 발생했습니다. 이 사항을 반드시 개선하여 다시 작성해 주세요:\n${feedback}`;
-  }
+    if (feedback) {
+      prompt += `\n\n⚠️ 중요: 이전 작성물에 대해 다음과 같은 피드백이 발생했습니다. 이 사항을 반드시 개선하여 다시 작성해 주세요:\n${feedback}`;
+    }
 
-  // Type the prompt into the editor
-  const textarea = await page.$('div[contenteditable="true"], textarea, [role="textbox"]');
-  await textarea.focus();
-  
-  await page.evaluate((el, text) => {
-    el.innerHTML = '';
-    const p = document.createElement('p');
-    p.textContent = text;
-    el.appendChild(p);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  }, textarea, prompt);
+    // Type the prompt into the editor
+    const textarea = await page.$('div[contenteditable="true"], textarea, [role="textbox"]');
+    await textarea.focus();
+    
+    // Safely clear and set text content using textContent/appendChild to avoid TrustedHTML CSP violations!
+    await page.evaluate((el, text) => {
+      el.textContent = '';
+      const p = document.createElement('p');
+      p.textContent = text;
+      el.appendChild(p);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, textarea, prompt);
 
-  console.log(`📤 프롬프트 입력 완료! 2초 후 전송 버튼 클릭...`);
-  await new Promise(resolve => setTimeout(resolve, 2000));
-
-  const sendButton = await page.$('button[aria-label="Send message"], button[aria-label="전송"], button.send-button');
-  if (sendButton) {
-    await sendButton.click();
-  } else {
-    await page.keyboard.press('Enter');
-  }
-
-  console.log(`⏳ AI 집필이 진행 중입니다... (답변 완료 대기...)`);
-
-  // Loop-wait for completion (polling stop button visibility)
-  let isDone = false;
-  for (let i = 0; i < 45; i++) { // wait up to 90 seconds
+    console.log(`📤 프롬프트 입력 완료! 2초 후 전송 버튼 클릭...`);
     await new Promise(resolve => setTimeout(resolve, 2000));
-    const stopBtn = await page.$('button[aria-label="Stop generation"], button[aria-label="답변 생성 중단"]');
-    if (!stopBtn) {
-      const isSendActive = await page.evaluate(() => {
-        const btn = document.querySelector('button[aria-label="Send message"], button[aria-label="전송"]');
-        return btn && !btn.disabled;
-      });
-      if (isSendActive) {
-        isDone = true;
-        break;
+
+    const sendButton = await page.$('button[aria-label="Send message"], button[aria-label="전송"], button.send-button');
+    if (sendButton) {
+      await sendButton.click();
+    } else {
+      await page.keyboard.press('Enter');
+    }
+
+    console.log(`⏳ AI 집필이 진행 중입니다... (답변 완료 대기...)`);
+
+    // Loop-wait for completion (polling stop button visibility)
+    let isDone = false;
+    for (let i = 0; i < 45; i++) { // wait up to 90 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const stopBtn = await page.$('button[aria-label="Stop generation"], button[aria-label="답변 생성 중단"]');
+      if (!stopBtn) {
+        const isSendActive = await page.evaluate(() => {
+          const btn = document.querySelector('button[aria-label="Send message"]') || document.querySelector('button[aria-label="전송"]');
+          return btn && !btn.disabled;
+        });
+        if (isSendActive) {
+          isDone = true;
+          break;
+        }
       }
     }
+
+    if (!isDone) {
+      console.log(`⚠️ 답변 완료 감지가 지연되어 10초간 최종 버퍼 대기를 실행합니다...`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+    }
+
+    console.log(`📥 답변 완료! 생성된 텍스트 데이터를 스크래핑합니다...`);
+
+    // Extract content from last message card
+    const articleContent = await page.evaluate(() => {
+      const cardElms = document.querySelectorAll('message-content, .message-content, .model-response');
+      if (cardElms.length === 0) return null;
+      const lastCard = cardElms[cardElms.length - 1];
+      return lastCard.innerText;
+    });
+
+    if (!articleContent) {
+      throw new Error("❌ AI 답변 추출 실패: 제미나이 답변 노드를 찾지 못했습니다.");
+    }
+
+    console.log(`🎉 성공적으로 글 작성을 마쳤습니다! (총 ${articleContent.length}자 추출 완료)`);
+    return articleContent;
+
+  } finally {
+    console.log(`🧹 크롬 브라우저를 정상 종료하고 리소스를 반환합니다.`);
+    try {
+      const proc = browser.process();
+      if (proc) {
+        proc.kill('SIGKILL');
+      } else {
+        await browser.close();
+      }
+    } catch (closeErr) {
+      console.error("⚠️ 브라우저 종료 중 오류:", closeErr.message);
+    }
   }
-
-  if (!isDone) {
-    console.log(`⚠️ 답변 완료 감지가 지연되어 10초간 최종 버퍼 대기를 실행합니다...`);
-    await new Promise(resolve => setTimeout(resolve, 10000));
-  }
-
-  console.log(`📥 답변 완료! 생성된 텍스트 데이터를 스크래핑합니다...`);
-
-  // Extract content from last message card
-  const articleContent = await page.evaluate(() => {
-    const cardElms = document.querySelectorAll('message-content, .message-content, .model-response');
-    if (cardElms.length === 0) return null;
-    const lastCard = cardElms[cardElms.length - 1];
-    return lastCard.innerText;
-  });
-
-  if (!articleContent) {
-    await browser.close();
-    throw new Error("❌ AI 답변 추출 실패: 제미나이 답변 노드를 찾지 못했습니다.");
-  }
-
-  console.log(`🎉 성공적으로 글 작성을 마쳤습니다! (총 ${articleContent.length}자 추출 완료)`);
-  
-  await browser.close();
-  return articleContent;
 }
