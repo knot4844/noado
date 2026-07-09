@@ -93,6 +93,19 @@ const articleSchema = {
         <div class="video-container">
           <video src={videoPath} controls autoplay muted loop playsinline class="promo-video-player"></video>
         </div>
+        <!-- Video Sub AdSense Banner (Option 2) -->
+        <div class="video-sub-ad">
+          <div class="adsense-label">추천 광고</div>
+          <ins class="adsbygoogle"
+               style="display:inline-block;width:100%;max-width:300px;height:75px;"
+               data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
+               data-ad-slot="1112223334"
+               data-ad-format="horizontal"
+               data-full-width-responsive="true"></ins>
+          <script>
+               (adsbygoogle = window.adsbygoogle || []).push({});
+          </script>
+        </div>
       </div>
     )}
 
@@ -345,5 +358,30 @@ const articleSchema = {
     display: block;
     aspect-ratio: 9/16;
     object-fit: cover;
+  }
+
+  .video-sub-ad {
+    max-width: 300px;
+    margin: 1.25rem auto 0;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-sizing: border-box;
+  }
+
+  :root.light-mode .video-sub-ad {
+    background: rgba(0, 0, 0, 0.015);
+    border: 1px dashed rgba(0, 0, 0, 0.08);
+  }
+
+  .adsense-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+    opacity: 0.6;
   }
 </style>
