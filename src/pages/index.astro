@@ -1,0 +1,325 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Fetch all posts and sort by date descending
+const allPosts = await getCollection('posts');
+const sortedPosts = allPosts.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+
+// Get unique categories for reference
+const categories = [...new Set(allPosts.map(post => post.data.category))];
+---
+
+<BaseLayout title="홈 | 실시간 지원금 & 재테크 꿀팁 정보">
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <span class="badge">실시간 정책 정보 포털</span>
+      <h1>정부 지원금 & 숨겨진 돈<br><span class="highlight">한눈에 찾고 신청하세요</span></h1>
+      <p>전국의 다양한 청년 지원금, 근로장려금, 주거 혜택부터 생활 재테크 꿀팁까지 실시간으로 업데이트하여 신속하게 알려드립니다.</p>
+    </div>
+  </section>
+
+  <!-- Content Grid Section -->
+  <section class="posts-section">
+    <div class="section-header">
+      <h2>최신 정보 및 혜택 가이드</h2>
+      <div class="category-filters">
+        <button class="filter-btn active" data-category="all">전체</button>
+        {categories.map(cat => (
+          <button class="filter-btn" data-category={cat}>{cat}</button>
+        ))}
+      </div>
+    </div>
+
+    <!-- Posts Grid -->
+    {sortedPosts.length === 0 ? (
+      <div class="no-posts">
+        <p>작성된 포스팅이 없습니다. 자동화 스크립트를 사용하여 첫 글을 작성해 보세요!</p>
+      </div>
+    ) : (
+      <div class="posts-grid" id="posts-grid">
+        {sortedPosts.map(post => {
+          const formattedDate = new Date(post.data.date).toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          
+          return (
+            <article class="post-card" data-category={post.data.category}>
+              <a href={`/posts/${post.slug}`} class="card-link">
+                <div class="card-content">
+                  <span class="card-category">{post.data.category}</span>
+                  <h3 class="card-title">{post.data.title}</h3>
+                  <p class="card-description">{post.data.description}</p>
+                  <div class="card-meta">
+                    <time datetime={post.data.date}>{formattedDate}</time>
+                    <span class="read-more">자세히 보기 &rarr;</span>
+                  </div>
+                </div>
+              </a>
+            </article>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<style>
+  /* Hero section styling */
+  .hero-section {
+    background: linear-gradient(185deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 3rem 1.5rem;
+    margin-bottom: 3rem;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .hero-section {
+      padding: 5rem 3rem;
+    }
+  }
+
+  .hero-section::before {
+    content: '';
+    position: absolute;
+    top: -20%;
+    left: -20%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .badge {
+    display: inline-block;
+    background-color: var(--accent-glow);
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.3rem 1rem;
+    border-radius: 50px;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.5px;
+  }
+
+  .hero-content h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 1.5rem;
+    letter-spacing: -1px;
+    word-break: keep-all;
+  }
+
+  @media (min-width: 768px) {
+    .hero-content h1 {
+      font-size: 3.5rem;
+    }
+  }
+
+  .highlight {
+    background: linear-gradient(90deg, #60a5fa, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-content p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    max-width: 650px;
+    margin: 0 auto;
+    word-break: keep-all;
+  }
+
+  /* Filter section */
+  .section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  @media (min-width: 768px) {
+    .section-header {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+
+  .section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .category-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.4rem 1rem;
+    border-radius: 50px;
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+  }
+
+  .filter-btn:hover, .filter-btn.active {
+    background-color: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  }
+
+  /* Grid Layout */
+  .posts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .posts-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .posts-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .post-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: var(--transition-smooth);
+    box-shadow: var(--card-shadow);
+    display: flex;
+  }
+
+  .card-link {
+    width: 100%;
+    color: inherit;
+    display: flex;
+  }
+
+  .card-content {
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .post-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 30px -10px rgba(37, 99, 235, 0.15);
+  }
+
+  .card-category {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    word-break: keep-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+    margin-top: auto;
+  }
+
+  .read-more {
+    font-weight: 600;
+    color: var(--accent);
+    transition: var(--transition-smooth);
+  }
+
+  .post-card:hover .read-more {
+    transform: translateX(4px);
+  }
+
+  .no-posts {
+    background-color: var(--bg-secondary);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+</style>
+
+<script>
+  // Simple client-side category filtering
+  const buttons = document.querySelectorAll('.filter-btn');
+  const cards = document.querySelectorAll('.post-card');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Toggle active classes on buttons
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const selectedCat = btn.getAttribute('data-category');
+
+      cards.forEach(card => {
+        const cardCat = card.getAttribute('data-category');
+        if (selectedCat === 'all' || cardCat === selectedCat) {
+          (card as HTMLElement).style.display = 'flex';
+        } else {
+          (card as HTMLElement).style.display = 'none';
+        }
+      });
+    });
+  });
+</script>

@@ -1,0 +1,86 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="개인정보처리방침 | AutoAdSense">
+  <div class="legal-container">
+    <h1>개인정보처리방침</h1>
+    <p class="updated-date">최근 수정일: {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    
+    <section>
+      <h2>1. 개인정보의 수집 항목 및 방법</h2>
+      <p>본 블로그는 사용자의 회원가입을 요구하지 않으며, 이메일 주소나 전화번호 등 직접적인 개인정보를 수집하지 않습니다. 다만, 서비스 이용 과정에서 서비스 이용 기록, 접속 로그, 쿠키, 접속 IP 정보 등이 설정을 통해 자동으로 수집될 수 있습니다.</p>
+    </section>
+
+    <section>
+      <h2>2. 쿠키(Cookie) 및 광고 게재에 관한 안내</h2>
+      <p>본 사이트는 광고 게재를 위해 Google AdSense를 이용하고 있습니다. Google을 포함한 제3자 제공업체는 쿠키를 사용하여 사용자가 본 웹사이트 또는 다른 웹사이트를 이전에 방문한 적이 있는지에 기초하여 광고를 게재합니다.</p>
+      <p>Google의 광고 쿠키 사용을 통해 Google과 파트너는 사용자의 본 웹사이트 방문 및 인터넷상의 다른 웹사이트 방문에 기초하여 광고를 게재할 수 있습니다. 사용자는 <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Google 광고 설정</a>을 방문하여 맞춤형 광고를 해제할 수 있습니다.</p>
+    </section>
+
+    <section>
+      <h2>3. 개인정보의 보유 및 이용기간</h2>
+      <p>본 블로그는 사용자의 개인정보를 직접 보관하지 않습니다. 단, 서버 로그 등에 의해 간접 수집된 데이터는 시스템 안정성 확보 및 불법적인 해킹 시도 대처를 위해서만 단기간 보관된 후 영구 삭제됩니다.</p>
+    </section>
+
+    <section>
+      <h2>4. 이용자 및 법정대리인의 권리와 그 행사방법</h2>
+      <p>이용자는 언제든지 웹 브라우저의 옵션 설정을 변경함으로써 쿠키 수집을 거부하거나 저장된 쿠키를 삭제할 수 있습니다.</p>
+    </section>
+
+    <section>
+      <h2>5. 문의사항</h2>
+      <p>개인정보 처리 및 서비스 이용과 관련된 문의사항은 관리자 이메일(support@example.com)을 통해 연락해 주시기 바랍니다.</p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .legal-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  @media (min-width: 768px) {
+    .legal-container {
+      padding: 4rem;
+    }
+  }
+
+  h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 1rem;
+  }
+
+  .updated-date {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 2.5rem;
+  }
+
+  section {
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+</style>

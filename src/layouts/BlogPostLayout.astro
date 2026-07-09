@@ -1,0 +1,259 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    description: string;
+    date: string;
+    category: string;
+    image?: string;
+    keywords?: string[];
+  };
+}
+
+const { frontmatter } = Astro.props;
+const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+// JSON-LD Schema for Google Rich Snippets (SEO)
+const articleSchema = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": frontmatter.title,
+  "description": frontmatter.description,
+  "image": frontmatter.image || "https://example.com/default-og.jpg",
+  "datePublished": frontmatter.date,
+  "author": {
+    "@type": "Organization",
+    "name": "AutoAdSense 정보팀"
+  }
+};
+---
+
+<BaseLayout 
+  title={frontmatter.title} 
+  description={frontmatter.description} 
+  image={frontmatter.image}
+  articleDate={frontmatter.date}
+>
+  <!-- Inject Article Schema -->
+  <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
+
+  <article class="blog-post">
+    <!-- Meta details -->
+    <div class="post-meta">
+      <span class="post-category">{frontmatter.category}</span>
+      <time datetime={frontmatter.date}>{formattedDate}</time>
+    </div>
+
+    <!-- Title -->
+    <h1 class="post-title">{frontmatter.title}</h1>
+
+    <!-- AdSense Top Banner -->
+    <div class="adsense-container header-ad">
+      <div class="adsense-label">광고</div>
+      <!-- 광고 코드는 애드센스 승인 후 자동광고 또는 아래 코드 삽입 -->
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
+           data-ad-slot="1234567890"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </div>
+
+    <!-- Content Body -->
+    <div class="post-content">
+      <slot />
+    </div>
+
+    <!-- AdSense Bottom Banner -->
+    <div class="adsense-container footer-ad">
+      <div class="adsense-label">광고</div>
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-format="autorelaxed"
+           data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
+           data-ad-slot="0987654321"></ins>
+      <script>
+           (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </div>
+
+    <!-- Keywords / Tags -->
+    {frontmatter.keywords && frontmatter.keywords.length > 0 && (
+      <div class="post-tags">
+        {frontmatter.keywords.map((kw) => (
+          <span class="tag">#{kw}</span>
+        ))}
+      </div>
+    )}
+
+    <!-- Warning / Disclaimers -->
+    <div class="post-disclaimer">
+      <p><strong>안내사항:</strong> 본 블로그에서 제공하는 정보는 공식 기관의 발표 자료 및 보도자료를 참고하여 작성되었습니다. 정부 정책 및 지원 조건은 수시로 변경될 수 있으므로, 최종 신청 전에 반드시 관계 기관의 공식 홈페이지 또는 콜센터를 통해 정확한 요건을 재확인하시기 바랍니다.</p>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .blog-post {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2rem 1.5rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  @media (min-width: 768px) {
+    .blog-post {
+      padding: 3rem;
+    }
+  }
+
+  .post-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .post-category {
+    background-color: var(--accent-glow);
+    color: #60a5fa;
+    padding: 0.2rem 0.75rem;
+    border-radius: 50px;
+    font-weight: 600;
+  }
+
+  :root.light-mode .post-category {
+    color: var(--accent);
+  }
+
+  .post-title {
+    font-size: 2rem;
+    line-height: 1.35;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    word-break: keep-all;
+  }
+
+  @media (min-width: 768px) {
+    .post-title {
+      font-size: 2.5rem;
+    }
+  }
+
+  /* Markdown content styling */
+  .post-content :global(p) {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    word-break: keep-all;
+  }
+
+  .post-content :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 2.5rem 0 1.2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .post-content :global(h3) {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 2rem 0 1rem;
+    color: var(--text-primary);
+  }
+
+  .post-content :global(ul), .post-content :global(ol) {
+    margin: 0 0 1.5rem 1.5rem;
+    font-size: 1.05rem;
+  }
+
+  .post-content :global(li) {
+    margin-bottom: 0.5rem;
+  }
+
+  .post-content :global(strong) {
+    font-weight: 700;
+    color: #fca5a5; /* highlight key text */
+  }
+
+  :root.light-mode .post-content :global(strong) {
+    color: #dc2626;
+  }
+
+  /* Table styling (highly important for subsidies specs) */
+  .post-content :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0;
+    font-size: 0.95rem;
+  }
+
+  .post-content :global(th), .post-content :global(td) {
+    border: 1px solid var(--border-color);
+    padding: 0.75rem 1rem;
+    text-align: left;
+  }
+
+  .post-content :global(th) {
+    background-color: var(--bg-tertiary);
+    font-weight: 600;
+  }
+
+  /* Blockquote / Tip boxes */
+  .post-content :global(blockquote) {
+    border-left: 4px solid var(--accent);
+    background-color: var(--bg-tertiary);
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+
+  .post-content :global(blockquote p) {
+    margin-bottom: 0;
+    font-style: italic;
+    color: var(--text-secondary);
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 2.5rem 0 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .tag {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background-color: var(--bg-tertiary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+  }
+
+  .post-disclaimer {
+    background-color: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+</style>
