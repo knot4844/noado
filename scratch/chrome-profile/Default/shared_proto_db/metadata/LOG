@@ -1,2 +1,3 @@
-2026/07/09-15:43:13.960 1017864 Creating DB /Users/dyl/Documents/autoadsense-blog/scratch/chrome-profile/Default/shared_proto_db/metadata since it was missing.
-2026/07/09-15:43:13.963 1017864 Reusing MANIFEST /Users/dyl/Documents/autoadsense-blog/scratch/chrome-profile/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/07/09-22:57:45.014 10a32a2 Reusing MANIFEST /Users/dyl/Documents/autoadsense-blog/scratch/chrome-profile/Default/shared_proto_db/metadata/MANIFEST-000001
+2026/07/09-22:57:45.015 10a32a2 Recovering log #3
+2026/07/09-22:57:45.015 10a32a2 Reusing old log /Users/dyl/Documents/autoadsense-blog/scratch/chrome-profile/Default/shared_proto_db/metadata/000003.log 

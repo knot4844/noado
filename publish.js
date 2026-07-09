@@ -243,8 +243,15 @@ function evaluateSEO(articleText, targetKeyword) {
   let score = 0;
   const reports = [];
 
-  // Remove markdown block backticks if AI wrapped the output in ```markdown ... ```
-  let cleanText = articleText.replace(/^```markdown\n/, '').replace(/```$/, '').trim();
+  // Robust parsing: Strip any conversational prefix or opening backticks by slicing from the first '---'
+  let cleanText = articleText.trim();
+  const firstDashIndex = cleanText.indexOf('---');
+  if (firstDashIndex !== -1) {
+    cleanText = cleanText.substring(firstDashIndex).trim();
+  }
+  
+  // Strip trailing code block backticks if present
+  cleanText = cleanText.replace(/```$/, '').trim();
 
   // 1. Frontmatter 검사
   const hasFrontmatter = cleanText.startsWith('---') && cleanText.indexOf('---', 3) > 3;
@@ -351,7 +358,12 @@ async function main() {
 
   if (!finalResult) {
     console.log("\n⚠️ 최대 재작성 횟수를 초과했습니다. 가장 최근 버전으로 저장을 진행합니다.");
-    finalResult = currentArticle.replace(/^```markdown\n/, '').replace(/```$/, '').trim();
+    let cleanText = currentArticle.trim();
+    const firstDashIndex = cleanText.indexOf('---');
+    if (firstDashIndex !== -1) {
+      cleanText = cleanText.substring(firstDashIndex).trim();
+    }
+    finalResult = cleanText.replace(/```$/, '').trim();
   }
 
   // 3단계: 파일 저장
