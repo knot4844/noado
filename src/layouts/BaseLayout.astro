@@ -128,9 +128,10 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
 
       /* Header Layout */
       header {
-        background-color: rgba(18, 26, 41, 0.8);
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid var(--border-color);
+        background-color: rgba(11, 15, 25, 0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         position: sticky;
         top: 0;
         z-index: 100;
@@ -138,7 +139,8 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
       }
 
       :root.light-mode header {
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(255, 255, 255, 0.7);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       }
 
       .header-container {
@@ -150,14 +152,22 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
         align-items: center;
       }
 
-      .logo {
-        font-family: var(--font-display);
-        font-size: 1.5rem;
-        font-weight: 700;
-        background: linear-gradient(90deg, #60a5fa, #2563eb);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -0.5px;
+      .logo-container {
+        display: flex;
+        align-items: center;
+        height: 48px;
+        transition: var(--transition-smooth);
+      }
+
+      .logo-container:hover {
+        transform: scale(1.02);
+      }
+
+      .header-logo {
+        height: 100%;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.35));
       }
 
       .nav-links {
@@ -378,7 +388,9 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
   <body>
     <header>
       <div class="header-container">
-        <a href="/" class="logo" id="logo-link">NOADO 노아도</a>
+        <a href="/" class="logo-container" id="logo-link">
+          <img src="/logo.png" alt="NOADO 노아도" class="header-logo" />
+        </a>
         <nav class="nav-links">
           <a href="/" id="nav-home">홈</a>
           <a href="/privacy" id="nav-privacy">개인정보처리방침</a>
