@@ -2,7 +2,7 @@ import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: process.env.SITE_URL || 'https://example.com', // Change this to your domain
+  site: process.env.SITE_URL || 'https://noado.kr', // Change this to your domain
   integrations: [sitemap()],
   markdown: {
     shikiConfig: {
