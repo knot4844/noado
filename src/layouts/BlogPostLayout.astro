@@ -275,6 +275,26 @@ const faqSchema = faqs.length > 0 ? {
       </section>
     )}
 
+    <!-- E-E-A-T Author Card -->
+    <section class="post-author-section">
+      <div class="author-card-header">
+        <div class="author-avatar-badge">
+          <span class="author-avatar-emoji">🧑‍💼</span>
+        </div>
+        <div class="author-header-info">
+          <span class="author-lbl">정보 분석 및 검증 전문가</span>
+          <h4 class="author-name">노아도 알짜정책 분석팀</h4>
+        </div>
+      </div>
+      <p class="author-desc">
+        노아도 정책 분석팀은 보건복지부, 고용노동부, 국민연금공단 등 공식 행정기관의 최신 발표 자료 및 고시 정보를 철저히 교차 검증합니다. 어르신들께서 소중한 국가 지원금과 연금 혜택을 단 한 가지도 놓치지 않으시도록, 복잡한 정책 자격 기준을 가장 정밀하고 이해하기 쉽게 분석하여 신뢰성 높은 복지 정보를 전달해 드립니다.
+      </p>
+      <div class="author-meta-info">
+        <span class="author-meta-item">📅 최신 검수일: 2026년 7월 기준 개정 세부사항 반영 완료</span>
+        <span class="author-meta-item">📧 정보 제보/정정 문의: <a href="mailto:correction@noado.kr">correction@noado.kr</a></span>
+      </div>
+    </section>
+
     <!-- Warning / Disclaimers -->
     <div class="post-disclaimer">
       <p><strong>안내사항:</strong> 본 블로그에서 제공하는 정보는 공식 기관의 발표 자료 및 보도자료를 참고하여 작성되었습니다. 정부 정책 및 지원 조건은 수시로 변경될 수 있으므로, 최종 신청 전에 반드시 관계 기관의 공식 홈페이지 또는 콜센터를 통해 정확한 요건을 재확인하시기 바랍니다.</p>
@@ -782,5 +802,89 @@ const faqSchema = faqs.length > 0 ? {
     letter-spacing: 1px;
     margin-bottom: 0.5rem;
     opacity: 0.6;
+  }
+
+  /* E-E-A-T Author Profile Card Styling */
+  .post-author-section {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: rgba(30, 41, 59, 0.35);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+  }
+
+  :root.light-mode .post-author-section {
+    background: rgba(241, 245, 249, 0.7);
+  }
+
+  .author-card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .author-avatar-badge {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+  }
+
+  .author-avatar-emoji {
+    font-size: 1.75rem;
+  }
+
+  .author-lbl {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.15rem;
+  }
+
+  :root.light-mode .author-lbl {
+    color: var(--accent);
+  }
+
+  .author-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .author-desc {
+    font-size: 0.95rem !important;
+    line-height: 1.7 !important;
+    color: var(--text-secondary) !important;
+    margin-bottom: 1.25rem !important;
+    word-break: keep-all;
+  }
+
+  .author-meta-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    border-top: 1px dashed var(--border-color);
+    padding-top: 1rem;
+  }
+
+  .author-meta-item a {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .author-meta-item a:hover {
+    text-decoration: underline;
   }
 </style>

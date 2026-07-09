@@ -409,26 +409,61 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
 </style>
 
 <script>
-  // Simple client-side category filtering
+  // Client-side category filtering with URL parameter support
   const buttons = document.querySelectorAll('.filter-btn');
   const cards = document.querySelectorAll('.post-card');
 
+  function filterCategory(selectedCat: string | null) {
+    if (!selectedCat) selectedCat = 'all';
+
+    // Update active button state
+    buttons.forEach(btn => {
+      if (btn.getAttribute('data-category') === selectedCat) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Toggle card visibility
+    cards.forEach(card => {
+      const cardCat = card.getAttribute('data-category');
+      if (selectedCat === 'all' || cardCat === selectedCat) {
+        (card as HTMLElement).style.display = 'flex';
+      } else {
+        (card as HTMLElement).style.display = 'none';
+      }
+    });
+  }
+
+  // Handle button clicks
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
-      // Toggle active classes on buttons
-      buttons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const selectedCat = btn.getAttribute('data-category');
-
-      cards.forEach(card => {
-        const cardCat = card.getAttribute('data-category');
-        if (selectedCat === 'all' || cardCat === selectedCat) {
-          (card as HTMLElement).style.display = 'flex';
-        } else {
-          (card as HTMLElement).style.display = 'none';
-        }
-      });
+      const cat = btn.getAttribute('data-category');
+      // Update URL without reloading page
+      const url = new URL(window.location.href);
+      if (cat && cat !== 'all') {
+        url.searchParams.set('category', cat);
+      } else {
+        url.searchParams.delete('category');
+      }
+      window.history.pushState({}, '', url.toString());
+      filterCategory(cat);
     });
+  });
+
+  // Handle initial page load with URL query parameter
+  window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const initialCategory = params.get('category');
+    if (initialCategory) {
+      filterCategory(initialCategory);
+    }
+  });
+
+  // Handle browser back/forward buttons
+  window.addEventListener('popstate', () => {
+    const params = new URLSearchParams(window.location.search);
+    filterCategory(params.get('category'));
   });
 </script>
