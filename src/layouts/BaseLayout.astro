@@ -15,6 +15,7 @@ const {
 
 // AdSense Publisher ID - Loaded from env or fallback placeholder
 const adsenseId = import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX";
+const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : adsenseId;
 ---
 
 <!DOCTYPE html>
@@ -49,8 +50,8 @@ const adsenseId = import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX";
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <!-- Google AdSense Integration -->
-    {adsenseId && adsenseId !== "ca-pub-XXXXXXXXXXXXX" && (
-      <script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseId}`} crossorigin="anonymous"></script>
+    {formattedAdsenseId && formattedAdsenseId !== "ca-pub-XXXXXXXXXXXXX" && (
+      <script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${formattedAdsenseId}`} crossorigin="anonymous"></script>
     )}
 
     <!-- Global CSS Styles -->
