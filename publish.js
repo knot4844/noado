@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import { YoutubeTranscript } from '@danielxceron/youtube-transcript';
 import { renderPromoVideo } from './render_video.js';
+import { generateArticleWithBrowser } from './scratch/browser_writer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,11 +19,12 @@ if (!process.env.GEMINI_API_KEY) {
 
 // Check for Gemini API key and determine mode
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const isDryRun = process.argv.includes('--dry-run') || !GEMINI_API_KEY || !GEMINI_API_KEY.startsWith('AIza');
+const isDryRun = process.argv.includes('--dry-run');
+const USE_BROWSER = process.env.USE_BROWSER === 'true' || !GEMINI_API_KEY || !GEMINI_API_KEY.startsWith('AIza');
 
-// Initialize Gemini API (only if not in dry-run mode)
+// Initialize Gemini API (only if not using browser and key is valid)
 let genAI = null;
-if (!isDryRun) {
+if (!USE_BROWSER && GEMINI_API_KEY) {
   genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 }
 
@@ -170,6 +172,16 @@ keywords: ["기초연금", "어르신복지", "정부지원금", "노령연금"]
  * 1단계: AI를 활용한 SEO 글쓰기 생성
  */
 async function generateArticle(targetKeyword, targetCategory, feedback = null, youtubeTranscript = "") {
+  if (USE_BROWSER) {
+    console.log(`🌐 [브라우저 자동화 모드] 크롬 브라우저를 활성화하여 제미나이 웹에서 글을 작성합니다...`);
+    try {
+      return await generateArticleWithBrowser(targetKeyword, targetCategory, feedback);
+    } catch (err) {
+      console.error("❌ 브라우저 자동 집필 중 오류 발생, 모의 기사 생성으로 대체합니다:", err.message);
+      return generateMockArticle(targetKeyword, targetCategory);
+    }
+  }
+
   if (isDryRun) {
     console.log(`💡 [데모/드라이런] API 키가 미등록 상태이거나 데모 모드입니다. 고품질 SEO 모의 본문을 자체 생성합니다.`);
     return generateMockArticle(targetKeyword, targetCategory);
