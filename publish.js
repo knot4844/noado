@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
+import { YoutubeTranscript } from '@danielxceron/youtube-transcript';
+import { renderPromoVideo } from './render_video.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +31,9 @@ function getArgs() {
   const args = {};
   process.argv.slice(2).forEach(val => {
     if (val.startsWith('--')) {
-      const [key, value] = val.substring(2).split('=');
+      const parts = val.substring(2).split('=');
+      const key = parts[0];
+      const value = parts.slice(1).join('=');
       args[key] = value;
     }
   });
@@ -37,13 +41,59 @@ function getArgs() {
 }
 
 const args = getArgs();
-const keyword = args.keyword;
+const youtubeUrl = args.youtube;
 const category = args.category || "생활정보";
+let keyword = args.keyword;
 
-if (!keyword) {
-  console.log("💡 사용법: node publish.js --keyword=\"키워드\" [--category=\"카테고리\"]");
-  console.log("예: node publish.js --keyword=\"2026년 근로장려금 신청\" --category=\"정부지원금\"");
+if (!keyword && !youtubeUrl) {
+  console.log("💡 사용법: node publish.js [--keyword=\"키워드\"] [--youtube=\"유튜브URL\"] [--category=\"카테고리\"]");
+  console.log("예: node publish.js --keyword=\"2026년 근로장려금\" --youtube=\"https://www.youtube.com/watch?v=...\"");
   process.exit(0);
+}
+
+// Fetch YouTube transcript helper
+async function fetchYoutubeTranscript(url) {
+  // Extract Video ID
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  const videoId = (match && match[2].length === 11) ? match[2] : null;
+
+  if (videoId) {
+    const cachePath = path.join(__dirname, 'public', 'transcripts', `${videoId}.txt`);
+    if (fs.existsSync(cachePath)) {
+      console.log(`💾 로컬 자막 캐시 발견: ${cachePath}`);
+      return fs.readFileSync(cachePath, 'utf-8');
+    }
+  }
+
+  try {
+    console.log(`📡 유튜브 자막 추출 중: ${url}`);
+    try {
+      const transcript = await YoutubeTranscript.fetchTranscript(url, { lang: 'ko' });
+      return transcript.map(t => t.text).join(' ');
+    } catch (koErr) {
+      console.log(`⚠️ 한국어 자막 추출 실패(또는 없음), 기본 자막으로 재시도...`);
+      const transcript = await YoutubeTranscript.fetchTranscript(url);
+      return transcript.map(t => t.text).join(' ');
+    }
+  } catch (err) {
+    console.error(`❌ 유튜브 자막 추출 실패:`, err.message);
+    return null;
+  }
+}
+
+// Extract keyword from transcript using Gemini
+async function extractKeywordFromTranscript(transcript) {
+  if (isDryRun) return "유튜브 자동화 정보";
+  try {
+    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-pro";
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const prompt = `다음 유튜브 자막 대본을 읽고, 이 영상을 블로그 글로 작성할 때 가장 알맞은 1개의 네이버/구글 검색용 핵심 목표 키워드(예: "2026년 국민연금 조기수령")만 뽑아서 출력해 주세요. 다른 수식어나 설명 없이 오직 핵심 키워드 단어/문구만 한 줄로 출력해야 합니다.\n\n대본:\n${transcript.substring(0, 3000)}`;
+    const result = await model.generateContent(prompt);
+    return (await result.response).text().trim().replace(/['"]/g, '');
+  } catch (err) {
+    return "유튜브 자동화 정보";
+  }
 }
 
 // URL/Slug friendly string generator
@@ -118,7 +168,7 @@ keywords: ["${targetKeyword}", "정부지원금", "생활정보", "신청방법"
 /**
  * 1단계: AI를 활용한 SEO 글쓰기 생성
  */
-async function generateArticle(targetKeyword, targetCategory, feedback = null) {
+async function generateArticle(targetKeyword, targetCategory, feedback = null, youtubeTranscript = "") {
   if (isDryRun) {
     console.log(`💡 [데모/드라이런] API 키가 미등록 상태이거나 데모 모드입니다. 고품질 SEO 모의 본문을 자체 생성합니다.`);
     return generateMockArticle(targetKeyword, targetCategory);
@@ -157,6 +207,10 @@ keywords: ["${targetKeyword}", "[연관 키워드 1]", "[연관 키워드 2]", "
 6. 글자 수: 본문(Frontmatter 제외)은 한글 기준 최소 1,500자 이상의 매우 풍부하고 가치 있는 정보로 채우세요. 단순히 정보를 나열하지 말고, 자격 요건, 신청 기한, 필요 서류, 모바일 신청 방법 등을 매우 상세하고 친절하게 설명해야 구글 애드센스 승인을 통과할 수 있습니다.
 7. 글의 마지막에는 항상 자주 묻는 질문(FAQ) 3가지를 정리해 주세요.
   `;
+
+  if (youtubeTranscript) {
+    prompt += `\n\n[참고 데이터 - 유튜브 영상 자막 스크립트]\n다음은 해당 주제에 대한 유튜브 영상의 실제 대본 자막입니다. 이 자막의 최신 정보(수치, 자격 요건, 절차 등)를 정확하게 활용하여 풍부하고 전문적인 글을 구성해 주세요. 자막 속 실제 정보에 기반해야 하며 거짓 정보(환각)를 작성해서는 안 됩니다:\n\n${youtubeTranscript}`;
+  }
 
   if (feedback) {
     prompt += `\n\n⚠️ 중요: 이전 작성물에 대해 다음과 같은 피드백이 발생했습니다. 이 사항을 반드시 개선하여 다시 작성해 주세요:\n${feedback}`;
@@ -240,6 +294,18 @@ function evaluateSEO(articleText, targetKeyword) {
  * 메인 실행 엔진 (루프 & 피드백)
  */
 async function main() {
+  let youtubeTranscript = "";
+  if (youtubeUrl) {
+    youtubeTranscript = await fetchYoutubeTranscript(youtubeUrl);
+    if (!youtubeTranscript) {
+      console.log("⚠️ 유튜브 자막 추출에 실패하여 일반 웹 검색 및 AI 생성 모드로 전환합니다.");
+    } else if (!keyword) {
+      console.log("🤖 유튜브 자막 분석 결과로부터 블로그 목표 키워드를 자동 추출하는 중...");
+      keyword = await extractKeywordFromTranscript(youtubeTranscript);
+      console.log(`🎯 추출된 자동 목표 키워드: "${keyword}"`);
+    }
+  }
+
   console.log(`\n📝 키워드 "${keyword}"에 대한 구글 애드센스 최적화 블로그 자동 글쓰기를 시작합니다.`);
   
   let currentArticle = "";
@@ -248,23 +314,23 @@ async function main() {
   const maxAttempts = 3;
   let finalResult = null;
 
-  // 피드백 루프: 80점 이상이 될 때까지 최대 3회 재작성
+  // 피드백 루프: 90점 이상이 될 때까지 최대 3회 재작성
   while (attempts < maxAttempts) {
     attempts++;
     console.log(`\n🔄 [시도 ${attempts}/${maxAttempts}] 글 생성 및 SEO 진단 중...`);
     
-    currentArticle = await generateArticle(keyword, category, feedback);
+    currentArticle = await generateArticle(keyword, category, feedback, youtubeTranscript);
     const evaluation = evaluateSEO(currentArticle, keyword);
     
     console.log(`\n📊 SEO 자가 진단 결과 (점수: ${evaluation.score}/100)`);
     evaluation.reports.forEach(report => console.log(report));
 
-    if (evaluation.score >= 80) {
-      console.log(`\n🎉 통과! SEO 평가 점수가 ${evaluation.score}점으로 기준값(80점) 이상입니다.`);
+    if (evaluation.score >= 90) {
+      console.log(`\n🎉 통과! SEO 평가 점수가 ${evaluation.score}점으로 기준값(90점) 이상입니다.`);
       finalResult = evaluation.cleanText;
       break;
     } else {
-      console.log(`\n⚠️ 경고: 점수가 ${evaluation.score}점으로 기준치(80점) 미달입니다. AI에게 피드백을 전달하여 재작성합니다.`);
+      console.log(`\n⚠️ 경고: 점수가 ${evaluation.score}점으로 기준치(90점) 미달입니다. AI에게 피드백을 전달하여 재작성합니다.`);
       feedback = evaluation.reports.filter(r => r.startsWith('❌')).join('\n');
     }
   }
@@ -286,6 +352,26 @@ async function main() {
   const filePath = path.join(targetDir, `${slug}.md`);
   fs.writeFileSync(filePath, finalResult, 'utf-8');
   console.log(`\n💾 글 저장 완료: ${filePath}`);
+
+  // Extract top 3 bullet highlights from the post body for Remotion video props
+  const bulletRegex = /^\s*[\-\*]\s+(.+)$/gm;
+  const highlights = [];
+  let bulletMatch;
+  while ((bulletMatch = bulletRegex.exec(finalResult)) !== null && highlights.length < 3) {
+    const cleanBullet = bulletMatch[1].replace(/\*\*/g, '').replace(/`/g, '').trim();
+    if (cleanBullet.length > 5 && cleanBullet.length < 55) {
+      highlights.push(cleanBullet);
+    }
+  }
+  // Fill fallbacks if list items are empty
+  while (highlights.length < 3) {
+    if (highlights.length === 0) highlights.push("실시간 정부 고시 조건 완벽 정리");
+    else if (highlights.length === 1) highlights.push("온라인/모바일 간편 신청 방법 안내");
+    else highlights.push("노아도 알짜정책 포털에서 상세 확인");
+  }
+
+  console.log("\n🎬 기사 요약 기반 15초 숏츠 홍보 영상(Remotion MP4) 인코딩을 시작합니다...");
+  renderPromoVideo(slug, postTitle, highlights);
 
   // 4단계: 배포 자동화 (Git Push)
   if (process.env.AUTO_DEPLOY === 'true') {
