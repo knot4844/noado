@@ -19,6 +19,21 @@ const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
   day: 'numeric',
 });
 
+// Check if matching video exists on the filesystem
+import fs from 'fs';
+import path from 'path';
+
+function getSlug(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9ㄱ-ㅎㅏ-ㅣ가-힣\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+const slug = getSlug(frontmatter.title);
+const videoPath = `/videos/${slug}.mp4`;
+const hasVideo = fs.existsSync(path.join(process.cwd(), 'public', 'videos', `${slug}.mp4`));
+
 // JSON-LD Schema for Google Rich Snippets (SEO)
 const articleSchema = {
   "@context": "https://schema.org",
@@ -69,6 +84,18 @@ const articleSchema = {
     </div>
 
     <!-- Content Body -->
+    {hasVideo && (
+      <div class="post-video-section">
+        <div class="video-preview-header">
+          <span class="video-badge">15초 요약</span>
+          <h3>🎬 이 글의 15초 영상 요약</h3>
+        </div>
+        <div class="video-container">
+          <video src={videoPath} controls autoplay muted loop playsinline class="promo-video-player"></video>
+        </div>
+      </div>
+    )}
+
     <div class="post-content">
       <slot />
     </div>
@@ -255,5 +282,68 @@ const articleSchema = {
     margin-top: 2rem;
     font-size: 0.85rem;
     color: var(--text-secondary);
+  }
+
+  /* Video Section styling */
+  .post-video-section {
+    background: rgba(22, 31, 48, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin: 2rem 0;
+    box-shadow: var(--card-shadow);
+  }
+
+  :root.light-mode .post-video-section {
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .video-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .video-preview-header h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .video-badge {
+    background: linear-gradient(135deg, #ef4444, #ec4899);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+
+  .video-container {
+    max-width: 300px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  }
+
+  :root.light-mode .video-container {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .promo-video-player {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 9/16;
+    object-fit: cover;
   }
 </style>
