@@ -65,6 +65,23 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
       </div>
     )}
   </section>
+
+  <!-- Compliance Policy Section -->
+  <section class="compliance-section">
+    <div class="compliance-box">
+      <h3>개인정보처리 및 서비스 정책 안내</h3>
+      <p>noado.kr은 구글 애드센스 정책 및 국내 법령상의 개인정보 보호 규정을 철저히 준수합니다. 블로그 서비스 이용 시의 권리 의무 사항과 개인정보의 처리 방식, 쿠키 활용 등에 대한 투명한 정보는 아래 정책 문서를 통해 상시 투명하게 제공됩니다.</p>
+      <div class="compliance-links">
+        <a href="/privacy" class="policy-link">개인정보처리방침</a>
+        <span class="divider">|</span>
+        <a href="/terms" class="policy-link">이용약관</a>
+        <span class="divider">|</span>
+        <a href="/sitemap-index.xml" target="_blank" class="policy-link">사이트맵</a>
+        <span class="divider">|</span>
+        <a href="/rss.xml" target="_blank" class="policy-link">RSS 피드</a>
+      </div>
+    </div>
+  </section>
 </BaseLayout>
 
 <style>
@@ -296,6 +313,64 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
     padding: 4rem 2rem;
     text-align: center;
     color: var(--text-secondary);
+  }
+
+  /* Compliance section styling */
+  .compliance-section {
+    margin-top: 4rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 3rem;
+  }
+
+  .compliance-box {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2.25rem 1.5rem;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+    box-shadow: var(--card-shadow);
+  }
+
+  .compliance-box h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+  }
+
+  .compliance-box p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    word-break: keep-all;
+  }
+
+  .compliance-links {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .policy-link {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    transition: var(--transition-smooth);
+  }
+
+  .policy-link:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+  }
+
+  .divider {
+    color: var(--border-color);
+    font-size: 0.85rem;
   }
 </style>
 
