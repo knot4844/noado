@@ -1,0 +1,343 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="사이트 소개" description="노아도 정보광장은 50~70대 어르신을 위한 정부 복지 혜택, 연금, 지원금 정보를 쉽고 자세하게 전달하는 전문 블로그입니다.">
+  <article class="about-page">
+    <!-- Hero Section -->
+    <div class="about-hero">
+      <span class="about-badge">노아도 정보광장 소개</span>
+      <h1>어르신의 <span class="highlight">든든한 복지 안내서</span></h1>
+      <p class="hero-subtitle">대한민국 시니어를 위한 정부 지원 정보를 가장 쉽고 자상하게 전달합니다.</p>
+    </div>
+
+    <!-- Mission Section -->
+    <section class="about-section">
+      <h2>🎯 노아도 정보광장의 목표</h2>
+      <div class="mission-grid">
+        <div class="mission-card">
+          <span class="mission-icon">📋</span>
+          <h3>정확한 정보 제공</h3>
+          <p>보건복지부, 국민연금공단, 고용노동부 등 <strong>정부 공식 기관의 발표 자료</strong>를 기반으로 연금, 지원금, 복지 혜택 정보를 정리하여 전달합니다.</p>
+        </div>
+        <div class="mission-card">
+          <span class="mission-icon">👴</span>
+          <h3>어르신 맞춤 눈높이</h3>
+          <p>50~70대 어르신들께서 복잡한 정책 용어를 어려움 없이 이해하실 수 있도록 <strong>큰 글씨, 쉬운 단어, 단계별 그림 설명</strong>을 제공합니다.</p>
+        </div>
+        <div class="mission-card">
+          <span class="mission-icon">🔔</span>
+          <h3>시의성 있는 업데이트</h3>
+          <p>정부 정책은 매년 기준 금액과 자격 요건이 변경됩니다. <strong>2026년 최신 기준</strong>에 맞추어 내용을 수시로 갱신합니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Topics Section -->
+    <section class="about-section">
+      <h2>📖 주요 다루는 주제</h2>
+      <div class="topics-list">
+        <div class="topic-item">
+          <span class="topic-icon">💰</span>
+          <div>
+            <h3>국가 연금 제도</h3>
+            <p>기초연금, 국민연금, 노령연금의 자격 조건과 신청 방법, 수령액 모의계산</p>
+          </div>
+        </div>
+        <div class="topic-item">
+          <span class="topic-icon">🏥</span>
+          <div>
+            <h3>의료·건강 혜택</h3>
+            <p>어르신 틀니·임플란트 지원, 건강검진 무료 대상, 노인장기요양보험</p>
+          </div>
+        </div>
+        <div class="topic-item">
+          <span class="topic-icon">🏠</span>
+          <div>
+            <h3>주거·생활 지원</h3>
+            <p>주거급여, 실버 주택, 난방비 지원, 교통비 할인, 통신요금 감면</p>
+          </div>
+        </div>
+        <div class="topic-item">
+          <span class="topic-icon">💼</span>
+          <div>
+            <h3>일자리·경제 정보</h3>
+            <p>노인 일자리 사업, 재취업 지원, 실업급여 안내, 근로장려금</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- E-E-A-T Author Profile -->
+    <section class="about-section author-section">
+      <h2>✍️ 운영진 소개</h2>
+      <div class="author-card">
+        <div class="author-avatar">
+          <span class="avatar-emoji">🧑‍💼</span>
+        </div>
+        <div class="author-info">
+          <h3>노아도 정보팀</h3>
+          <p class="author-role">복지 정책 분석 · 시니어 생활 정보 전문</p>
+          <p>노아도 정보광장은 정부 정책 발표 자료, 관보, 복지부 고시문을 지속적으로 모니터링하여 정확하고 시의성 있는 복지 안내 콘텐츠를 제작합니다. 어르신들의 소중한 권리를 한 가지도 놓치지 않도록 최선을 다하겠습니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trust Section -->
+    <section class="about-section trust-section">
+      <h2>🔒 신뢰와 투명성</h2>
+      <div class="trust-grid">
+        <div class="trust-item">
+          <h3>📌 출처 기반 글쓰기</h3>
+          <p>모든 글은 보건복지부, 국민연금공단, 고용노동부 등 공식 기관의 공개 자료를 기반으로 작성됩니다.</p>
+        </div>
+        <div class="trust-item">
+          <h3>🛡️ 광고 정책 준수</h3>
+          <p>본 사이트는 <strong>Google 애드센스 프로그램 정책</strong>과 <strong>대한민국 개인정보보호법</strong>을 철저히 준수합니다.</p>
+        </div>
+        <div class="trust-item">
+          <h3>📧 열린 소통</h3>
+          <p>잘못된 정보나 개선 제안이 있으시면 <a href="/contact">문의 페이지</a>를 통해 언제든 알려주십시오.</p>
+        </div>
+      </div>
+    </section>
+
+  </article>
+</BaseLayout>
+
+<style>
+  .about-page {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .about-hero {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    margin-bottom: 3rem;
+    background: radial-gradient(circle at 50% -20%, rgba(37, 99, 235, 0.12) 0%, transparent 60%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+  }
+
+  .about-badge {
+    display: inline-block;
+    background: var(--accent-glow);
+    color: #60a5fa;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.3rem 1rem;
+    border-radius: 50px;
+    margin-bottom: 1.25rem;
+    letter-spacing: 0.5px;
+  }
+
+  :root.light-mode .about-badge {
+    color: var(--accent);
+  }
+
+  .about-hero h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 1rem;
+    word-break: keep-all;
+  }
+
+  @media (min-width: 768px) {
+    .about-hero h1 { font-size: 3rem; }
+  }
+
+  .highlight {
+    background: linear-gradient(90deg, #60a5fa, #2563eb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .about-section {
+    margin-bottom: 3rem;
+  }
+
+  .about-section h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  /* Mission Grid */
+  .mission-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .mission-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .mission-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition-smooth);
+  }
+
+  .mission-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+  }
+
+  .mission-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+
+  .mission-card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .mission-card p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Topics List */
+  .topics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .topic-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    transition: var(--transition-smooth);
+  }
+
+  .topic-item:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+  }
+
+  .topic-icon {
+    font-size: 1.75rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .topic-item h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .topic-item p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* Author Section */
+  .author-card {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  @media (max-width: 767px) {
+    .author-card {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+
+  .author-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .avatar-emoji { font-size: 2.5rem; }
+
+  .author-info h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .author-role {
+    font-size: 0.9rem;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .author-info p:last-child {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  /* Trust Section */
+  .trust-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .trust-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .trust-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  .trust-item h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .trust-item p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+</style>

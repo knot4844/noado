@@ -30,6 +30,7 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
     <title>{title} | 노아도 알짜정책 포털</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site).toString()} />
     
     <!-- Open Graph (Facebook/KakaoTalk) -->
     <meta property="og:type" content={articleDate ? "article" : "website"} />
@@ -393,8 +394,8 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
         </a>
         <nav class="nav-links">
           <a href="/" id="nav-home">홈</a>
-          <a href="/privacy" id="nav-privacy">개인정보처리방침</a>
-          <a href="/terms" id="nav-terms">이용약관</a>
+          <a href="/about" id="nav-about">소개</a>
+          <a href="/contact" id="nav-contact">문의</a>
           <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
             <!-- Sun Icon -->
             <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -426,6 +427,8 @@ const formattedAdsenseId = adsenseId.startsWith("pub-") ? `ca-${adsenseId}` : ad
         <div class="footer-links">
           <h4>정보 및 정책</h4>
           <ul>
+            <li><a href="/about" id="footer-about">사이트 소개</a></li>
+            <li><a href="/contact" id="footer-contact">문의하기</a></li>
             <li><a href="/privacy" id="footer-privacy">개인정보처리방침</a></li>
             <li><a href="/terms" id="footer-terms">이용약관</a></li>
             <li><a href="/sitemap-index.xml" target="_blank" id="footer-sitemap">사이트맵</a></li>

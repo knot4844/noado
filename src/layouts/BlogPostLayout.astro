@@ -15,9 +15,11 @@ interface Props {
     slug: string;
     text: string;
   }[];
+  relatedPosts?: any[];
+  currentSlug?: string;
 }
 
-const { frontmatter, headings = [] } = Astro.props;
+const { frontmatter, headings = [], relatedPosts = [], currentSlug = '' } = Astro.props;
 const filteredHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
 const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
   year: 'numeric',
@@ -40,18 +42,66 @@ const slug = getSlug(frontmatter.title);
 const videoPath = `/videos/${slug}.mp4`;
 const hasVideo = fs.existsSync(path.join(process.cwd(), 'public', 'videos', `${slug}.mp4`));
 
-// JSON-LD Schema for Google Rich Snippets (SEO)
+// Build the current page URL for sharing
+const pageUrl = `https://noado.kr/posts/${currentSlug}`;
+const encodedUrl = encodeURIComponent(pageUrl);
+const encodedTitle = encodeURIComponent(frontmatter.title);
+
+// JSON-LD Schema for Google Rich Snippets (BlogPosting + FAQ)
 const articleSchema = {
   "@context": "https://schema.org",
   "@type": "BlogPosting",
   "headline": frontmatter.title,
   "description": frontmatter.description,
-  "image": frontmatter.image || "https://example.com/default-og.jpg",
+  "image": frontmatter.image || "https://noado.kr/logo.png",
   "datePublished": frontmatter.date,
+  "dateModified": frontmatter.date,
+  "url": pageUrl,
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": pageUrl
+  },
   "author": {
     "@type": "Organization",
-    "name": "AutoAdSense 정보팀"
-  }
+    "name": "노아도 정보팀",
+    "url": "https://noado.kr/about"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "노아도 정보광장",
+    "url": "https://noado.kr",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://noado.kr/logo.png"
+    }
+  },
+  "keywords": frontmatter.keywords?.join(', ') || frontmatter.category
+};
+
+// BreadcrumbList Schema
+const breadcrumbSchema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "홈",
+      "item": "https://noado.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": frontmatter.category,
+      "item": `https://noado.kr/?category=${encodeURIComponent(frontmatter.category)}`
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": frontmatter.title,
+      "item": pageUrl
+    }
+  ]
 };
 ---
 
@@ -63,8 +113,19 @@ const articleSchema = {
 >
   <!-- Inject Article Schema -->
   <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
+  <!-- Inject Breadcrumb Schema -->
+  <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
 
   <article class="blog-post">
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumb" aria-label="breadcrumb">
+      <a href="/">홈</a>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-category">{frontmatter.category}</span>
+      <span class="breadcrumb-sep">›</span>
+      <span class="breadcrumb-current">{frontmatter.title.length > 30 ? frontmatter.title.substring(0, 30) + '…' : frontmatter.title}</span>
+    </nav>
+
     <!-- Meta details -->
     <div class="post-meta">
       <span class="post-category">{frontmatter.category}</span>
@@ -77,7 +138,6 @@ const articleSchema = {
     <!-- AdSense Top Banner -->
     <div class="adsense-container header-ad">
       <div class="adsense-label">광고</div>
-      <!-- 광고 코드는 애드센스 승인 후 자동광고 또는 아래 코드 삽입 -->
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
@@ -98,19 +158,6 @@ const articleSchema = {
         </div>
         <div class="video-container">
           <video src={videoPath} controls autoplay muted loop playsinline class="promo-video-player"></video>
-        </div>
-        <!-- Video Sub AdSense Banner (Option 2) -->
-        <div class="video-sub-ad">
-          <div class="adsense-label">추천 광고</div>
-          <ins class="adsbygoogle"
-               style="display:inline-block;width:100%;max-width:300px;height:75px;"
-               data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
-               data-ad-slot="1112223334"
-               data-ad-format="horizontal"
-               data-full-width-responsive="true"></ins>
-          <script>
-               (adsbygoogle = window.adsbygoogle || []).push({});
-          </script>
         </div>
       </div>
     )}
@@ -136,6 +183,38 @@ const articleSchema = {
       <slot />
     </div>
 
+    <!-- Social Share Buttons (카카오톡, 네이버 밴드, 페이스북, 링크 복사) -->
+    <div class="share-section">
+      <h3 class="share-title">📤 이 글이 도움이 되셨나요? 주변 분들에게 공유해 주세요!</h3>
+      <div class="share-buttons">
+        <!-- 카카오톡 -->
+        <a href={`https://story.kakao.com/share?url=${encodedUrl}`} target="_blank" rel="noopener noreferrer" class="share-btn kakao" title="카카오스토리 공유">
+          <span class="share-icon">💬</span>
+          <span class="share-label">카카오</span>
+        </a>
+        <!-- 네이버 밴드 -->
+        <a href={`https://band.us/plugin/share?body=${encodedTitle}%20${encodedUrl}&route=${encodedUrl}`} target="_blank" rel="noopener noreferrer" class="share-btn band" title="네이버 밴드 공유">
+          <span class="share-icon">🟢</span>
+          <span class="share-label">밴드</span>
+        </a>
+        <!-- 네이버 블로그 -->
+        <a href={`https://share.naver.com/web/shareView?url=${encodedUrl}&title=${encodedTitle}`} target="_blank" rel="noopener noreferrer" class="share-btn naver" title="네이버 블로그 공유">
+          <span class="share-icon">📗</span>
+          <span class="share-label">네이버</span>
+        </a>
+        <!-- 페이스북 -->
+        <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`} target="_blank" rel="noopener noreferrer" class="share-btn facebook" title="페이스북 공유">
+          <span class="share-icon">📘</span>
+          <span class="share-label">페이스북</span>
+        </a>
+        <!-- 링크 복사 -->
+        <button class="share-btn copy-link" id="copy-link-btn" data-url={pageUrl} title="링크 복사">
+          <span class="share-icon">🔗</span>
+          <span class="share-label">링크복사</span>
+        </button>
+      </div>
+    </div>
+
     <!-- AdSense Bottom Banner -->
     <div class="adsense-container footer-ad">
       <div class="adsense-label">광고</div>
@@ -158,12 +237,55 @@ const articleSchema = {
       </div>
     )}
 
+    <!-- Related Posts (Internal Links) -->
+    {relatedPosts.length > 0 && (
+      <section class="related-posts">
+        <h2 class="related-title">📰 함께 읽으면 좋은 글</h2>
+        <div class="related-grid">
+          {relatedPosts.map(post => (
+            <a href={`/posts/${post.slug}`} class="related-card">
+              <span class="related-category">{post.data.category}</span>
+              <h3>{post.data.title}</h3>
+              <p>{post.data.description.substring(0, 80)}…</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
     <!-- Warning / Disclaimers -->
     <div class="post-disclaimer">
       <p><strong>안내사항:</strong> 본 블로그에서 제공하는 정보는 공식 기관의 발표 자료 및 보도자료를 참고하여 작성되었습니다. 정부 정책 및 지원 조건은 수시로 변경될 수 있으므로, 최종 신청 전에 반드시 관계 기관의 공식 홈페이지 또는 콜센터를 통해 정확한 요건을 재확인하시기 바랍니다.</p>
     </div>
   </article>
 </BaseLayout>
+
+<!-- Copy link script -->
+<script>
+  const copyBtn = document.getElementById('copy-link-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const url = copyBtn.getAttribute('data-url') || window.location.href;
+      try {
+        await navigator.clipboard.writeText(url);
+        const label = copyBtn.querySelector('.share-label');
+        if (label) {
+          const original = label.textContent;
+          label.textContent = '복사완료!';
+          setTimeout(() => { label.textContent = original; }, 2000);
+        }
+      } catch {
+        // Fallback for older browsers
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+    });
+  }
+</script>
 
 <style>
   .blog-post {
@@ -180,6 +302,39 @@ const articleSchema = {
     .blog-post {
       padding: 3rem;
     }
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+  }
+
+  .breadcrumb a {
+    color: var(--text-secondary);
+    transition: color 0.2s;
+  }
+
+  .breadcrumb a:hover { color: var(--accent); }
+
+  .breadcrumb-sep { color: var(--text-muted); }
+
+  .breadcrumb-category {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .breadcrumb-current {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 250px;
   }
 
   .post-meta {
@@ -254,14 +409,14 @@ const articleSchema = {
 
   .post-content :global(strong) {
     font-weight: 800;
-    color: #fca5a5; /* highlight key text */
+    color: #fca5a5;
   }
 
   :root.light-mode .post-content :global(strong) {
     color: #dc2626;
   }
 
-  /* Table styling (highly important for subsidies specs) */
+  /* Table styling */
   .post-content :global(table) {
     width: 100%;
     border-collapse: collapse;
@@ -280,7 +435,7 @@ const articleSchema = {
     font-weight: 600;
   }
 
-  /* Blockquote / Tip boxes */
+  /* Blockquote */
   .post-content :global(blockquote) {
     border-left: 4px solid var(--accent);
     background-color: var(--bg-tertiary);
@@ -323,9 +478,7 @@ const articleSchema = {
     color: var(--text-primary);
   }
 
-  .toc-icon {
-    font-size: 1.25rem;
-  }
+  .toc-icon { font-size: 1.25rem; }
 
   .toc-list {
     list-style: none;
@@ -333,15 +486,9 @@ const articleSchema = {
     margin: 0;
   }
 
-  .toc-item {
-    margin-bottom: 0.5rem;
-    line-height: 1.5;
-  }
+  .toc-item { margin-bottom: 0.5rem; line-height: 1.5; }
 
-  .toc-item.depth-2 {
-    font-weight: 600;
-    font-size: 1.15rem;
-  }
+  .toc-item.depth-2 { font-weight: 600; font-size: 1.15rem; }
 
   .toc-item.depth-3 {
     padding-left: 1.25rem;
@@ -360,10 +507,140 @@ const articleSchema = {
     text-decoration: underline;
   }
 
-  :root.light-mode .toc-item a:hover {
-    color: var(--accent);
+  :root.light-mode .toc-item a:hover { color: var(--accent); }
+
+  /* Share Section */
+  .share-section {
+    margin: 2.5rem 0;
+    padding: 1.5rem;
+    background: rgba(30, 41, 59, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    text-align: center;
   }
 
+  :root.light-mode .share-section {
+    background: rgba(248, 250, 252, 0.8);
+  }
+
+  .share-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    color: var(--text-primary);
+  }
+
+  .share-buttons {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .share-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: var(--transition-smooth);
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    min-width: 70px;
+  }
+
+  .share-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .share-icon { font-size: 1.5rem; }
+
+  .share-label { font-size: 0.75rem; color: var(--text-secondary); }
+
+  .share-btn.kakao:hover { border-color: #FEE500; background: rgba(254, 229, 0, 0.1); }
+  .share-btn.band:hover { border-color: #2DB400; background: rgba(45, 180, 0, 0.1); }
+  .share-btn.naver:hover { border-color: #03C75A; background: rgba(3, 199, 90, 0.1); }
+  .share-btn.facebook:hover { border-color: #1877F2; background: rgba(24, 119, 242, 0.1); }
+  .share-btn.copy-link:hover { border-color: var(--accent); background: var(--accent-glow); }
+
+  /* Related Posts */
+  .related-posts {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--border-color);
+  }
+
+  .related-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+  }
+
+  .related-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .related-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .related-card {
+    display: block;
+    padding: 1.25rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    transition: var(--transition-smooth);
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .related-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.15);
+  }
+
+  .related-category {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .related-card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0.5rem 0;
+    line-height: 1.4;
+    word-break: keep-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .related-card p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Tags */
   .post-tags {
     display: flex;
     flex-wrap: wrap;
@@ -452,22 +729,6 @@ const articleSchema = {
     display: block;
     aspect-ratio: 9/16;
     object-fit: cover;
-  }
-
-  .video-sub-ad {
-    max-width: 300px;
-    margin: 1.25rem auto 0;
-    text-align: center;
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px dashed rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 0.5rem;
-    box-sizing: border-box;
-  }
-
-  :root.light-mode .video-sub-ad {
-    background: rgba(0, 0, 0, 0.015);
-    border: 1px dashed rgba(0, 0, 0, 0.08);
   }
 
   .adsense-label {

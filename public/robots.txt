@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://noado.kr/sitemap-index.xml
+
+# Block crawling of admin/system paths
+Disallow: /_astro/
+Disallow: /api/

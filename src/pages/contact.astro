@@ -1,0 +1,216 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="문의하기" description="노아도 정보광장에 대한 문의, 정보 정정 요청, 광고 관련 안내를 위한 연락 페이지입니다.">
+  <article class="contact-page">
+    <div class="contact-hero">
+      <span class="contact-badge">문의 및 제보</span>
+      <h1>노아도 정보광장에<br><span class="highlight">문의하기</span></h1>
+      <p class="hero-subtitle">정보 정정, 콘텐츠 제안, 광고 문의 등 무엇이든 편하게 연락 주십시오.</p>
+    </div>
+
+    <section class="contact-section">
+      <div class="contact-cards">
+        <!-- Email Contact -->
+        <div class="contact-card">
+          <span class="contact-icon">📧</span>
+          <h3>이메일 문의</h3>
+          <p>정보 정정 요청, 콘텐츠 제안, 기타 일반 문의</p>
+          <a href="mailto:contact@noado.kr" class="contact-link">contact@noado.kr</a>
+        </div>
+
+        <!-- Content Correction -->
+        <div class="contact-card">
+          <span class="contact-icon">📝</span>
+          <h3>정보 정정 요청</h3>
+          <p>잘못된 정보나 변경된 정책 내용을 발견하셨다면 알려주십시오. 빠르게 확인하여 정정하겠습니다.</p>
+          <a href="mailto:correction@noado.kr" class="contact-link">correction@noado.kr</a>
+        </div>
+
+        <!-- Ad Inquiry -->
+        <div class="contact-card">
+          <span class="contact-icon">📢</span>
+          <h3>광고 및 제휴 문의</h3>
+          <p>노아도 정보광장과의 제휴, 광고 협업 관련 문의</p>
+          <a href="mailto:ads@noado.kr" class="contact-link">ads@noado.kr</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Response Info -->
+    <section class="response-info">
+      <h2>📌 문의 안내사항</h2>
+      <ul class="info-list">
+        <li>
+          <strong>응답 소요 시간:</strong> 접수된 문의는 영업일 기준 <strong>1~3일 이내</strong>에 답변 드리도록 최선을 다하겠습니다.
+        </li>
+        <li>
+          <strong>정보 정정 요청 시:</strong> 해당 글의 제목 또는 URL, 잘못된 부분의 위치, 올바른 정보 및 출처를 함께 기재하여 주시면 더욱 신속한 처리가 가능합니다.
+        </li>
+        <li>
+          <strong>개인정보 관련:</strong> 본 사이트의 개인정보 처리에 관한 사항은 <a href="/privacy">개인정보처리방침</a>을 확인하여 주십시오.
+        </li>
+      </ul>
+    </section>
+  </article>
+</BaseLayout>
+
+<style>
+  .contact-page {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .contact-hero {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    margin-bottom: 3rem;
+    background: radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.12) 0%, transparent 60%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+  }
+
+  .contact-badge {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.3rem 1rem;
+    border-radius: 50px;
+    margin-bottom: 1.25rem;
+  }
+
+  :root.light-mode .contact-badge {
+    color: #059669;
+  }
+
+  .contact-hero h1 {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 1rem;
+    word-break: keep-all;
+  }
+
+  @media (min-width: 768px) {
+    .contact-hero h1 { font-size: 3rem; }
+  }
+
+  .highlight {
+    background: linear-gradient(90deg, #34d399, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .contact-section {
+    margin-bottom: 3rem;
+  }
+
+  .contact-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .contact-cards { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .contact-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2rem 1.5rem;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition-smooth);
+  }
+
+  .contact-card:hover {
+    transform: translateY(-4px);
+    border-color: #10b981;
+    box-shadow: 0 12px 30px -10px rgba(16, 185, 129, 0.2);
+  }
+
+  .contact-icon {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .contact-card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .contact-card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+
+  .contact-link {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    font-weight: 700;
+    padding: 0.5rem 1.25rem;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    transition: var(--transition-smooth);
+  }
+
+  :root.light-mode .contact-link {
+    color: #059669;
+  }
+
+  .contact-link:hover {
+    background: #10b981;
+    color: #ffffff;
+  }
+
+  .response-info {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+  }
+
+  .response-info h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .info-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .info-list li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  .info-list li:last-child {
+    border-bottom: none;
+  }
+</style>

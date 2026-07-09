@@ -5,14 +5,21 @@ import BlogPostLayout from '../../layouts/BlogPostLayout.astro';
 export async function getStaticPaths() {
   const blogEntries = await getCollection('posts');
   return blogEntries.map(entry => ({
-    params: { slug: entry.slug }, props: { entry },
+    params: { slug: entry.slug },
+    props: { entry, allPosts: blogEntries },
   }));
 }
 
-const { entry } = Astro.props;
+const { entry, allPosts } = Astro.props;
 const { Content, headings } = await entry.render();
+
+// Find related posts by same category, excluding current post
+const relatedPosts = allPosts
+  .filter(p => p.slug !== entry.slug && p.data.category === entry.data.category)
+  .sort(() => Math.random() - 0.5) // shuffle
+  .slice(0, 4); // max 4 related posts
 ---
 
-<BlogPostLayout frontmatter={entry.data} headings={headings}>
+<BlogPostLayout frontmatter={entry.data} headings={headings} relatedPosts={relatedPosts} currentSlug={entry.slug}>
   <Content />
 </BlogPostLayout>
