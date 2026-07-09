@@ -11,41 +11,32 @@ export const PromoVideo = ({ title = "새로운 소식 알림", highlights = ["�
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Background animation (moving fluid glowing blobs for premium mesh gradient feel)
-  const blob1X = interpolate(frame, [0, 450], [-100, 100], { extrapolateRight: "clamp" });
-  const blob2Y = interpolate(frame, [0, 450], [100, -100], { extrapolateRight: "clamp" });
+  // Background animation (mesh blobs moving slowly)
+  const blob1X = interpolate(frame, [0, 450], [-100, 150], { extrapolateRight: "clamp" });
+  const blob2Y = interpolate(frame, [0, 450], [150, -100], { extrapolateRight: "clamp" });
 
-  // Title springs
-  const titleSpring = spring({
-    frame,
-    fps,
-    config: { damping: 12 },
-    delay: 10,
-  });
-  const titleScale = interpolate(titleSpring, [0, 1], [0.85, 1]);
-  const titleOpacity = interpolate(titleSpring, [0, 1], [0, 1]);
+  // 1. Title segment (0s - 3s: frames 0 - 90)
+  const titleOpacity = interpolate(frame, [0, 15, 75, 90], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const titleScale = interpolate(frame, [0, 15, 75, 90], [0.85, 1.05, 1, 0.95], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
-  // Highlights animations (staggered entries at 2s, 4s, 6s)
-  const h1Spring = spring({ frame, fps, config: { damping: 14 }, delay: 60 });
-  const h2Spring = spring({ frame, fps, config: { damping: 14 }, delay: 120 });
-  const h3Spring = spring({ frame, fps, config: { damping: 14 }, delay: 180 });
+  // 2. Highlight 1 segment (3s - 6s: frames 90 - 180)
+  const h1Opacity = interpolate(frame, [85, 100, 165, 180], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const h1Scale = interpolate(frame, [85, 100, 165, 180], [0.85, 1.05, 1, 0.95], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
-  const h1Slide = interpolate(h1Spring, [0, 1], [-100, 0]);
-  const h1Opacity = interpolate(h1Spring, [0, 1], [0, 1]);
-  
-  const h2Slide = interpolate(h2Spring, [0, 1], [-100, 0]);
-  const h2Opacity = interpolate(h2Spring, [0, 1], [0, 1]);
-  
-  const h3Slide = interpolate(h3Spring, [0, 1], [-100, 0]);
-  const h3Opacity = interpolate(h3Spring, [0, 1], [0, 1]);
+  // 3. Highlight 2 segment (6s - 9s: frames 180 - 270)
+  const h2Opacity = interpolate(frame, [175, 190, 255, 270], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const h2Scale = interpolate(frame, [175, 190, 255, 270], [0.85, 1.05, 1, 0.95], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
-  // End Card CTA animation (starts at 9s, frame 270)
-  const ctaSpring = spring({ frame, fps, config: { damping: 11 }, delay: 270 });
-  const ctaScale = interpolate(ctaSpring, [0, 1], [0.5, 1]);
-  const ctaOpacity = interpolate(ctaSpring, [0, 1], [0, 1]);
+  // 4. Highlight 3 segment (9s - 12s: frames 270 - 360)
+  const h3Opacity = interpolate(frame, [265, 280, 345, 360], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const h3Scale = interpolate(frame, [265, 280, 345, 360], [0.85, 1.05, 1, 0.95], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
+  // 5. Outro CTA segment (12s - 15s: frames 360 - 450)
+  const ctaOpacity = interpolate(frame, [355, 370], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const ctaScale = interpolate(frame, [355, 370], [0.85, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
   // Pulsating glow loop for CTA button
-  const pulse = Math.sin(frame * 0.15) * 0.08 + 1.0;
+  const pulse = Math.sin(frame * 0.15) * 0.06 + 1.0;
 
   return (
     <AbsoluteFill style={{
@@ -57,31 +48,31 @@ export const PromoVideo = ({ title = "새로운 소식 알림", highlights = ["�
       {/* Mesh Gradient Background Blobs */}
       <div style={{
         position: 'absolute',
-        width: '600px',
-        height: '600px',
+        width: '700px',
+        height: '700px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(37,99,235,0.4) 0%, rgba(37,99,235,0) 70%)',
-        filter: 'blur(80px)',
-        top: '-100px',
+        background: 'radial-gradient(circle, rgba(37,99,235,0.45) 0%, rgba(37,99,235,0) 70%)',
+        filter: 'blur(90px)',
+        top: '-150px',
         left: `${blob1X}px`,
         pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute',
-        width: '500px',
-        height: '500px',
+        width: '600px',
+        height: '600px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(147,51,234,0.3) 0%, rgba(147,51,234,0) 70%)',
-        filter: 'blur(70px)',
-        bottom: '-50px',
-        right: '100px',
+        background: 'radial-gradient(circle, rgba(147,51,234,0.35) 0%, rgba(147,51,234,0) 70%)',
+        filter: 'blur(80px)',
+        bottom: '-100px',
+        right: '50px',
         transform: `translateY(${blob2Y}px)`,
         pointerEvents: 'none',
       }} />
 
       {/* Main Container */}
       <div style={{
-        padding: '60px 40px',
+        padding: '80px 40px 60px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -93,154 +84,211 @@ export const PromoVideo = ({ title = "새로운 소식 알림", highlights = ["�
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px'
+          gap: '14px'
         }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
             background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-            boxShadow: '0 0 10px rgba(59,130,246,0.5)'
+            boxShadow: '0 0 12px rgba(59,130,246,0.6)'
           }} />
           <span style={{
-            fontSize: '24px',
-            fontWeight: 800,
-            letterSpacing: '1px',
+            fontSize: '28px',
+            fontWeight: 900,
+            letterSpacing: '1.5px',
             background: 'linear-gradient(90deg, #60a5fa, #c084fc)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
-          }}>NOADO 노아도</span>
+          }}>NOADO 정보광장</span>
         </div>
 
-        {/* Middle Article Card & Highlights */}
+        {/* Center Caption Box */}
         <div style={{
+          flex: 1,
           display: 'flex',
-          flexDirection: 'column',
-          gap: '40px',
-          margin: 'auto 0'
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          padding: '0 10px',
         }}>
-          {/* Post Title Card */}
-          <div style={{
-            opacity: titleOpacity,
-            transform: `scale(${titleScale})`,
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '24px',
-            padding: '30px 24px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-            backdropFilter: 'blur(10px)',
-          }}>
-            <span style={{
-              color: '#3b82f6',
-              fontSize: '18px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              display: 'block',
-              marginBottom: '12px'
-            }}>TODAY'S TOPIC</span>
-            <h1 style={{
-              fontSize: '36px',
-              fontWeight: 800,
-              lineHeight: 1.3,
-              margin: 0,
-              color: '#ffffff',
-              wordBreak: 'keep-all'
-            }}>{title}</h1>
-          </div>
+          {/* Title Scene (0s - 3s) */}
+          {frame < 90 && (
+            <div style={{
+              opacity: titleOpacity,
+              transform: `scale(${titleScale})`,
+              textAlign: 'center',
+              position: 'absolute',
+              width: '100%',
+            }}>
+              <span style={{
+                color: '#3b82f6',
+                fontSize: '24px',
+                fontWeight: 800,
+                letterSpacing: '3px',
+                display: 'block',
+                marginBottom: '20px'
+              }}>오늘의 실시간 정보</span>
+              <h1 style={{
+                fontSize: '54px',
+                fontWeight: 900,
+                lineHeight: 1.35,
+                margin: 0,
+                color: '#ffffff',
+                wordBreak: 'keep-all',
+                textShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                background: 'linear-gradient(90deg, #ffffff, #93c5fd)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>{title}</h1>
+            </div>
+          )}
 
-          {/* Highlights Bullets */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            paddingLeft: '10px'
-          }}>
-            {/* Highlight 1 */}
+          {/* Highlight 1 Scene (3s - 6s) */}
+          {frame >= 85 && frame < 180 && (
             <div style={{
               opacity: h1Opacity,
-              transform: `translateX(${h1Slide}px)`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
+              transform: `scale(${h1Scale})`,
+              textAlign: 'center',
+              position: 'absolute',
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '32px',
+              padding: '50px 30px',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(12px)',
             }}>
-              <div style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                backgroundColor: '#3b82f6',
-                boxShadow: '0 0 8px #3b82f6'
-              }} />
-              <span style={{ fontSize: '22px', fontWeight: 600, color: '#e2e8f0' }}>{highlights[0]}</span>
+              <span style={{
+                color: '#3b82f6',
+                fontSize: '22px',
+                fontWeight: 900,
+                display: 'block',
+                marginBottom: '20px',
+                letterSpacing: '1.5px'
+              }}>체크 포인트 01</span>
+              <p style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                lineHeight: 1.45,
+                margin: 0,
+                color: '#ffffff',
+                wordBreak: 'keep-all',
+              }}>{highlights[0]}</p>
             </div>
+          )}
 
-            {/* Highlight 2 */}
+          {/* Highlight 2 Scene (6s - 9s) */}
+          {frame >= 175 && frame < 270 && (
             <div style={{
               opacity: h2Opacity,
-              transform: `translateX(${h2Slide}px)`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
+              transform: `scale(${h2Scale})`,
+              textAlign: 'center',
+              position: 'absolute',
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '32px',
+              padding: '50px 30px',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(12px)',
             }}>
-              <div style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                backgroundColor: '#a855f7',
-                boxShadow: '0 0 8px #a855f7'
-              }} />
-              <span style={{ fontSize: '22px', fontWeight: 600, color: '#e2e8f0' }}>{highlights[1]}</span>
+              <span style={{
+                color: '#a855f7',
+                fontSize: '22px',
+                fontWeight: 900,
+                display: 'block',
+                marginBottom: '20px',
+                letterSpacing: '1.5px'
+              }}>체크 포인트 02</span>
+              <p style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                lineHeight: 1.45,
+                margin: 0,
+                color: '#ffffff',
+                wordBreak: 'keep-all',
+              }}>{highlights[1]}</p>
             </div>
+          )}
 
-            {/* Highlight 3 */}
+          {/* Highlight 3 Scene (9s - 12s) */}
+          {frame >= 265 && frame < 360 && (
             <div style={{
               opacity: h3Opacity,
-              transform: `translateX(${h3Slide}px)`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
+              transform: `scale(${h3Scale})`,
+              textAlign: 'center',
+              position: 'absolute',
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '32px',
+              padding: '50px 30px',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(12px)',
+            }}>
+              <span style={{
+                color: '#22c55e',
+                fontSize: '22px',
+                fontWeight: 900,
+                display: 'block',
+                marginBottom: '20px',
+                letterSpacing: '1.5px'
+              }}>체크 포인트 03</span>
+              <p style={{
+                fontSize: '44px',
+                fontWeight: 800,
+                lineHeight: 1.45,
+                margin: 0,
+                color: '#ffffff',
+                wordBreak: 'keep-all',
+              }}>{highlights[2]}</p>
+            </div>
+          )}
+
+          {/* Outro CTA Scene (12s - 15s) */}
+          {frame >= 355 && (
+            <div style={{
+              opacity: ctaOpacity,
+              transform: `scale(${ctaScale})`,
+              textAlign: 'center',
+              position: 'absolute',
+              width: '100%',
             }}>
               <div style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                backgroundColor: '#22c55e',
-                boxShadow: '0 0 8px #22c55e'
-              }} />
-              <span style={{ fontSize: '22px', fontWeight: 600, color: '#e2e8f0' }}>{highlights[2]}</span>
+                display: 'inline-block',
+                padding: '24px 48px',
+                borderRadius: '50px',
+                background: 'linear-gradient(90deg, #2563eb, #7c3aed)',
+                color: '#ffffff',
+                fontSize: '36px',
+                fontWeight: 900,
+                boxShadow: '0 15px 35px rgba(37,99,235,0.5)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                transform: `scale(${pulse})`,
+                marginBottom: '28px'
+              }}>
+                noado.kr 에서 확인!
+              </div>
+              <p style={{
+                fontSize: '24px',
+                color: '#94a3b8',
+                margin: '10px 0 0',
+                fontWeight: 600,
+                letterSpacing: '0.5px'
+              }}>네이버에 '노아도 정보광장' 검색</p>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* End Card CTA Button */}
+        {/* Footer info (keeps stable at bottom) */}
         <div style={{
-          opacity: ctaOpacity,
-          transform: `scale(${ctaScale})`,
           textAlign: 'center',
-          width: '100%',
-          marginTop: '30px'
+          fontSize: '16px',
+          color: '#475569',
+          letterSpacing: '1px'
         }}>
-          <div style={{
-            display: 'inline-block',
-            padding: '18px 36px',
-            borderRadius: '50px',
-            background: 'linear-gradient(90deg, #2563eb, #7c3aed)',
-            color: '#ffffff',
-            fontSize: '22px',
-            fontWeight: 800,
-            boxShadow: '0 10px 25px rgba(37,99,235,0.4)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            transform: `scale(${pulse})`,
-            transition: 'transform 0.1s linear'
-          }}>
-            자세한 내용은 noado.kr에서!
-          </div>
-          <p style={{
-            fontSize: '14px',
-            color: '#94a3b8',
-            marginTop: '16px',
-            letterSpacing: '0.5px'
-          }}>네이버/구글 검색창에 '노아도 정보광장'을 검색하세요</p>
+          ⓒ NOADO INFORMATION PORTAL
         </div>
       </div>
     </AbsoluteFill>
