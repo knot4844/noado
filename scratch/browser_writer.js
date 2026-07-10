@@ -8,22 +8,35 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function generateArticleWithBrowser(targetKeyword, targetCategory, feedback = null) {
   console.log(`🌐 [브라우저 자동화] 크롬 브라우저를 실행합니다...`);
   
-  const profileDir = path.join(__dirname, 'chrome-profile');
-  if (!fs.existsSync(profileDir)) {
-    fs.mkdirSync(profileDir, { recursive: true });
-  }
+  let browser;
+  try {
+    console.log(`🌐 [브라우저 자동화] 디버깅 포트 9222로 기존 크롬 브라우저에 연결을 시도합니다...`);
+    browser = await puppeteer.connect({
+      browserURL: 'http://localhost:9222',
+      defaultViewport: null
+    });
+    console.log(`✅ 기존 크롬 브라우저에 연결 성공!`);
+  } catch (connectErr) {
+    console.log(`⚠️ 디버깅 포트 9222 연결 실패 (기존 브라우저가 열려있지 않거나 디버깅 모드가 아님): ${connectErr.message}`);
+    console.log(`🌐 [브라우저 자동화] 대신 새로운 크롬 브라우저 창을 실행합니다...`);
+    
+    const profileDir = path.join(__dirname, 'chrome-profile');
+    if (!fs.existsSync(profileDir)) {
+      fs.mkdirSync(profileDir, { recursive: true });
+    }
 
-  const browser = await puppeteer.launch({
-    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    headless: false, // visible window
-    defaultViewport: null,
-    userDataDir: profileDir,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--window-size=1280,900'
-    ]
-  });
+    browser = await puppeteer.launch({
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      headless: false, // visible window
+      defaultViewport: null,
+      userDataDir: profileDir,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--window-size=1280,900'
+      ]
+    });
+  }
 
   try {
     const page = await browser.newPage();
