@@ -88,7 +88,7 @@ async function fetchYoutubeTranscript(url) {
 async function extractKeywordFromTranscript(transcript) {
   if (isDryRun) return "유튜브 자동화 정보";
   try {
-    const modelName = process.env.GEMINI_MODEL || "gemini-1.5-pro";
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
     const model = genAI.getGenerativeModel({ model: modelName });
     const prompt = `다음 유튜브 자막 대본을 읽고, 이 영상을 블로그 글로 작성할 때 가장 알맞은 1개의 네이버/구글 검색용 핵심 목표 키워드(예: "2026년 국민연금 조기수령")만 뽑아서 출력해 주세요. 다른 수식어나 설명 없이 오직 핵심 키워드 단어/문구만 한 줄로 출력해야 합니다.\n\n대본:\n${transcript.substring(0, 3000)}`;
     const result = await model.generateContent(prompt);
@@ -251,7 +251,7 @@ async function generateArticle(targetKeyword, targetCategory, feedback = null, y
   }
 
   // Use gemini-1.5-pro for high quality structure, fallback to flash if needed
-  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-pro";
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const model = genAI.getGenerativeModel({ model: modelName });
   
   const today = new Date().toISOString().split('T')[0];
