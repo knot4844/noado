@@ -5,6 +5,27 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Setup global log duplication to scratch/publish.log
+const logFilePath = path.join(__dirname, 'scratch', 'publish.log');
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+if (!fs.existsSync(path.join(__dirname, 'scratch'))) {
+  fs.mkdirSync(path.join(__dirname, 'scratch'), { recursive: true });
+}
+
+console.log = function(...args) {
+  originalConsoleLog.apply(console, args);
+  const text = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n';
+  fs.appendFileSync(logFilePath, text, 'utf-8');
+};
+
+console.error = function(...args) {
+  originalConsoleError.apply(console, args);
+  const text = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n';
+  fs.appendFileSync(logFilePath, text, 'utf-8');
+};
+
 async function runBatch() {
   const keywordsPath = path.join(__dirname, 'scratch', 'keywords_100.json');
   if (!fs.existsSync(keywordsPath)) {

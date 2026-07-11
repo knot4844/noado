@@ -10,6 +10,27 @@ import { generateArticleWithBrowser } from './scratch/browser_writer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Setup global log duplication to scratch/publish.log
+const logFilePath = path.join(__dirname, 'scratch', 'publish.log');
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+if (!fs.existsSync(path.join(__dirname, 'scratch'))) {
+  fs.mkdirSync(path.join(__dirname, 'scratch'), { recursive: true });
+}
+
+console.log = function(...args) {
+  originalConsoleLog.apply(console, args);
+  const text = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n';
+  fs.appendFileSync(logFilePath, text, 'utf-8');
+};
+
+console.error = function(...args) {
+  originalConsoleError.apply(console, args);
+  const text = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n';
+  fs.appendFileSync(logFilePath, text, 'utf-8');
+};
+
 // Load environment variables
 dotenv.config();
 // Fallback to root .env if key is not found
@@ -441,8 +462,20 @@ async function main() {
   }
 
   const filePath = path.join(targetDir, `${slug}.md`);
-  fs.writeFileSync(filePath, finalResult, 'utf-8');
-  console.log(`\n💾 글 저장 완료: ${filePath}`);
+  
+  // Inject explicit high-quality Image & Video embedding elements right after frontmatter
+  let enhancedResult = finalResult;
+  const secondDash = enhancedResult.indexOf('---', 3);
+  if (secondDash !== -1) {
+    const insertIndex = secondDash + 3;
+    const imgTag = `\n\n![${postTitle} 안내 인포그래픽](/images/posts/${slug}.png)\n`;
+    const videoTag = `\n\n<div class="post-video-section">\n  <div class="video-preview-header">\n    <span class="video-badge">15초 요약</span>\n    <h3>🎬 이 글의 15초 영상 요약</h3>\n  </div>\n  <div class="video-container">\n    <video src="/videos/${slug}.mp4" controls autoplay muted loop playsinline class="promo-video-player"></video>\n  </div>\n</div>\n`;
+    
+    enhancedResult = enhancedResult.substring(0, insertIndex) + imgTag + videoTag + enhancedResult.substring(insertIndex);
+  }
+
+  fs.writeFileSync(filePath, enhancedResult, 'utf-8');
+  console.log(`\n💾 글 저장 완료 (이미지 및 비디오 임베딩 탑재): ${filePath}`);
 
   // 신규 글 생성 후 전체 글 간 상호 내부 링크(Cross-linking) 자동 갱신
   try {

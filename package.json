@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "publish": "node publish.js"
+    "publish": "node publish.js",
+    "monitor": "node scratch/monitor_server.js"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.7",
