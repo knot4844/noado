@@ -10,6 +10,7 @@ const postsCollection = defineCollection({
     category: z.string(),
     image: z.string().optional(),
     keywords: z.array(z.string()).optional(),
+    hideCalculator: z.boolean().optional(),
   }),
 });
 

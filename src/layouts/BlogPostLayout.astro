@@ -13,6 +13,7 @@ interface Props {
     image?: string;
     keywords?: string[];
     updated?: string;
+    hideCalculator?: boolean;
   };
   headings?: {
     depth: number;
@@ -220,6 +221,9 @@ const faqSchema = faqs.length > 0 ? {
     </div>
 
     {
+      /* 임종·사별처럼 민감한 글에는 복지 계산기를 붙이지 않는다.
+         frontmatter 에 hideCalculator: true 를 두면 제외된다. */
+      !frontmatter.hideCalculator &&
       (frontmatter.category === '기초·국민연금' || 
        frontmatter.category === '건강·의료' || 
        frontmatter.category === '생활 지원금' || 
