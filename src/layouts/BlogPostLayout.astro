@@ -1,5 +1,8 @@
 ---
+import fs from 'fs';
+import path from 'path';
 import BaseLayout from './BaseLayout.astro';
+import MultiWelfareCalculator from '../components/MultiWelfareCalculator.astro';
 
 interface Props {
   frontmatter: {
@@ -9,6 +12,7 @@ interface Props {
     category: string;
     image?: string;
     keywords?: string[];
+    updated?: string;
   };
   headings?: {
     depth: number;
@@ -21,16 +25,23 @@ interface Props {
 }
 
 const { frontmatter, headings = [], relatedPosts = [], currentSlug = '', faqs = [] } = Astro.props;
+
+// 애드센스 승인 전에는 광고 슬롯을 렌더링하지 않는다.
+// 채워지지 않는 빈 '광고' 상자가 남으면 심사에서 미완성 사이트로 읽힌다.
+// 승인 후 PUBLIC_ADS_ENABLED=true 로 켜면 된다.
+const adsEnabled = import.meta.env.PUBLIC_ADS_ENABLED === 'true';
+const adsenseClient = import.meta.env.PUBLIC_ADSENSE_ID || '';
 const filteredHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
-const formattedDate = new Date(frontmatter.date).toLocaleDateString('ko-KR', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-});
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+const formattedDate = fmtDate(frontmatter.date);
+
+// 글을 실제로 손본 날짜. 없으면 최초 발행일을 쓴다.
+const reviewedDate = frontmatter.updated || frontmatter.date;
+const lastReviewed = fmtDate(reviewedDate);
+const wasRevised = Boolean(frontmatter.updated && frontmatter.updated !== frontmatter.date);
 
 // Check if matching video exists on the filesystem
-import fs from 'fs';
-import path from 'path';
 
 function getSlug(text) {
   return text
@@ -56,15 +67,16 @@ const articleSchema = {
   "description": frontmatter.description,
   "image": frontmatter.image || "https://noado.kr/logo.png",
   "datePublished": frontmatter.date,
-  "dateModified": frontmatter.date,
+  "dateModified": reviewedDate,
   "url": pageUrl,
   "mainEntityOfPage": {
     "@type": "WebPage",
     "@id": pageUrl
   },
   "author": {
-    "@type": "Organization",
-    "name": "노아도 정보팀",
+    "@type": "Person",
+    "name": "헌신",
+    "description": "아버지의 치매·췌장암 간병을 직접 겪은 보호자. 요양보호사 자격 보유(현장 실무 경력 없음).",
     "url": "https://noado.kr/about"
   },
   "publisher": {
@@ -94,7 +106,7 @@ const breadcrumbSchema = {
       "@type": "ListItem",
       "position": 2,
       "name": frontmatter.category,
-      "item": `https://noado.kr/?category=${encodeURIComponent(frontmatter.category)}`
+      "item": `https://noado.kr/category/${encodeURIComponent(frontmatter.category)}`
     },
     {
       "@type": "ListItem",
@@ -138,7 +150,7 @@ const faqSchema = faqs.length > 0 ? {
     <nav class="breadcrumb" aria-label="breadcrumb">
       <a href="/">홈</a>
       <span class="breadcrumb-sep">›</span>
-      <span class="breadcrumb-category">{frontmatter.category}</span>
+      <a href={`/category/${encodeURIComponent(frontmatter.category)}`} class="breadcrumb-category">{frontmatter.category}</a>
       <span class="breadcrumb-sep">›</span>
       <span class="breadcrumb-current">{frontmatter.title.length > 30 ? frontmatter.title.substring(0, 30) + '…' : frontmatter.title}</span>
     </nav>
@@ -147,6 +159,7 @@ const faqSchema = faqs.length > 0 ? {
     <div class="post-meta">
       <span class="post-category">{frontmatter.category}</span>
       <time datetime={frontmatter.date}>{formattedDate}</time>
+      {wasRevised && <span class="post-updated">· {lastReviewed} 수정</span>}
     </div>
 
     <!-- Title -->
@@ -157,19 +170,20 @@ const faqSchema = faqs.length > 0 ? {
       <img src={frontmatter.image || "/default-og.png"} alt={frontmatter.title} class="featured-img" loading="eager" />
     </div>
 
-    <!-- AdSense Top Banner -->
-    <div class="adsense-container header-ad">
-      <div class="adsense-label">광고</div>
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
-           data-ad-slot="1234567890"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-      <script>
-           (adsbygoogle = window.adsbygoogle || []).push({});
-      </script>
-    </div>
+    <!-- AdSense Top Banner (승인 후 활성화) -->
+    {adsEnabled && (
+      <div class="adsense-container header-ad">
+        <div class="adsense-label">광고</div>
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client={adsenseClient}
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+      </div>
+    )}
 
     <!-- Content Body -->
     {hasVideo && (
@@ -205,6 +219,21 @@ const faqSchema = faqs.length > 0 ? {
       <slot />
     </div>
 
+    {
+      (frontmatter.category === '기초·국민연금' || 
+       frontmatter.category === '건강·의료' || 
+       frontmatter.category === '생활 지원금' || 
+       frontmatter.category === '복지·주거' || 
+       frontmatter.category === '생활·돌봄' ||
+       frontmatter.title.includes('수급자') ||
+       frontmatter.title.includes('연금') ||
+       frontmatter.title.includes('지원금') ||
+       frontmatter.title.includes('임플란트') ||
+       frontmatter.title.includes('틀니')) && (
+        <MultiWelfareCalculator />
+      )
+    }
+
     <!-- Social Share Buttons (카카오톡, 네이버 밴드, 페이스북, 링크 복사) -->
     <div class="share-section">
       <h3 class="share-title">📤 이 글이 도움이 되셨나요? 주변 분들에게 공유해 주세요!</h3>
@@ -237,18 +266,19 @@ const faqSchema = faqs.length > 0 ? {
       </div>
     </div>
 
-    <!-- AdSense Bottom Banner -->
-    <div class="adsense-container footer-ad">
-      <div class="adsense-label">광고</div>
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-format="autorelaxed"
-           data-ad-client={import.meta.env.PUBLIC_ADSENSE_ID || "ca-pub-XXXXXXXXXXXXX"}
-           data-ad-slot="0987654321"></ins>
-      <script>
-           (adsbygoogle = window.adsbygoogle || []).push({});
-      </script>
-    </div>
+    <!-- AdSense Bottom Banner (승인 후 활성화) -->
+    {adsEnabled && (
+      <div class="adsense-container footer-ad">
+        <div class="adsense-label">광고</div>
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-format="autorelaxed"
+             data-ad-client={adsenseClient}></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+      </div>
+    )}
 
     <!-- Keywords / Tags -->
     {frontmatter.keywords && frontmatter.keywords.length > 0 && (
@@ -279,19 +309,28 @@ const faqSchema = faqs.length > 0 ? {
     <section class="post-author-section">
       <div class="author-card-header">
         <div class="author-avatar-badge">
-          <span class="author-avatar-emoji">🧑‍💼</span>
+          <span class="author-avatar-emoji">🕊️</span>
         </div>
         <div class="author-header-info">
-          <span class="author-lbl">정보 분석 및 검증 전문가</span>
-          <h4 class="author-name">노아도 알짜정책 분석팀</h4>
+          <span class="author-lbl">아버지를 간병한 보호자 · 요양보호사 자격 보유</span>
+          <h4 class="author-name">헌신</h4>
         </div>
       </div>
       <p class="author-desc">
-        노아도 정책 분석팀은 보건복지부, 고용노동부, 국민연금공단 등 공식 행정기관의 최신 발표 자료 및 고시 정보를 철저히 교차 검증합니다. 어르신들께서 소중한 국가 지원금과 연금 혜택을 단 한 가지도 놓치지 않으시도록, 복잡한 정책 자격 기준을 가장 정밀하고 이해하기 쉽게 분석하여 신뢰성 높은 복지 정보를 전달해 드립니다.
+        아버지께서 치매 진단을 받으시고, 이후 췌장암 4기로 2023년에 돌아가시기까지 곁에서 간병했습니다.
+        장기요양 등급을 신청하고, 병원비와 돌봄 비용을 감당할 방법을 찾아 제도를 뒤지던 시간 동안
+        가장 아쉬웠던 것은 <strong>제도가 없다는 사실이 아니라, 있는 제도를 제때 몰랐다는 사실</strong>이었습니다.
+        그때 제가 찾아 헤맸던 정보를 지금 같은 처지에 계신 분들이 덜 헤매고 찾으실 수 있도록 정리합니다.
+      </p>
+      <p class="author-disclosure">
+        10여 년 전 요양보호사 자격을 취득했으나 <strong>현장 실무 경력은 없습니다.</strong>
+        따라서 이 글은 전문가의 상담이 아니라, 같은 일을 먼저 겪은 보호자가 공식 자료를 확인해 정리한 안내입니다.
+        모든 수치와 자격 요건은 보건복지부·국민연금공단 등 공식 발표 자료를 근거로 하며,
+        최종 판정은 반드시 관할 기관에서 확인하셔야 합니다.
       </p>
       <div class="author-meta-info">
-        <span class="author-meta-item">📅 최신 검수일: 2026년 7월 기준 개정 세부사항 반영 완료</span>
-        <span class="author-meta-item">📧 정보 제보/정정 문의: <a href="mailto:knot4844@gmail.com">knot4844@gmail.com</a></span>
+        <span class="author-meta-item">📅 최종 검수일: {lastReviewed}</span>
+        <span class="author-meta-item">📧 정정 제보 및 문의: <a href="mailto:knot4844@gmail.com">knot4844@gmail.com</a></span>
       </div>
     </section>
 
@@ -299,6 +338,39 @@ const faqSchema = faqs.length > 0 ? {
     <div class="post-disclaimer">
       <p><strong>안내사항:</strong> 본 블로그에서 제공하는 정보는 공식 기관의 발표 자료 및 보도자료를 참고하여 작성되었습니다. 정부 정책 및 지원 조건은 수시로 변경될 수 있으므로, 최종 신청 전에 반드시 관계 기관의 공식 홈페이지 또는 콜센터를 통해 정확한 요건을 재확인하시기 바랍니다.</p>
     </div>
+  <!-- 본문 중간 광고 동적 삽입 (승인 후 PUBLIC_ADS_ENABLED=true 로 활성화) -->
+    <script define:vars={{ adsEnabled, adsenseClient }}>
+      if (adsEnabled && adsenseClient) {
+        document.addEventListener('DOMContentLoaded', () => {
+          const postContent = document.querySelector('.post-content');
+          if (postContent) {
+            const paragraphs = postContent.querySelectorAll('p, h2, h3, table');
+            if (paragraphs.length >= 6) {
+              // 두 번째 및 네 번째 주요 단락 뒤에 본문 인피드 광고 생성 주입
+              const insertAd = (targetIndex) => {
+                const adContainer = document.createElement('div');
+                adContainer.className = 'adsense-container body-ad';
+                adContainer.innerHTML = `
+                  <div class="adsense-label">광고</div>
+                  <ins class="adsbygoogle"
+                       style="display:block; text-align:center;"
+                       data-ad-layout="in-article"
+                       data-ad-format="fluid"
+                       data-ad-client="${adsenseClient}"></ins>
+                `;
+                paragraphs[targetIndex].parentNode.insertBefore(adContainer, paragraphs[targetIndex].nextSibling);
+                try {
+                  (adsbygoogle = window.adsbygoogle || []).push({});
+                } catch(e) {}
+              };
+
+              if (paragraphs.length > 3) insertAd(2);
+              if (paragraphs.length > 7) insertAd(6);
+            }
+          }
+        });
+      }
+    </script>
   </article>
 </BaseLayout>
 
@@ -335,8 +407,8 @@ const faqSchema = faqs.length > 0 ? {
     margin-bottom: 2rem;
     border-radius: var(--radius);
     overflow: hidden;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    border: 2px solid var(--border-color);
+    box-shadow: var(--card-shadow);
   }
 
   .featured-img {
@@ -356,7 +428,7 @@ const faqSchema = faqs.length > 0 ? {
     max-width: 800px;
     margin: 0 auto;
     background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
     border-radius: var(--radius);
     padding: 2rem 1.5rem;
     box-shadow: var(--card-shadow);
@@ -408,6 +480,11 @@ const faqSchema = faqs.length > 0 ? {
     font-size: 0.9rem;
     color: var(--text-secondary);
     margin-bottom: 1rem;
+  }
+
+  .post-updated {
+    font-size: 0.85rem;
+    color: var(--text-muted);
   }
 
   .post-category {
@@ -473,11 +550,11 @@ const faqSchema = faqs.length > 0 ? {
 
   .post-content :global(strong) {
     font-weight: 800;
-    color: #fca5a5;
+    color: var(--accent);
   }
 
-  :root.light-mode .post-content :global(strong) {
-    color: #dc2626;
+  :root.dark-mode .post-content :global(strong) {
+    color: #FFB380;
   }
 
   /* Table styling */
@@ -486,6 +563,9 @@ const faqSchema = faqs.length > 0 ? {
     border-collapse: collapse;
     margin: 2.2rem 0;
     font-size: 1.1rem;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .post-content :global(th), .post-content :global(td) {
@@ -865,6 +945,19 @@ const faqSchema = faqs.length > 0 ? {
     font-size: 0.95rem !important;
     line-height: 1.7 !important;
     color: var(--text-secondary) !important;
+    margin-bottom: 1.25rem !important;
+    word-break: keep-all;
+  }
+
+  /* 자격의 한계를 명시하는 문단 — 본문보다 한 단계 낮은 톤으로 두되 분명히 읽히게 한다 */
+  .author-disclosure {
+    font-size: 0.9rem !important;
+    line-height: 1.75 !important;
+    color: var(--text-secondary) !important;
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--border-color);
+    border-radius: 0 8px 8px 0;
+    padding: 0.9rem 1.1rem !important;
     margin-bottom: 1.25rem !important;
     word-break: keep-all;
   }

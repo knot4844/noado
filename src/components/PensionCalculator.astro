@@ -1,0 +1,553 @@
+---
+// Basic Pension Calculator Component for Korean Seniors (2025-2026 Criteria)
+---
+<div class="calculator-card">
+  <div class="calc-header">
+    <span class="calc-badge">모의 시뮬레이터</span>
+    <h2>기초연금 10초 모의 계산기</h2>
+    <p class="calc-desc">가구 유형과 재산 상태를 입력하시면 2025~2026년 복지부 선정기준액과 비교하여 예상 수급 여부를 바로 판정해 드립니다.</p>
+  </div>
+
+  <div class="calc-body">
+    <!-- Row 1: Household & Region -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>👥 가구 유형</label>
+        <div class="radio-group">
+          <label class="radio-label active">
+            <input type="radio" name="household" value="single" checked />
+            단독가구
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="household" value="couple" />
+            부부가구
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>📍 거주 지역</label>
+        <div class="radio-group">
+          <label class="radio-label active">
+            <input type="radio" name="region" value="large" checked />
+            대도시 <span class="sub-lbl">(특별시/광역시/특례시)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="region" value="medium" />
+            중소도시 <span class="sub-lbl">(일반 시)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="region" value="small" />
+            농어촌 <span class="sub-lbl">(군/읍/면)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <hr class="calc-divider" />
+
+    <!-- Sliders Section -->
+    <div class="sliders-section">
+      <!-- Income sliders -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>💼 근로소득 (월)</span>
+          <span class="value-display"><strong id="val-work-income">100</strong> 만원</span>
+        </div>
+        <input type="range" id="input-work-income" min="0" max="1000" step="10" value="100" class="range-slider" />
+        <span class="range-hint">근로소득 공제 115만원 차감 후 30%가 추가 공제됩니다.</span>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>💰 기타소득 (월)</span>
+          <span class="value-display"><strong id="val-other-income">0</strong> 만원</span>
+        </div>
+        <input type="range" id="input-other-income" min="0" max="500" step="10" value="0" class="range-slider" />
+        <span class="range-hint">공적연금(국민연금 등), 사업소득, 이자소득 등이 포함됩니다.</span>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>🏠 일반재산 (주택/토지 공시지가 등)</span>
+          <span class="value-display"><strong id="val-property">25,000</strong> 만원</span>
+        </div>
+        <input type="range" id="input-property" min="0" max="200000" step="500" value="25000" class="range-slider" />
+        <span class="range-hint">살고 계신 주택 공시가격에서 거주지 공제(최대 1억 3,500만원)가 자동 차감됩니다.</span>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>💳 금융재산 (예적금 등)</span>
+          <span class="value-display"><strong id="val-finance">1,000</strong> 만원</span>
+        </div>
+        <input type="range" id="input-finance" min="0" max="30000" step="100" value="1000" class="range-slider" />
+        <span class="range-hint">기본 금융재산 공제 2,000만원이 추가로 자동 차감됩니다.</span>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>🛑 부채 (은행 대출 등)</span>
+          <span class="value-display"><strong id="val-debt">0</strong> 만원</span>
+        </div>
+        <input type="range" id="input-debt" min="0" max="30000" step="100" value="0" class="range-slider" />
+        <span class="range-hint">신용대출, 주택담보대출 등 증빙 가능한 부채액은 재산에서 제외됩니다.</span>
+      </div>
+    </div>
+
+    <!-- Calculations Result Box -->
+    <div class="result-box">
+      <div class="result-summary">
+        <div class="result-lbl">최종 소득인정액 (예상)</div>
+        <div class="result-value"><span id="calc-result-sum">0</span> 만원 / 월</div>
+      </div>
+
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" id="calc-progress"></div>
+        </div>
+        <div class="progress-limits">
+          <span>0원</span>
+          <span class="limit-marker" id="calc-limit-marker">선정기준액 219만원</span>
+        </div>
+      </div>
+
+      <!-- Verdict Banner -->
+      <div class="verdict-banner" id="calc-verdict">
+        <span class="verdict-icon">💡</span>
+        <div class="verdict-text">
+          <h4 id="verdict-title">수급 가능성이 매우 높습니다!</h4>
+          <p id="verdict-body">회원님의 소득인정액이 기준선 이하이므로 기초연금 혜택을 받으실 수 있을 것으로 보입니다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Regional Property Deductions
+  const DEFAULTS = {
+    regionDeduction: {
+      large: 13500,  // 1억 3,500만원
+      medium: 8500,  // 8,500만원
+      small: 7250    // 7,250만원
+    },
+    limit: {
+      single: 219,   // 219만원
+      couple: 350.4  // 350.4만원
+    },
+    financeDeduction: 2000, // 2,000만원 공제
+    annualInterestRate: 0.04 // 재산의 소득환산율 연 4%
+  };
+
+  // Get DOM elements
+  const inputWork = document.getElementById('input-work-income');
+  const inputOther = document.getElementById('input-other-income');
+  const inputProperty = document.getElementById('input-property');
+  const inputFinance = document.getElementById('input-finance');
+  const inputDebt = document.getElementById('input-debt');
+
+  const displayWork = document.getElementById('val-work-income');
+  const displayOther = document.getElementById('val-other-income');
+  const displayProperty = document.getElementById('val-property');
+  const displayFinance = document.getElementById('val-finance');
+  const displayDebt = document.getElementById('val-debt');
+
+  const resultSum = document.getElementById('calc-result-sum');
+  const progressFill = document.getElementById('calc-progress');
+  const limitMarker = document.getElementById('calc-limit-marker');
+  const verdictBanner = document.getElementById('calc-verdict');
+  const verdictTitle = document.getElementById('verdict-title');
+  const verdictBody = document.getElementById('verdict-body');
+
+  // Handle radio buttons activation style
+  document.querySelectorAll('.radio-label input').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const name = e.target.name;
+      document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+        input.parentElement.classList.remove('active');
+      });
+      e.target.parentElement.classList.add('active');
+      calculate();
+    });
+  });
+
+  // Event listeners for range inputs
+  const inputs = [inputWork, inputOther, inputProperty, inputFinance, inputDebt];
+  const displays = [displayWork, displayOther, displayProperty, displayFinance, displayDebt];
+
+  inputs.forEach((input, index) => {
+    input.addEventListener('input', () => {
+      let val = parseFloat(input.value);
+      if (input.id === 'input-property') {
+        displays[index].textContent = val.toLocaleString('ko-KR');
+      } else if (input.id === 'input-finance' || input.id === 'input-debt') {
+        displays[index].textContent = val.toLocaleString('ko-KR');
+      } else {
+        displays[index].textContent = val.toLocaleString('ko-KR');
+      }
+      calculate();
+    });
+  });
+
+  function calculate() {
+    // Current selections
+    const household = document.querySelector('input[name="household"]:checked').value;
+    const region = document.querySelector('input[name="region"]:checked').value;
+
+    const workIncome = parseFloat(inputWork.value); // 만원
+    const otherIncome = parseFloat(inputOther.value); // 만원
+    const property = parseFloat(inputProperty.value); // 만원
+    const finance = parseFloat(inputFinance.value); // 만원
+    const debt = parseFloat(inputDebt.value); // 만원
+
+    // 1. 소득 평가액 산정
+    // 근로소득은 115만원 차감 후 30%를 공제합니다.
+    let parsedWorkIncome = 0;
+    if (workIncome > 115) {
+      parsedWorkIncome = (workIncome - 115) * 0.7;
+    }
+    const incomeEvaluation = parsedWorkIncome + otherIncome;
+
+    // 2. 재산의 소득 환산액 산정
+    // 일반재산 기본공제 차감
+    const regionDed = DEFAULTS.regionDeduction[region];
+    let remainingProperty = Math.max(0, property - regionDed);
+
+    // 금융재산 기본공제 차감
+    let remainingFinance = Math.max(0, finance - DEFAULTS.financeDeduction);
+
+    // 부채 차감
+    let netAsset = (remainingProperty + remainingFinance) - debt;
+    netAsset = Math.max(0, netAsset);
+
+    // 재산 소득 환산식 = (순자산 * 연 4%) / 12개월
+    const assetConversion = (netAsset * DEFAULTS.annualInterestRate) / 12;
+
+    // 3. 최종 소득인정액
+    const totalRecognition = incomeEvaluation + assetConversion;
+    const limitAmount = DEFAULTS.limit[household];
+
+    // Format output (keep 1 decimal digit if not integer)
+    resultSum.textContent = totalRecognition.toFixed(1);
+
+    // Update progress bar
+    const percentage = Math.min(100, (totalRecognition / limitAmount) * 100);
+    progressFill.style.width = `${percentage}%`;
+
+    // Limit marker display
+    limitMarker.textContent = `기준선: ${limitAmount}만원`;
+
+    // Update Verdict
+    if (totalRecognition <= limitAmount) {
+      progressFill.style.backgroundColor = 'var(--accent-success, #10b981)';
+      verdictBanner.className = 'verdict-banner success';
+      verdictTitle.textContent = '수급 가능성이 매우 높습니다! 🎉';
+      verdictBody.innerHTML = `소득인정액(<strong>${totalRecognition.toFixed(1)}만원</strong>)이 선정기준액(<strong>${limitAmount}만원</strong>) 이하에 속합니다. 복지로 또는 관할 행정복지센터를 통해 정밀 심사를 받아보십시오.`;
+    } else {
+      progressFill.style.backgroundColor = 'var(--accent-warning, #f59e0b)';
+      verdictBanner.className = 'verdict-banner warning';
+      verdictTitle.textContent = '기준선 초과로 탈락 위험이 있습니다. ⚠️';
+      verdictBody.innerHTML = `소득인정액(<strong>${totalRecognition.toFixed(1)}만원</strong>)이 기준선(<strong>${limitAmount}만원</strong>)을 다소 초과했습니다. 재산 처분이나 부채 조정, 근로 공제 적용 등 다른 요소를 세부 심사해 볼 수 있으니 세무 담당자나 복지사 상담을 권장합니다.`;
+    }
+  }
+
+  // Initial calculation
+  calculate();
+</script>
+
+<style>
+  .calculator-card {
+    background: var(--bg-secondary, #161f30);
+    border: 1px solid var(--border-color, #243249);
+    border-radius: var(--radius, 12px);
+    padding: 2rem;
+    margin: 2.5rem 0;
+    box-shadow: var(--card-shadow, 0 10px 30px rgba(0, 0, 0, 0.4));
+    font-family: var(--font-primary, sans-serif);
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  .calc-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .calc-badge {
+    display: inline-block;
+    background: var(--accent-glow, rgba(37, 99, 235, 0.15));
+    color: #60a5fa;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .calc-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary, #f3f4f6);
+  }
+
+  .calc-desc {
+    font-size: 0.95rem;
+    color: var(--text-secondary, #9ca3af);
+    line-height: 1.5;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .form-row {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .radio-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .radio-label {
+    flex: 1;
+    min-width: 100px;
+    padding: 0.75rem 1rem;
+    background: var(--bg-primary, #0b0f19);
+    border: 1px solid var(--border-color, #243249);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: var(--transition-smooth, all 0.2s);
+  }
+
+  .radio-label input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+
+  .radio-label:hover {
+    border-color: var(--accent, #2563eb);
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .radio-label.active {
+    border-color: var(--accent, #2563eb);
+    background: rgba(37, 99, 235, 0.12);
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+  }
+
+  .sub-lbl {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-secondary, #9ca3af);
+    margin-top: 0.2rem;
+  }
+
+  .calc-divider {
+    border: 0;
+    height: 1px;
+    background: var(--border-color, #243249);
+    margin: 1.5rem 0;
+  }
+
+  .sliders-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .value-display {
+    color: var(--accent, #2563eb);
+    font-size: 1.1rem;
+  }
+
+  .value-display strong {
+    font-size: 1.3rem;
+  }
+
+  .range-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: var(--bg-primary, #0b0f19);
+    outline: none;
+    border: 1px solid var(--border-color, #243249);
+    margin: 0.5rem 0;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent, #2563eb);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+    transition: transform 0.1s ease;
+  }
+
+  .range-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+
+  .range-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted, #6b7280);
+    line-height: 1.3;
+  }
+
+  /* Result Box Styling */
+  .result-box {
+    background: var(--bg-primary, #0b0f19);
+    border: 1px solid var(--border-color, #243249);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .result-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color, #243249);
+    padding-bottom: 0.75rem;
+  }
+
+  .result-lbl {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .result-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent-success, #10b981);
+  }
+
+  .result-value span {
+    font-size: 1.8rem;
+  }
+
+  .progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--bg-secondary, #161f30);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-color, #243249);
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--accent-success, #10b981);
+    transition: width 0.3s ease-in-out, background-color 0.3s ease;
+  }
+
+  .progress-limits {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted, #6b7280);
+  }
+
+  .limit-marker {
+    font-weight: 700;
+    color: var(--text-secondary, #9ca3af);
+  }
+
+  /* Verdict Banner */
+  .verdict-banner {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .verdict-banner.success {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.25);
+  }
+
+  .verdict-banner.warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.25);
+  }
+
+  .verdict-icon {
+    font-size: 1.5rem;
+    display: inline-block;
+    margin-top: 0.1rem;
+  }
+
+  .verdict-text h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .verdict-text p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary, #9ca3af) !important;
+    margin-bottom: 0 !important;
+  }
+</style>

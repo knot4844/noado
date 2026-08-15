@@ -1,0 +1,933 @@
+---
+// Multi-Welfare Calculator for Korean Seniors (2026 Criteria)
+---
+<div class="welfare-calculator card">
+  <div class="calc-header">
+    <span class="calc-badge">모의 시뮬레이터</span>
+    <h2>노아도 시니어 종합 복지 계산기</h2>
+    <p class="calc-desc">가구유형, 재산, 연령을 입력하여 기초연금, 국민연금, 기초생활수급, 의료 감면 자격을 10초 만에 시뮬레이션해 보세요.</p>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="calc-tabs" role="tablist">
+    <button class="tab-btn active" role="tab" aria-selected="true" data-target="tab-pension">👵 기초연금</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-target="tab-national">👴 국민연금</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-target="tab-livelihood">🏠 기초생활수급</button>
+    <button class="tab-btn" role="tab" aria-selected="false" data-target="tab-medical">🩺 의료비 감면</button>
+  </div>
+
+  <div class="tab-content-container">
+    
+    <!-- 1. 기초연금 탭 -->
+    <div id="tab-pension" class="tab-panel active" role="tabpanel">
+      <div class="panel-header">
+        <h3>기초연금 예상 수급 판정</h3>
+        <p>2026년도 보건복지부 고시 기준액과 본인의 소득인정액을 비교합니다.</p>
+      </div>
+
+      <div class="calc-grid">
+        <div class="control-section">
+          <div class="form-group">
+            <label class="input-label">👥 가구 유형</label>
+            <div class="segment-control">
+              <button class="segment-btn active" data-value="single" data-group="p-household">단독가구</button>
+              <button class="segment-btn" data-value="couple" data-group="p-household">부부가구</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="input-label">📍 거주 지역</label>
+            <div class="segment-control">
+              <button class="segment-btn active" data-value="large" data-group="p-region">대도시</button>
+              <button class="segment-btn" data-value="medium" data-group="p-region">중소도시</button>
+              <button class="segment-btn" data-value="small" data-group="p-region">농어촌</button>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>💼 월 근로소득</span>
+              <span class="val-text"><strong id="txt-p-work">100</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-p-work" min="0" max="1000" step="10" value="100" class="calc-slider" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>💰 월 기타소득 (공적연금 등)</span>
+              <span class="val-text"><strong id="txt-p-other">0</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-p-other" min="0" max="500" step="10" value="0" class="calc-slider" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>🏠 부동산/일반재산 가액</span>
+              <span class="val-text"><strong id="txt-p-prop">20,000</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-p-prop" min="0" max="200000" step="500" value="20000" class="calc-slider" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>💳 금융재산 (예적금 등)</span>
+              <span class="val-text"><strong id="txt-p-finance">1,000</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-p-finance" min="0" max="30000" step="100" value="1000" class="calc-slider" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>🛑 증빙 가능한 채무/부채</span>
+              <span class="val-text"><strong id="txt-p-debt">0</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-p-debt" min="0" max="30000" step="100" value="0" class="calc-slider" />
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-card">
+            <h4>시뮬레이션 판정 결과</h4>
+            <div class="result-badge pass" id="badge-pension">수급 가능 유력</div>
+            <div class="result-metrics">
+              <div class="metric-row">
+                <span>나의 소득인정액:</span>
+                <span class="metric-val" id="val-p-total">980,000 원</span>
+              </div>
+              <div class="metric-row">
+                <span>2026년 선정기준액:</span>
+                <span class="metric-val" id="val-p-limit">2,190,000 원</span>
+              </div>
+            </div>
+            <p class="result-explain" id="explain-pension">입력하신 재산 대비 소득인정액이 선정 기준액보다 낮아 수급 자격을 충족할 가능성이 매우 높습니다. 만 65세 도래 1개월 전 미리 신청해 보세요!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 국민연금 탭 -->
+    <div id="tab-national" class="tab-panel" role="tabpanel">
+      <div class="panel-header">
+        <h3>국민연금(노령연금) 예상 수령액</h3>
+        <p>본인의 납부 기간과 월 평균 납입 소득액에 의거한 모의 수령 산식입니다.</p>
+      </div>
+
+      <div class="calc-grid">
+        <div class="control-section">
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>📅 총 납부 기간 (개월수)</span>
+              <span class="val-text"><strong id="txt-n-months">120</strong> 개월 (10년)</span>
+            </div>
+            <input type="range" id="slide-n-months" min="120" max="480" step="12" value="120" class="calc-slider" />
+            <span class="slider-hint">최소 120개월 이상 납부해야 평생 연금으로 수령 가능합니다.</span>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>💵 납부 기간 평균 소득 (월)</span>
+              <span class="val-text"><strong id="txt-n-income">250</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-n-income" min="100" max="600" step="10" value="250" class="calc-slider" />
+            <span class="slider-hint">월 소득에 비례하여 부과된 보험료(9%)의 근거 소득입니다.</span>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-card">
+            <h4>예상 수령액 (2026년 기준)</h4>
+            <div class="result-value-box">
+              <span class="val-unit">매월 약</span>
+              <span class="big-value" id="val-n-expected">364,000</span>
+              <span class="val-unit">원</span>
+            </div>
+            <div class="result-metrics">
+              <div class="metric-row">
+                <span>기본 연금액 비율:</span>
+                <span class="metric-val" id="val-n-rate">14.5%</span>
+              </div>
+              <div class="metric-row">
+                <span>가입 등급:</span>
+                <span class="metric-val">10년 가입 최소 충족</span>
+              </div>
+            </div>
+            <p class="result-explain">실제 물가상승률 및 전체 가입자 평균소득(A값) 보정에 따라 국민연금공단 조회 결과와 다소 차이가 있을 수 있습니다. 공단 지사에서 정확한 상세 시뮬레이션을 제공합니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 기초생활수급 탭 -->
+    <div id="tab-livelihood" class="tab-panel" role="tabpanel">
+      <div class="panel-header">
+        <h3>기초생활수급 자격 모의 자격 점검</h3>
+        <p>2026년 가구원 수 기준 기준중위소득 비율과 비교하여 수급 급여 자격을 예측합니다.</p>
+      </div>
+
+      <div class="calc-grid">
+        <div class="control-section">
+          <div class="form-group">
+            <label class="input-label">👨‍👩‍👧 가구원 수</label>
+            <div class="segment-control">
+              <button class="segment-btn active" data-value="1" data-group="l-members">1인</button>
+              <button class="segment-btn" data-value="2" data-group="l-members">2인</button>
+              <button class="segment-btn" data-value="3" data-group="l-members">3인</button>
+              <button class="segment-btn" data-value="4" data-group="l-members">4인</button>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-info">
+              <span>💳 가구 총 월 소득인정액</span>
+              <span class="val-text"><strong id="txt-l-income">60</strong> 만원</span>
+            </div>
+            <input type="range" id="slide-l-income" min="0" max="400" step="5" value="60" class="calc-slider" />
+            <span class="slider-hint">실제 버는 소득과 보유 재산의 소득 환산액을 합친 소득인정액입니다.</span>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-card">
+            <h4>2026년 기준 중위소득 대조</h4>
+            <div class="eligibility-list">
+              <div class="eligibility-item status-ok" id="l-item-living">
+                <span>생계급여 (중위 32% 이하):</span>
+                <strong id="l-val-living">수급 가능 유력</strong>
+              </div>
+              <div class="eligibility-item status-ok" id="l-item-medical">
+                <span>의료급여 (중위 40% 이하):</span>
+                <strong id="l-val-medical">수급 가능 유력</strong>
+              </div>
+              <div class="eligibility-item status-ok" id="l-item-housing">
+                <span>주거급여 (중위 48% 이하):</span>
+                <strong id="l-val-housing">수급 가능 유력</strong>
+              </div>
+            </div>
+            <p class="result-explain">기초생활수급자는 부양의무자 기준(의료급여 제외 완화) 및 재산의 소득 환산식 기준이 별도로 엄격히 작동하므로, 복지로 모의 계산 후 읍면동 행정복지센터를 내방하십시오.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 의료비 감면 탭 -->
+    <div id="tab-medical" class="tab-panel" role="tabpanel">
+      <div class="panel-header">
+        <h3>65세 이상 건강보험 의료 혜택</h3>
+        <p>어르신들께서 가장 자주 하시는 치과 임플란트 및 틀니 건강보험 본인부담 비율 정보입니다.</p>
+      </div>
+
+      <div class="calc-grid">
+        <div class="control-section">
+          <div class="form-group">
+            <label class="input-label">🎂 신청인 만 나이</label>
+            <div class="segment-control">
+              <button class="segment-btn" data-value="under65" data-group="m-age">만 65세 미만</button>
+              <button class="segment-btn active" data-value="over65" data-group="m-age">만 65세 이상</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="input-label">🩺 수급자격 및 건강보험 자격 구분</label>
+            <div class="segment-control vertical">
+              <button class="segment-btn active" data-value="normal" data-group="m-welfare">일반 건강보험 가입자</button>
+              <button class="segment-btn" data-value="medical-1" data-group="m-welfare">의료급여 1종 수급자</button>
+              <button class="segment-btn" data-value="medical-2" data-group="m-welfare">의료급여 2종 / 차상위 희귀난치</button>
+              <button class="segment-btn" data-value="chasing-manseong" data-group="m-welfare">차상위 만성질환자</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-card">
+            <h4>어르신 본인부담금 혜택 결과</h4>
+            <div class="benefit-item">
+              <strong>🦷 치과 임플란트 (평생 2개 지원)</strong>
+              <div class="benefit-metric-box">
+                <span>본인부담금 비율:</span>
+                <span class="benefit-value" id="val-m-implant">30%</span>
+              </div>
+              <p class="benefit-desc" id="desc-m-implant">일반 건강보험 어르신 기준 원래 약 120만원 선의 임플란트 1개당 비용을 약 36만원 선만 부담하시면 됩니다.</p>
+            </div>
+
+            <div class="benefit-item mt-4">
+              <strong>🦷 치과 틀니 (7년마다 재제작 지원)</strong>
+              <div class="benefit-metric-box">
+                <span>본인부담금 비율:</span>
+                <span class="benefit-value" id="val-m-denture">30%</span>
+              </div>
+              <p class="benefit-desc" id="desc-m-denture">완전틀니, 부분틀니 모두 7년 주기로 지원 혜택이 적용되어 본인부담금만 내시면 정합 시술이 가능합니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  /* 시니어 접근성을 최우선으로 고려한 CSS */
+  .welfare-calculator {
+    margin: 2.5rem 0;
+    padding: 2.5rem;
+    border: 2px solid var(--color-primary);
+    background: linear-gradient(135deg, #FFFDF9 0%, #F5F7FB 100%);
+    border-radius: 20px;
+    font-family: var(--font-body);
+  }
+
+  .calc-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .calc-badge {
+    display: inline-block;
+    background: var(--color-primary);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    margin-bottom: 0.75rem;
+  }
+
+  .calc-header h2 {
+    font-size: var(--text-2xl);
+    color: var(--color-secondary-dark);
+    margin: 0.5rem 0;
+    font-weight: var(--weight-bold);
+  }
+
+  .calc-desc {
+    font-size: var(--text-base);
+    color: var(--color-text-light);
+    line-height: var(--leading-normal);
+  }
+
+  /* Tabs UI */
+  .calc-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--color-border);
+    padding-bottom: 8px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    min-width: 120px;
+    background: #EAE5DE;
+    color: var(--color-text-light);
+    border: none;
+    padding: 12px 16px;
+    border-radius: 12px 12px 0 0;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 48px;
+  }
+
+  .tab-btn.active {
+    background: var(--color-secondary);
+    color: white;
+  }
+
+  .tab-panel {
+    display: none;
+  }
+
+  .tab-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-header {
+    margin-bottom: 1.5rem;
+    border-bottom: 1px dashed var(--color-border);
+    padding-bottom: 1rem;
+  }
+
+  .panel-header h3 {
+    font-size: var(--text-xl);
+    color: var(--color-secondary-dark);
+    margin: 0;
+  }
+
+  .panel-header p {
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+    margin: 4px 0 0 0;
+  }
+
+  /* Grid & Controls */
+  .calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .calc-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+
+  .control-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .input-label {
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+  }
+
+  /* Segmented Controls */
+  .segment-control {
+    display: flex;
+    background: #EAE6DF;
+    padding: 4px;
+    border-radius: 12px;
+    gap: 4px;
+  }
+
+  .segment-control.vertical {
+    flex-direction: column;
+    background: transparent;
+    padding: 0;
+    gap: 8px;
+  }
+
+  .segment-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--color-text-light);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-height: 44px;
+    text-align: center;
+  }
+
+  .segment-control.vertical .segment-btn {
+    text-align: left;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    padding-left: 16px;
+  }
+
+  .segment-btn.active {
+    background: white;
+    color: var(--color-text);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    font-weight: var(--weight-semibold);
+  }
+
+  .segment-control.vertical .segment-btn.active {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary);
+  }
+
+  /* Slider Styling */
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .slider-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+  }
+
+  .val-text {
+    font-size: var(--text-base);
+    color: var(--color-primary-dark);
+  }
+
+  .val-text strong {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+  }
+
+  .calc-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #E4DFD8;
+    border-radius: 8px;
+    outline: none;
+    margin: 8px 0;
+  }
+
+  .calc-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    cursor: pointer;
+    transition: transform 0.1s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  .calc-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+  }
+
+  .slider-hint {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    line-height: var(--leading-normal);
+  }
+
+  /* Result Cards */
+  .result-section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .result-card {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .result-card h4 {
+    margin: 0 0 1rem 0;
+    font-size: var(--text-lg);
+    color: var(--color-text);
+    text-align: center;
+  }
+
+  .result-badge {
+    text-align: center;
+    padding: 10px;
+    border-radius: 12px;
+    font-size: var(--text-base);
+    font-weight: var(--weight-bold);
+    margin-bottom: 1.5rem;
+  }
+
+  .result-badge.pass {
+    background-color: rgba(46, 139, 87, 0.1);
+    color: var(--color-accent-dark);
+    border: 1px solid rgba(46, 139, 87, 0.2);
+  }
+
+  .result-badge.fail {
+    background-color: rgba(214, 64, 69, 0.1);
+    color: var(--color-error);
+    border: 1px solid rgba(214, 64, 69, 0.2);
+  }
+
+  .result-value-box {
+    text-align: center;
+    background: #FDF9F3;
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+    margin-bottom: 1.5rem;
+  }
+
+  .big-value {
+    font-size: var(--text-4xl);
+    font-weight: var(--weight-bold);
+    color: var(--color-primary-dark);
+  }
+
+  .val-unit {
+    font-size: var(--text-lg);
+    color: var(--color-text-light);
+    font-weight: var(--weight-semibold);
+  }
+
+  .result-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+    background: #F7F5F0;
+    padding: 12px 16px;
+    border-radius: 12px;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+  }
+
+  .metric-val {
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+  }
+
+  .result-explain {
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+    line-height: var(--leading-normal);
+    margin: 0;
+  }
+
+  /* Livelihood list styling */
+  .eligibility-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .eligibility-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: var(--text-sm);
+    border: 1px solid var(--color-border);
+  }
+
+  .eligibility-item.status-ok {
+    background-color: rgba(46, 139, 87, 0.05);
+    border-color: rgba(46, 139, 87, 0.2);
+    color: var(--color-accent-dark);
+  }
+
+  .eligibility-item.status-no {
+    background-color: rgba(214, 64, 69, 0.05);
+    border-color: rgba(214, 64, 69, 0.2);
+    color: var(--color-error);
+  }
+
+  /* Medical benefits list */
+  .benefit-item {
+    border-bottom: 1px dashed var(--color-border);
+    padding-bottom: 12px;
+  }
+
+  .benefit-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .benefit-item strong {
+    font-size: var(--text-base);
+    color: var(--color-text);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .benefit-metric-box {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    color: var(--color-text-light);
+    margin-bottom: 4px;
+  }
+
+  .benefit-value {
+    font-weight: var(--weight-bold);
+    color: var(--color-accent-dark);
+  }
+
+  .benefit-desc {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    line-height: var(--leading-normal);
+    margin: 0;
+  }
+</style>
+
+<!-- Client scripts for interactivity -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. TABS NAVIGATION CONTROL
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+
+        // Toggle buttons
+        tabButtons.forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-selected', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+
+        // Toggle panels
+        tabPanels.forEach(panel => {
+          panel.classList.remove('active');
+        });
+        document.getElementById(targetId)?.classList.add('active');
+      });
+    });
+
+    // Segment control logic
+    const segmentButtons = document.querySelectorAll('.segment-btn');
+    segmentButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const group = btn.getAttribute('data-group');
+        segmentButtons.forEach(b => {
+          if (b.getAttribute('data-group') === group) {
+            b.classList.remove('active');
+          }
+        });
+        btn.classList.add('active');
+        calculateWelfare(); // Recalculate everything on change
+      });
+    });
+
+    // 2. WELFARE CALCULATIONS
+    
+    // Elements - Pension
+    const pWork = document.getElementById('slide-p-work');
+    const pOther = document.getElementById('slide-p-other');
+    const pProp = document.getElementById('slide-p-prop');
+    const pFinance = document.getElementById('slide-p-finance');
+    const pDebt = document.getElementById('slide-p-debt');
+
+    const txtPWork = document.getElementById('txt-p-work');
+    const txtPOther = document.getElementById('txt-p-other');
+    const txtPProp = document.getElementById('txt-p-prop');
+    const txtPFinance = document.getElementById('txt-p-finance');
+    const txtPDebt = document.getElementById('txt-p-debt');
+
+    const badgePension = document.getElementById('badge-pension');
+    const valPTotal = document.getElementById('val-p-total');
+    const valPLimit = document.getElementById('val-p-limit');
+    const explainPension = document.getElementById('explain-pension');
+
+    // Elements - National
+    const nMonths = document.getElementById('slide-n-months');
+    const nIncome = document.getElementById('slide-n-income');
+    const txtNMonths = document.getElementById('txt-n-months');
+    const txtNIncome = document.getElementById('txt-n-income');
+    const valNExpected = document.getElementById('val-n-expected');
+    const valNRate = document.getElementById('val-n-rate');
+
+    // Elements - Livelihood
+    const lIncome = document.getElementById('slide-l-income');
+    const txtLIncome = document.getElementById('txt-l-income');
+    const lValLiving = document.getElementById('l-val-living');
+    const lValMedical = document.getElementById('l-val-medical');
+    const lValHousing = document.getElementById('l-val-housing');
+    const lItemLiving = document.getElementById('l-item-living');
+    const lItemMedical = document.getElementById('l-item-medical');
+    const lItemHousing = document.getElementById('l-item-housing');
+
+    // Elements - Medical
+    const valMImplant = document.getElementById('val-m-implant');
+    const valMDenture = document.getElementById('val-m-denture');
+    const descMImplant = document.getElementById('desc-m-implant');
+    const descMDenture = document.getElementById('desc-m-denture');
+
+    function calculateWelfare() {
+      // --- (1) Pension Calculator logic ---
+      if (pWork && pOther && pProp && pFinance && pDebt) {
+        const workVal = parseInt(pWork.value);
+        const otherVal = parseInt(pOther.value);
+        const propVal = parseInt(pProp.value);
+        const finVal = parseInt(pFinance.value);
+        const debtVal = parseInt(pDebt.value);
+
+        // Update displays
+        txtPWork.textContent = workVal.toLocaleString();
+        txtPOther.textContent = otherVal.toLocaleString();
+        txtPProp.textContent = propVal.toLocaleString();
+        txtPFinance.textContent = finVal.toLocaleString();
+        txtPDebt.textContent = debtVal.toLocaleString();
+
+        const household = document.querySelector('.segment-btn.active[data-group="p-household"]')?.getAttribute('data-value') || 'single';
+        const region = document.querySelector('.segment-btn.active[data-group="p-region"]')?.getAttribute('data-value') || 'large';
+
+        // 2026 Criteria
+        const limit = (household === 'single') ? 2190000 : 3504000;
+        valPLimit.textContent = limit.toLocaleString() + " 원";
+
+        // 거주지별 기본 공제
+        let regionDeduction = 135000000; // 대도시
+        if (region === 'medium') regionDeduction = 85000000;
+        else if (region === 'small') regionDeduction = 72000000;
+
+        // 근로소득 기본공제 115만원 차감 후 30% 추가 차감
+        let netWorkIncome = (workVal * 10000) - 1150000;
+        if (netWorkIncome < 0) netWorkIncome = 0;
+        netWorkIncome = netWorkIncome * 0.7;
+
+        // 기타소득 (월)
+        const netOtherIncome = otherVal * 10000;
+
+        // 일반재산
+        let netProperty = (propVal * 10000) - regionDeduction;
+        if (netProperty < 0) netProperty = 0;
+
+        // 금융재산 기본공제 2,000만원
+        let netFinance = (finVal * 10000) - 20000000;
+        if (netFinance < 0) netFinance = 0;
+
+        // 부채 차감
+        const totalDebt = debtVal * 10000;
+
+        // 순재산액
+        let netWealth = (netProperty + netFinance) - totalDebt;
+        if (netWealth < 0) netWealth = 0;
+
+        // 재산 소득 환산액 (연 4% 이율 / 12개월)
+        const wealthToIncome = (netWealth * 0.04) / 12;
+
+        // 최종 소득인정액
+        const totalIncomeRecognition = Math.round(netWorkIncome + netOtherIncome + wealthToIncome);
+        valPTotal.textContent = totalIncomeRecognition.toLocaleString() + " 원";
+
+        if (totalIncomeRecognition <= limit) {
+          badgePension.textContent = "수급 가능 유력";
+          badgePension.className = "result-badge pass";
+          explainPension.textContent = "가구 소득인정액이 2026년 기준 선정기준액보다 낮아 기초연금을 받으실 수 있을 것으로 보입니다. 만 65세 생일 1달 전에 거주지 주민센터에 꼭 방문해 보세요.";
+        } else {
+          badgePension.textContent = "수급 자격 초과";
+          badgePension.className = "result-badge fail";
+          explainPension.textContent = "가구 소득인정액이 선정기준액을 일부 초과하여 기초연금 자격에서 제외될 수 있습니다. 금융재산 정리나 공적 채무 증빙 서류를 지참해 상세한 현장 모의 테스트를 받아보시길 권장합니다.";
+        }
+      }
+
+      // --- (2) National Pension logic ---
+      if (nMonths && nIncome) {
+        const months = parseInt(nMonths.value);
+        const avgIncome = parseInt(nIncome.value);
+
+        txtNMonths.textContent = `${months} 개월 (${Math.floor(months / 12)}년)`;
+        txtNIncome.textContent = avgIncome.toLocaleString();
+
+        // 2026년식 간단 노령연금 모의 계산법 (가입 개월수에 비례한 계산)
+        // 10년(120개월) 가입 시 평균소득의 약 10~15% 수령 기준
+        const rate = 10 + ((months - 120) / 12) * 1.0; // 매년 약 1.0% 누적
+        const expected = Math.round((avgIncome * 10000) * (rate / 100));
+
+        valNExpected.textContent = expected.toLocaleString();
+        valNRate.textContent = rate.toFixed(1) + "%";
+      }
+
+      // --- (3) Livelihood logic ---
+      if (lIncome) {
+        const members = parseInt(document.querySelector('.segment-btn.active[data-group="l-members"]')?.getAttribute('data-value') || '1');
+        const incomeVal = parseInt(lIncome.value);
+
+        txtLIncome.textContent = incomeVal.toLocaleString();
+
+        // 2026년 예상 기준중위소득 (1인: 242만원, 2인: 395만원, 3인: 504만원, 4인: 610만원)
+        let medianIncome = 2420000;
+        if (members === 2) medianIncome = 3950000;
+        else if (members === 3) medianIncome = 5040000;
+        else if (members === 4) medianIncome = 6100000;
+
+        const liveLimit = medianIncome * 0.32;
+        const medLimit = medianIncome * 0.40;
+        const houseLimit = medianIncome * 0.48;
+
+        const myRecognition = incomeVal * 10000;
+
+        // 생계
+        if (myRecognition <= liveLimit) {
+          lValLiving.textContent = "수급 가능 유력";
+          lItemLiving.className = "eligibility-item status-ok";
+        } else {
+          lValLiving.textContent = "소득 기준 초과";
+          lItemLiving.className = "eligibility-item status-no";
+        }
+
+        // 의료
+        if (myRecognition <= medLimit) {
+          lValMedical.textContent = "수급 가능 유력";
+          lItemMedical.className = "eligibility-item status-ok";
+        } else {
+          lValMedical.textContent = "소득 기준 초과";
+          lItemMedical.className = "eligibility-item status-no";
+        }
+
+        // 주거
+        if (myRecognition <= houseLimit) {
+          lValHousing.textContent = "수급 가능 유력";
+          lItemHousing.className = "eligibility-item status-ok";
+        } else {
+          lValHousing.textContent = "소득 기준 초과";
+          lItemHousing.className = "eligibility-item status-no";
+        }
+      }
+
+      // --- (4) Medical Discount logic ---
+      if (valMImplant && valMDenture) {
+        const age = document.querySelector('.segment-btn.active[data-group="m-age"]')?.getAttribute('data-value') || 'over65';
+        const welfare = document.querySelector('.segment-btn.active[data-group="m-welfare"]')?.getAttribute('data-value') || 'normal';
+
+        if (age === 'under65') {
+          valMImplant.textContent = "혜택 대상 아님";
+          valMDenture.textContent = "혜택 대상 아님";
+          descMImplant.textContent = "만 65세 생일 이후에 임플란트 건강보험 지원을 받으실 수 있습니다.";
+          descMDenture.textContent = "만 65세 생일 이후에 7년 주기로 틀니 보험 혜택이 주어집니다.";
+        } else {
+          // over 65
+          if (welfare === 'normal') {
+            valMImplant.textContent = "30%";
+            valMDenture.textContent = "30%";
+            descMImplant.textContent = "일반 건강보험 대상자는 원래 비용 중 30%만 자부담합니다 (1개당 약 36만원 선).";
+            descMDenture.textContent = "틀니 시술 시에도 본인부담 비율은 30%로 감면이 일괄 적용됩니다.";
+          } else if (welfare === 'medical-1') {
+            valMImplant.textContent = "10%";
+            valMDenture.textContent = "5%";
+            descMImplant.textContent = "의료급여 1종 어르신은 10%의 초저부담율로 평생 2개까지 임플란트 식립이 가능합니다.";
+            descMDenture.textContent = "틀니 본인부담율은 5%로 감면되어 의료 재정이 대폭 부담을 분담합니다.";
+          } else if (welfare === 'medical-2' || welfare === 'chasing-manseong') {
+            valMImplant.textContent = "20%";
+            valMDenture.textContent = "15%";
+            descMImplant.textContent = "의료급여 2종 및 희귀난치, 만성질환 차상위 가구 어르신은 본인부담금 20%가 적용됩니다.";
+            descMDenture.textContent = "틀니의 본인부담 비율은 15%가 적용되어 매우 경제적입니다.";
+          }
+        }
+      }
+    }
+
+    // Attach slider change listeners
+    const sliders = document.querySelectorAll('.calc-slider');
+    sliders.forEach(slider => {
+      slider.addEventListener('input', calculateWelfare);
+    });
+
+    // Run initial calculations
+    calculateWelfare();
+  });
+</script>

@@ -1,0 +1,223 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// 카테고리마다 실제 정적 페이지를 만든다.
+// 기존에는 홈의 `/?category=...` 쿼리스트링 필터뿐이라 크롤러에게는
+// 링크만 있고 도착지가 없는 상태였다.
+export async function getStaticPaths() {
+  const allPosts = await getCollection('posts');
+  const categories = [...new Set(allPosts.map((p) => p.data.category))];
+
+  return categories.map((category) => ({
+    params: { category },
+    props: {
+      category,
+      posts: allPosts
+        .filter((p) => p.data.category === category)
+        .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()),
+    },
+  }));
+}
+
+const { category, posts } = Astro.props;
+
+const allPosts = await getCollection('posts');
+const categories = [...new Set(allPosts.map((p) => p.data.category))].sort();
+
+const description = `${category} 관련 정보 ${posts.length}건을 모아 정리했습니다. 자격 요건, 신청 방법, 지원 금액을 항목별로 확인하실 수 있습니다.`;
+---
+
+<BaseLayout title={`${category} 정보 모음`} description={description}>
+  <nav class="breadcrumb" aria-label="breadcrumb">
+    <a href="/">홈</a>
+    <span class="breadcrumb-sep">›</span>
+    <span class="breadcrumb-current">{category}</span>
+  </nav>
+
+  <header class="category-header">
+    <h1>{category}</h1>
+    <p>{description}</p>
+  </header>
+
+  <nav class="category-switch" aria-label="카테고리 목록">
+    {categories.map((c) => (
+      <a href={`/category/${encodeURIComponent(c)}`} class={c === category ? 'chip active' : 'chip'}>{c}</a>
+    ))}
+  </nav>
+
+  <div class="posts-grid">
+    {posts.map((post) => {
+      const formattedDate = new Date(post.data.date).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      return (
+        <article class="post-card">
+          <a href={`/posts/${post.slug}`} class="card-link">
+            <div class="card-content">
+              <span class="card-category">{post.data.category}</span>
+              <h2 class="card-title">{post.data.title}</h2>
+              <p class="card-description">{post.data.description}</p>
+              <div class="card-meta">
+                <time datetime={post.data.date}>{formattedDate}</time>
+                <span class="read-more">자세히 보기 &rarr;</span>
+              </div>
+            </div>
+          </a>
+        </article>
+      );
+    })}
+  </div>
+</BaseLayout>
+
+<style>
+  .breadcrumb {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .breadcrumb-sep {
+    margin: 0 0.5rem;
+  }
+
+  .breadcrumb-current {
+    color: var(--text-secondary);
+  }
+
+  .category-header {
+    margin-bottom: 2rem;
+  }
+
+  .category-header h1 {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    word-break: keep-all;
+  }
+
+  .category-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 46rem;
+    word-break: keep-all;
+  }
+
+  .category-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .chip {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 50px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--transition-smooth);
+  }
+
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+
+  .chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+  }
+
+  .posts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .posts-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .post-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: var(--transition-smooth);
+    box-shadow: var(--card-shadow);
+    display: flex;
+  }
+
+  .post-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--accent);
+  }
+
+  .card-link {
+    width: 100%;
+    color: inherit;
+    display: flex;
+  }
+
+  .card-content {
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .card-category {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    word-break: keep-all;
+  }
+
+  .card-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+    margin-top: auto;
+  }
+
+  .read-more {
+    font-weight: 600;
+    color: var(--accent);
+  }
+</style>
