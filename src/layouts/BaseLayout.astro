@@ -360,6 +360,72 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
         color: #ffffff !important;
       }
 
+      /* 보호자 노트 — 운영자가 실제로 겪은 것만 들어가는 자리.
+         공식 자료를 정리한 본문과 시각적으로 확실히 구분되어야 한다.
+         여기에 들어갈 내용은 docs/caregiver-facts.md 에 확인된 것만 쓴다. */
+      .caregiver-note {
+        display: block;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-left: 4px solid var(--accent);
+        border-radius: 0 var(--radius) var(--radius) 0;
+        padding: 1.5rem 1.75rem;
+        margin: 2.5rem 0;
+      }
+
+      /* 라벨은 작고 굵은 글씨라 4.5:1 이 필요하다.
+         주황 accent 는 배경 대비가 모자라므로 색은 본문색을 쓰고,
+         accent 는 왼쪽 테두리와 앞의 점으로만 남긴다. */
+      .caregiver-note-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        color: var(--text-primary);
+        margin-bottom: 0.85rem;
+      }
+
+      .caregiver-note-label::before {
+        content: "";
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--accent);
+        flex-shrink: 0;
+      }
+
+      .caregiver-note h4 {
+        font-size: 1.1rem;
+        margin: 0 0 0.75rem;
+        color: var(--text-primary);
+        word-break: keep-all;
+      }
+
+      .caregiver-note p {
+        font-size: 0.98rem;
+        line-height: 1.85;
+        color: var(--text-secondary);
+        word-break: keep-all;
+      }
+
+      .caregiver-note p + p {
+        margin-top: 0.85rem;
+      }
+
+      .caregiver-note strong {
+        color: var(--text-primary);
+      }
+
+      .caregiver-note-meta {
+        margin-top: 1rem !important;
+        padding-top: 0.85rem;
+        border-top: 1px solid var(--border-color);
+        font-size: 0.85rem !important;
+        color: var(--text-secondary) !important;
+      }
+
       /* 본문 하단 연관 글 네비게이션 — 라이트/다크 모두에서 읽히도록 테마 토큰만 사용한다 */
       .series-nav-container {
         background: var(--bg-secondary);
