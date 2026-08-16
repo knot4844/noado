@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-REPO="/Users/dyl/Documents/autoadsense-blog"
+REPO="/Users/dyl/antigravity/noado-blog"
 LOG="$REPO/scripts/publish.log"
 STATE="$REPO/scripts/.publish-state"
 

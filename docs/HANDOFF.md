@@ -9,7 +9,7 @@
 
 - **noado.kr** — 한국 노인 복지 정보 블로그. 애드센스 수익화가 목적.
 - Astro 정적 사이트 → **Vercel** 배포. GitHub `knot4844/noado`.
-- 작업 경로: **`~/Documents/autoadsense-blog`**
+- 작업 경로: **`~/antigravity/noado-blog`** (2026-08-17 이전·개명)
 - ⚠️ `~/antigravity/openclaw/apps/autoadsense/` 는 **7월에 버려진 프로토타입**이다.
   배포와 무관하니 건드리지 않는다.
 - 그룹 공통 규칙: `~/antigravity/CLAUDE.md` (오케스트레이터가 관리)
@@ -147,7 +147,10 @@ git push origin main      # 07:00~23:00 사이에만
 
 ### 형 결정 사항 (2026-08-16)
 
-- **저장소 이전: 하지 않는다.** `~/Documents/autoadsense-blog` 유지.
+- ~~저장소 이전: 하지 않는다~~ → **2026-08-17 이전 완료.**
+  형이 처음에는 "옮기지 마"라고 하셨으나, 오케스트레이터와 상의 후 승인하셨다.
+  `~/Documents/autoadsense-blog` → **`~/antigravity/noado-blog`**
+  목적: iCloud 동기화 위험 해소 + antigravity 그룹 편입(공통 규칙 자동 상속).
 - **CLAUDE.md 생성: 완료.** 저장소 루트에 있다.
 
 ### 발행 시간 제한 (전 프로젝트 공통, 2026-08-16)
@@ -211,8 +214,7 @@ npx vercel --prod --yes            # 수동 배포 (자동배포가 안 돌 때�
   Vercel API 로 확인한 결과 Git 연결이 실제로 **없었다**. `vercel git connect` 로
   `knot4844/noado` (main) 에 연결 완료. 이제 `git push` 만으로 자동배포된다.
 - **gh CLI 토큰 만료.** 지금 막는 것은 없다 (git push 는 키체인을 쓴다).
-- **저장소가 iCloud(`~/Documents`) 안에 있다.** 실제로
-  `.git/refs/remotes/origin/main 2` 라는 충돌 중복본이 생겨 `git fetch` 가
-  깨져 있었고 오늘 제거했다. `~/antigravity` 아래로 이전하는 안이 논의 중.
-  **2026-08-16 형 결정: 이전하지 않는다.** iCloud 위험은 남아 있으므로
-  `.git` 손상 징후(`fetch` 실패, ` 2` 접미 파일)가 보이면 즉시 확인할 것.
+- ~~저장소가 iCloud 안에 있다~~ → **2026-08-17 해결.**
+  `~/antigravity/noado-blog` 로 이전해 iCloud 동기화 범위를 벗어났다.
+  (이전 전 실제로 `.git/refs/remotes/origin/main 2` 충돌 중복본이 생겨
+  `git fetch` 가 통째로 깨졌던 이력이 있다. 그것이 이전 사유였다.)

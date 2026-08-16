@@ -87,7 +87,7 @@
 ### 확인 방법
 
 ```bash
-tail -20 ~/Documents/autoadsense-blog/scripts/publish.log
+tail -20 ~/antigravity/noado-blog/scripts/publish.log
 ```
 
 ### 발행량을 늘리자는 이야기가 나오면
