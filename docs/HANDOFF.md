@@ -101,6 +101,11 @@
 `updated` 를 그날 날짜로 찍으면 사이트가 계속 갱신되는 것으로 보인다.
 **날짜 조작이 아니라 실제로 고치는 것이므로 정당하다.**
 
+### 형 결정 사항 (2026-08-16)
+
+- **저장소 이전: 하지 않는다.** `~/Documents/autoadsense-blog` 유지.
+- **CLAUDE.md 생성: 완료.** 저장소 루트에 있다.
+
 ### 재신청 시점
 
 **최소 2~3주 뒤.** 그 사이 실제 발행·개선 흔적이 쌓여야 한다.
@@ -136,17 +141,18 @@ docs/topic-backlog.md        초기 10선 (100선에 흡수됨)
 
 ```bash
 npm run build                      # 빌드 검증
-npx vercel --prod --yes            # 프로덕션 배포 (git push 로는 자동배포 안 될 수 있음)
-git push origin main               # GitHub 반영 (키체인 자격증명 사용)
+git push origin main               # 푸시 → Vercel 자동배포 (2026-08-16 연동 복구됨)
+npx vercel --prod --yes            # 수동 배포 (자동배포가 안 돌 때만)
 ```
 
 ## 알려진 이슈
 
-- **Vercel↔GitHub 자동배포 연동 미확인.** `git push` 만으로 배포가 안 돌았다.
-  저장소 rename(`autoadsense-blog`→`noado`) 영향으로 **추정**되나 확증 못 함.
-  현재는 `vercel --prod` 로 직접 배포 중. 대시보드 Settings→Git 확인 필요.
+- ~~Vercel↔GitHub 자동배포 연동 미확인~~ → **2026-08-16 해결.**
+  Vercel API 로 확인한 결과 Git 연결이 실제로 **없었다**. `vercel git connect` 로
+  `knot4844/noado` (main) 에 연결 완료. 이제 `git push` 만으로 자동배포된다.
 - **gh CLI 토큰 만료.** 지금 막는 것은 없다 (git push 는 키체인을 쓴다).
 - **저장소가 iCloud(`~/Documents`) 안에 있다.** 실제로
   `.git/refs/remotes/origin/main 2` 라는 충돌 중복본이 생겨 `git fetch` 가
   깨져 있었고 오늘 제거했다. `~/antigravity` 아래로 이전하는 안이 논의 중.
-  이전 시 `~/antigravity/.claude/launch.json` 의 절대경로도 함께 수정해야 한다.
+  **2026-08-16 형 결정: 이전하지 않는다.** iCloud 위험은 남아 있으므로
+  `.git` 손상 징후(`fetch` 실패, ` 2` 접미 파일)가 보이면 즉시 확인할 것.
