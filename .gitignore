@@ -22,3 +22,7 @@ yarn-error.log*
 Thumbs.db
 .vercel
 scratch/
+
+# 예약 발행 상태·로그 (로컬 전용)
+scripts/publish.log
+scripts/.publish-state
