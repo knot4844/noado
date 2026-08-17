@@ -49,8 +49,23 @@
 **오전부터 3시간 간격으로 하나씩 올린다.**
 
 ```
-크론   0 9,12,15 * * *   scripts/publish-next.sh
+launchd   ~/Library/LaunchAgents/kr.noado.publish.plist   (09 / 12 / 15시)
 ```
+
+**cron 이 아니라 launchd 를 쓴다.** 2026-08-17 에 cron 으로 걸었다가
+09·12·15시 세 번 모두 실패했다. 원인은 `could not read Username for
+'https://github.com': Device not configured` — **cron 은 GUI 로그인 세션
+밖에서 돌기 때문에 macOS 키체인에 접근하지 못한다.** git push 가 자격증명을
+못 읽는다. LaunchAgent 는 사용자 Aqua 세션 안에서 실행되므로 키체인이 열린다.
+
+**검증할 때는 반드시 `--dry-run` 을 붙인다.**
+
+```bash
+./scripts/publish-next.sh --dry-run    # 커밋만 고르고 푸시 안 함
+```
+
+드라이런 없이 상한 가드를 우회해 테스트하다가 글 한 편이 예정보다 하루
+일찍 실제 발행된 일이 있었다(2026-08-17). 그래서 이 모드를 넣었다.
 
 `scripts/publish-next.sh` 가 대기 중인 **글 커밋을 하나씩** 푸시한다.
 푸시가 곧 배포이므로 푸시 시각이 곧 게시 시각이다.

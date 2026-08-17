@@ -9,8 +9,17 @@
 # 규칙: 23:00~07:00 발행 금지, 하루 3편 상한
 #
 # 자동화는 시끄럽게 실패해야 한다. 실패하면 로그에 남기고 맥 알림을 띄운다.
+#
+# 검증할 때는 반드시 --dry-run 을 붙인다:
+#     ./scripts/publish-next.sh --dry-run
+# 실제 푸시 없이 "어느 커밋을 고르는지"까지만 확인한다.
+# (2026-08-17: 드라이런 없이 상한 가드를 우회해 검증하다가 글 한 편이
+#  예정보다 하루 일찍 실제 발행된 일이 있었다. 그래서 이 모드를 넣었다)
 
 set -uo pipefail
+
+DRY=0
+[ "${1:-}" = "--dry-run" ] && DRY=1
 
 REPO="/Users/dyl/antigravity/noado-blog"
 LOG="$REPO/scripts/publish.log"
@@ -63,6 +72,10 @@ done
 # 글 커밋이 더 없으면 남은 문서 커밋을 한 번에 정리하고 끝낸다
 if [ -z "$TARGET" ]; then
   LAST=$(echo "$PENDING" | tail -1)
+  if [ "$DRY" = "1" ]; then
+    echo "[DRY-RUN] 글 커밋 없음. 문서 커밋 일괄 대상: $(git log -1 --format='%h %s' "$LAST")"
+    exit 0
+  fi
   log "INFO 남은 것은 문서 커밋뿐. 일괄 푸시: $(git log -1 --format='%h %s' "$LAST")"
   git push origin "$LAST:main" >> "$LOG" 2>&1 || fail "문서 커밋 푸시 실패"
   log "OK 문서 커밋 푸시 완료"
@@ -74,6 +87,15 @@ SLUG=$(changed_files "$TARGET" | grep '^src/content/posts/.*\.md$' | head -1 \
         | sed 's|src/content/posts/||;s|\.md$||')
 
 # ── 4. 푸시 ───────────────────────────────────────────────────────
+if [ "$DRY" = "1" ]; then
+  echo "[DRY-RUN] 실제 푸시 안 함"
+  echo "[DRY-RUN] 고른 커밋 : $SUBJECT"
+  echo "[DRY-RUN] 글 슬러그 : $SLUG"
+  echo "[DRY-RUN] 오늘 발행 : ${COUNT}/3편"
+  log "DRY-RUN 검증만 수행 → $SUBJECT"
+  exit 0
+fi
+
 log "PUSH 시작 → $SUBJECT"
 git push origin "$TARGET:main" >> "$LOG" 2>&1 || fail "푸시 실패: $SUBJECT"
 
