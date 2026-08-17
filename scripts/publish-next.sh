@@ -46,18 +46,33 @@ if [ "$HOUR" -lt 7 ] || [ "$HOUR" -ge 23 ]; then
 fi
 
 # ── 2. 하루 3편 상한 ──────────────────────────────────────────────
+# 상한은 애드센스 방어선이다. 사람이 고칠 수 있는 파일 하나에 의존하면 안 된다.
+# 그래서 **git 사실**에서 센다 — 오늘 0시의 origin/main 부터 지금까지
+# 실제로 원격에 올라간 글 커밋 수. 상태 파일은 참고용 보조 지표일 뿐이다.
+# (2026-08-17: 검증하느라 상태 파일을 덮어썼더니 가드가 뚫려 글 한 편이
+#  하루 일찍 발행된 일이 있었다. 그 뒤로 이 방식으로 바꿨다)
+git fetch -q origin 2>/dev/null || log "WARN fetch 실패 — 상한 계산이 부정확할 수 있음"
+
 COUNT=0
-if [ -f "$STATE" ]; then
-  SAVED_DATE=$(cut -d' ' -f1 "$STATE")
-  [ "$SAVED_DATE" = "$TODAY" ] && COUNT=$(cut -d' ' -f2 "$STATE")
+BASE=$(git rev-parse "origin/main@{$TODAY 00:00:00}" 2>/dev/null || echo "")
+if [ -n "$BASE" ]; then
+  for SHA in $(git log "$BASE..origin/main" --format='%H' 2>/dev/null); do
+    changed_files "$SHA" | grep -q '^src/content/posts/.*\.md$' && COUNT=$((COUNT + 1))
+  done
+else
+  # reflog 에 오늘 기준점이 없으면(오늘 첫 실행 등) 상태 파일로 대체한다
+  if [ -f "$STATE" ] && [ "$(cut -d' ' -f1 "$STATE")" = "$TODAY" ]; then
+    COUNT=$(cut -d' ' -f2 "$STATE")
+    log "INFO reflog 기준점 없음 — 상태 파일 기준 ${COUNT}편"
+  fi
 fi
+
 if [ "$COUNT" -ge 3 ]; then
-  log "SKIP 오늘 이미 ${COUNT}편 발행. 하루 3편 상한"
+  log "SKIP 오늘 이미 ${COUNT}편 발행(git 실측). 하루 3편 상한"
   exit 0
 fi
 
 # ── 3. 대기 중인 커밋 확인 ────────────────────────────────────────
-git fetch -q origin 2>/dev/null || log "WARN fetch 실패 — 로컬 기준으로 진행"
 PENDING=$(git log origin/main..main --format='%H' --reverse)
 [ -z "$PENDING" ] && { log "IDLE 대기 중인 커밋 없음"; exit 0; }
 

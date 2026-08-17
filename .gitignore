@@ -26,3 +26,5 @@ scratch/
 # 예약 발행 상태·로그 (로컬 전용)
 scripts/publish.log
 scripts/.publish-state
+scripts/launchd.out.log
+scripts/launchd.err.log
