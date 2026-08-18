@@ -56,8 +56,12 @@ git fetch -q origin 2>/dev/null || log "WARN fetch 실패 — 상한 계산이 �
 COUNT=0
 BASE=$(git rev-parse "origin/main@{$TODAY 00:00:00}" 2>/dev/null || echo "")
 if [ -n "$BASE" ]; then
+  # 커밋 개수가 아니라 **글 파일 개수**를 센다.
+  # 한 커밋에 글이 여러 편 들어 있으면 그만큼 발행된 것이다.
+  # (2026-08-18: 10편이 한 커밋에 묶여 있어 상한이 무력화될 뻔했다)
   for SHA in $(git log "$BASE..origin/main" --format='%H' 2>/dev/null); do
-    changed_files "$SHA" | grep -q '^src/content/posts/.*\.md$' && COUNT=$((COUNT + 1))
+    N=$(changed_files "$SHA" | grep -c '^src/content/posts/.*\.md$')
+    COUNT=$((COUNT + N))
   done
 else
   # reflog 에 오늘 기준점이 없으면(오늘 첫 실행 등) 상태 파일로 대체한다
@@ -97,6 +101,13 @@ if [ -z "$TARGET" ]; then
   exit 0
 fi
 
+# 한 커밋에 글이 여러 편 묶여 있으면 상한을 넘길 수 있다. 남은 여유보다 많으면 멈춘다.
+INCOMING=$(changed_files "$TARGET" | grep -c '^src/content/posts/.*\.md$')
+REMAIN=$((3 - COUNT))
+if [ "$INCOMING" -gt "$REMAIN" ]; then
+  fail "커밋 하나에 글 ${INCOMING}편이 묶여 있어 오늘 남은 ${REMAIN}편을 넘긴다. 커밋을 글 단위로 쪼갠 뒤 다시 시도할 것: $(git log -1 --format='%h %s' "$TARGET")"
+fi
+
 SUBJECT=$(git log -1 --format='%h %s' "$TARGET")
 SLUG=$(changed_files "$TARGET" | grep '^src/content/posts/.*\.md$' | head -1 \
         | sed 's|src/content/posts/||;s|\.md$||')
@@ -114,8 +125,9 @@ fi
 log "PUSH 시작 → $SUBJECT"
 git push origin "$TARGET:main" >> "$LOG" 2>&1 || fail "푸시 실패: $SUBJECT"
 
-echo "$TODAY $((COUNT + 1))" > "$STATE"
-log "OK 푸시 완료 (오늘 $((COUNT + 1))/3편) → $SUBJECT"
+PUSHED=$(changed_files "$TARGET" | grep -c '^src/content/posts/.*\.md$')
+echo "$TODAY $((COUNT + PUSHED))" > "$STATE"
+log "OK 푸시 완료 (오늘 $((COUNT + PUSHED))/3편, 이번 ${PUSHED}편) → $SUBJECT"
 
 # ── 5. 라이브 검증 — 조용히 성공한 척하지 않는다 ──────────────────
 [ -z "$SLUG" ] && { log "WARN 슬러그를 못 찾아 라이브 검증 생략"; exit 0; }
