@@ -125,7 +125,7 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
   .badge {
     display: inline-block;
     background-color: var(--accent-glow);
-    color: #60a5fa;
+    color: var(--accent-text);
     font-weight: 600;
     font-size: 0.85rem;
     padding: 0.3rem 1rem;
@@ -203,10 +203,11 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
   }
 
   .filter-btn:hover, .filter-btn.active {
-    background-color: var(--accent);
+    /* 흰 글자를 얹으므로 진한 쪽을 쓴다 (--accent 위의 흰 글자는 2.31:1) */
+    background-color: var(--accent-strong);
     color: #ffffff;
-    border-color: var(--accent);
-    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    border-color: var(--accent-strong);
+    box-shadow: 0 4px 10px rgba(179, 71, 0, 0.25);
   }
 
   /* Grid Layout */
@@ -287,7 +288,7 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
 
   .card-category {
     font-size: 0.75rem;
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -332,7 +333,7 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
 
   .read-more {
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
     transition: var(--transition-smooth);
   }
 
@@ -393,7 +394,7 @@ const categories = [...new Set(allPosts.map(post => post.data.category))];
   .policy-link {
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
     transition: var(--transition-smooth);
   }
 

@@ -130,8 +130,9 @@ const description = `${category} 관련 정보 ${posts.length}건을 모아 정�
   }
 
   .chip.active {
-    background: var(--accent);
-    border-color: var(--accent);
+    /* 흰 글자를 얹으므로 진한 쪽을 쓴다 */
+    background: var(--accent-strong);
+    border-color: var(--accent-strong);
     color: #ffffff;
   }
 
@@ -178,7 +179,7 @@ const description = `${category} 관련 정보 ${posts.length}건을 모아 정�
 
   .card-category {
     font-size: 0.75rem;
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 700;
     letter-spacing: 0.5px;
     margin-bottom: 0.75rem;
@@ -218,6 +219,6 @@ const description = `${category} 관련 정보 ${posts.length}건을 모아 정�
 
   .read-more {
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 </style>

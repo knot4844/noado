@@ -460,12 +460,12 @@ const faqSchema = faqs.length > 0 ? {
     transition: color 0.2s;
   }
 
-  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb a:hover { color: var(--accent-text); }
 
   .breadcrumb-sep { color: var(--text-muted); }
 
   .breadcrumb-category {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 600;
   }
 
@@ -493,14 +493,11 @@ const faqSchema = faqs.length > 0 ? {
 
   .post-category {
     background-color: var(--accent-glow);
-    color: #60a5fa;
+    /* 이전 테마의 파란색(#60a5fa)이 남아 있었다. 다크에서 3.15:1 로 미달이었다 */
+    color: var(--accent-text);
     padding: 0.2rem 0.75rem;
     border-radius: 50px;
     font-weight: 600;
-  }
-
-  :root.light-mode .post-category {
-    color: var(--accent);
   }
 
   .post-title {
@@ -554,7 +551,7 @@ const faqSchema = faqs.length > 0 ? {
 
   .post-content :global(strong) {
     font-weight: 800;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   :root.dark-mode .post-content :global(strong) {
@@ -655,7 +652,7 @@ const faqSchema = faqs.length > 0 ? {
     text-decoration: underline;
   }
 
-  :root.light-mode .toc-item a:hover { color: var(--accent); }
+  :root.light-mode .toc-item a:hover { color: var(--accent-text); }
 
   /* Share Section */
   .share-section {
@@ -760,7 +757,7 @@ const faqSchema = faqs.length > 0 ? {
 
   .related-category {
     font-size: 0.75rem;
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -927,7 +924,7 @@ const faqSchema = faqs.length > 0 ? {
   .author-lbl {
     display: block;
     font-size: 0.8rem;
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -935,7 +932,7 @@ const faqSchema = faqs.length > 0 ? {
   }
 
   :root.light-mode .author-lbl {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .author-name {
@@ -977,7 +974,7 @@ const faqSchema = faqs.length > 0 ? {
   }
 
   .author-meta-item a {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 600;
   }
 

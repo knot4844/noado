@@ -81,9 +81,16 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
         
         --text-primary: #2B2B2B;        /* 눈부심 없는 진한 차콜 폰트 */
         --text-secondary: #5A5650;      /* 가독성 서브 색상 */
-        --text-muted: #8A857D;
+        --text-muted: #6E6A63;          /* 종전 #8A857D 는 흰 배경 3.66:1 로 미달 → 5.38:1 */
         
-        --accent: #FF8C42;              /* 시그니처 주황색 */
+        --accent: #FF8C42;              /* 시그니처 주황색 — 배경·테두리·장식용 */
+        /* ★글자에 쓰는 강조색은 따로 둔다.★ #FF8C42 는 흰 배경에서 2.31:1 로
+           WCAG AA(4.5:1)에 한참 못 미친다. 주 독자가 어르신이라 더 문제다.
+           아래 값은 흰 배경 5.50:1 / 모래색(#F5F2EB) 배경 4.92:1 로 실측했다. */
+        --accent-text: #B34700;
+        /* 흰 글자를 얹는 배경용. #FF8C42 위의 흰 글자는 2.31:1 이라 못 쓴다.
+           #B34700 위의 흰 글자는 5.50:1. 라이트·다크 같은 값을 쓴다 */
+        --accent-strong: #B34700;
         --accent-glow: rgba(255, 140, 66, 0.15);
         --accent-gradient: linear-gradient(135deg, #FF8C42 0%, #E06A1F 100%);
         --accent-success: #2E8B57;
@@ -103,9 +110,11 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
         
         --text-primary: #E5E5EA;        /* 밝은 회색 글자 (고대비) */
         --text-secondary: #AEAEB2;
-        --text-muted: #8E8E93;
+        --text-muted: #9A9AA0;          /* 종전 #8E8E93 는 카드 배경에서 4.27:1 로 미달 → 4.98:1 */
         
         --accent: #FF8C42;
+        --accent-text: #FFB380;         /* 어두운 배경 6.49:1 */
+        --accent-strong: #B34700;       /* 흰 글자용 배경 — 라이트와 같은 값 */
         --accent-glow: rgba(255, 140, 66, 0.3);
         --accent-gradient: linear-gradient(135deg, #FF8C42 0%, #FFB380 100%);
         
@@ -131,7 +140,7 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
       }
 
       a {
-        color: var(--accent);
+        color: var(--accent-text);
         text-decoration: none;
         transition: var(--transition-smooth);
       }
@@ -346,7 +355,7 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
         align-items: center;
         justify-content: center;
         background: transparent;
-        color: var(--accent) !important;
+        color: var(--accent-text) !important;
         font-weight: 600;
         font-size: 1.05rem;
         padding: 0.75rem 1.25rem;
@@ -466,7 +475,7 @@ const googleVerification = import.meta.env.PUBLIC_GOOGLE_VERIFICATION || "";
 
       .series-nav-container li a:hover {
         border-color: var(--accent);
-        color: var(--accent);
+        color: var(--accent-text);
       }
     </style>
 
