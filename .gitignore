@@ -28,3 +28,6 @@ scripts/publish.log
 scripts/.publish-state
 scripts/launchd.out.log
 scripts/launchd.err.log
+# 발행 실패 표식·안내 — 스크립트가 덮어쓴다. 사람이 쓰지 마라 (그룹 규칙 6)
+scripts/.publish-alert
+scripts/PUBLISH-ALERT.md
